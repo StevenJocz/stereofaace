@@ -55,9 +55,9 @@
 **Files:** Create `src/modules/schedule/schema.ts`, `drizzle/0005_schedule.sql`, `src/modules/schedule/service.ts`; Modify `src/db/schema.ts`, `drizzle/meta/*`; Test `tests/schedule-service.test.ts`.
 
 **Interfaces — Produces:**
-- `radioPrograms`: `id uuid pk`, `slug text unique`, `name text`, `description text null`, `hosts text null`, `photoId uuid null → media`, `color text` (`#rrggbb`, por defecto `#c6ff00`), `active boolean default true`, `createdAt`, `updatedAt`, `deletedAt null`.
+- `radioPrograms`: `id uuid pk`, `slug text unique`, `name text`, `description text null` (breve, máx. 300), `hosts text null` (nombres que se muestran al público), `djUsername text null` (usuario del DJ de AzuraCast que conduce el programa, p. ej. `dj1`; nunca se expone en la API pública), `photoId uuid null → media`, `color text` (`#rrggbb`, por defecto `#c6ff00`), `active boolean default true`, `createdAt`, `updatedAt`, `deletedAt null`.
 - `radioSchedule`: `id uuid pk`, `programId uuid → radioPrograms (cascade)`, `kind text`, `weekday int null`, `date date null`, `startTime text`, `endTime text`, `createdAt`.
-- Servicio: `listProgramsAdmin(db, actor)`, `saveProgram(db, actor, input: { id?: string; name: string; description?: string; hosts?: string; photoId?: string; color?: string; active?: boolean }): Promise<{ id: string; slug: string }>` (slug único con `uniqueSlug`), `deleteProgram(db, actor, id)` (lógico), `listSlotsAdmin(db, actor)`, `addSlot(db, actor, input: { programId: string; kind: "weekly" | "once"; weekday?: number; date?: string; start: string; end: string })`, `removeSlot(db, actor, id)`.
+- Servicio: `listProgramsAdmin(db, actor)`, `saveProgram(db, actor, input: { id?: string; name: string; description?: string; hosts?: string; djUsername?: string (regex `^[a-z0-9_.-]{2,50}$`); photoId?: string; color?: string; active?: boolean }): Promise<{ id: string; slug: string }>` (slug único con `uniqueSlug`), `deleteProgram(db, actor, id)` (lógico), `listSlotsAdmin(db, actor)`, `addSlot(db, actor, input: { programId: string; kind: "weekly" | "once"; weekday?: number; date?: string; start: string; end: string })`, `removeSlot(db, actor, id)`.
 - Validación: `HH:MM` 00:00–23:59; `weekly` exige `weekday` 0–6 y prohíbe `date`; `once` exige `date` y prohíbe `weekday`; `start !== end`.
 
 - [ ] **Step 1: Pruebas** — crear programa genera slug único (`mi-programa`, `mi-programa-2`); redactor no puede (403); `addSlot` rechaza `25:00`, `weekly` sin weekday y `once` con weekday; borrar programa lo oculta de la lista pública y borra sus tramos de la lista; `saveProgram` con `photoId` inexistente → `DomainError`; auditoría registra `schedule.program.save` sin datos sensibles.
@@ -92,11 +92,14 @@
 - [ ] **Step 7:** Verificación en el navegador con datos de prueba (programa con imagen, tramos de hoy): la barra muestra el programa actual, el clic abre el modal, las tres vistas cargan, Escape cierra, una emisora distinta no muestra programa, y sin programación el modal muestra el estado vacío.
 - [ ] **Step 8: Commit** `feat(schedule): programa en el reproductor y modal de programación`.
 
-### Task 5: Integración con el estudio
+### Task 5: Integración con el estudio (el DJ ya tiene su programa)
 
-**Files:** Modify `src/ui/studio/LiveBar.tsx`, `src/ui/studio/StudioConsole.tsx`.
+**Files:** Create `src/modules/schedule/dj.ts`, `src/app/api/studio/my-program/route.ts`; Modify `src/ui/studio/LiveBar.tsx`, `src/ui/studio/StudioConsole.tsx`; Test `tests/schedule-dj.test.ts`.
 
-- [ ] **Step 1:** La consola muestra «Programa ahora: <nombre> (hasta HH:MM)» y «Siguiente: <nombre> a las HH:MM» consultando `/api/radio/now` (mismo origen) cada 60 s, y los envía como parte del metadato de emisión cuando el DJ está EN VIVO (`artist` = nombre del programa si el DJ no ha escrito otro). Si no hay programa, no muestra nada.
+**Interfaces — Produces:** `getProgramForDj(db, actor, djUsername: string, now?: Date): Promise<{ scheduled: { program: StudioProgram; startsAt: string; endsAt: string } | null; next: { program: StudioProgram; startsAt: string } | null; others: StudioProgram[] }>` donde `StudioProgram = { id: string; name: string; description: string | null; imageUrl: string | null; hosts: string | null }`. `scheduled` es el programa de ese DJ cuya ocurrencia cubre «ahora» (o empieza en ≤ 15 min); `next` es su próxima ocurrencia; `others` son los demás programas activos (para emitir «fuera de horario»). Requiere `station:update`. Ruta `GET /api/studio/my-program?dj=<usuario>` (`await connection()`).
+
+- [ ] **Step 0: Pruebas que fallan** — con `dj1` y un programa `djUsername: "dj1"` con tramo que cubre ahora: `scheduled` es ese programa; 10 minutos antes de empezar también lo es (ventana de 15 min); fuera de horario `scheduled` es `null` y `next` trae la próxima ocurrencia de `dj1`; el programa de otro DJ no aparece como `scheduled` de `dj1` pero sí en `others`; un `dj` con caracteres no válidos (`../`) → error de dominio; sin permiso 403; la API pública `/api/radio/now` no incluye `djUsername`.
+- [ ] **Step 1:** Al escribir el usuario del DJ en la consola y conectarse, esta consulta carga su programa: la barra EN VIVO muestra «Tu programa: <nombre> · imagen · hasta HH:MM» (o «Tu próximo programa: … a las HH:MM» si aún no es la hora, o «Emitir como…» con un selector de `others` para emisiones fuera de horario). El programa elegido se envía como metadato en vivo (`title` = pista, `artist` = nombre del programa si la pista no trae artista) y en el historial. Si no hay programa, no se muestra nada y se emite como siempre.
 - [ ] **Step 2:** Verificación en navegador y `tsc`/`eslint`/`vitest` en verde.
 - [ ] **Step 3: Commit** `feat(studio): programa actual y siguiente en la consola`.
 
