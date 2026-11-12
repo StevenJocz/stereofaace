@@ -20,8 +20,8 @@ export function RelaySettingsForm({ initial }: { initial: { name: string; url: s
       <label className="flex items-start gap-2">
         <input type="checkbox" name="relayAutodj" className="mt-1" defaultChecked={state?.values ? state.values.relayAutodj === "on" : initial.autodj} />
         <span>
-          Sonar en el AutoDJ mientras no haya música ni transmisión en vivo
-          <span className="mono muted block">Crea o actualiza una lista «URL remota» en AzuraCast y pausa las listas de música normales para que suene solo la señal (los jingles siguen). Al desmarcarla, la música vuelve a sonar. Requiere la clave API de arriba.</span>
+          Usar la señal como AutoDJ (suena en lugar de la música de la biblioteca)
+          <span className="mono muted block">Mientras esté marcada suena solo la señal, y las listas de música normales quedan pausadas (los jingles siguen). Cuando tengas suficiente música, desmárcala y guarda: las listas se vuelven a encender. Si hay una transmisión en vivo, el DJ manda. Requiere la clave API de arriba.</span>
         </span>
       </label>
       <div className="flex flex-wrap items-center gap-3">
