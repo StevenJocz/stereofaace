@@ -1,3 +1,4 @@
+import { LoadGate } from "./autoplay";
 import { equalPowerGains } from "./crossfade";
 import { peakToDb, rmsToDb } from "./meter";
 import type { QueueItem } from "./queue";
@@ -20,6 +21,14 @@ export type Levels = { master: { rmsDb: number; peakDb: number }; A: number; B: 
 
 const CURVE_POINTS = 64;
 
+/** Una carga fue reemplazada por otra más reciente en el mismo deck; no es un error para el usuario. */
+export class LoadSupersededError extends Error {
+  constructor() {
+    super("Carga reemplazada por otra más reciente.");
+    this.name = "LoadSupersededError";
+  }
+}
+
 /**
  * Grafo de audio del estudio (solo navegador):
  * deck → volumen → fundido → analizador → bus → limitador → master → [analizador | destino de emisión | monitor].
@@ -27,6 +36,7 @@ const CURVE_POINTS = 64;
 export class AudioEngine {
   readonly ctx: AudioContext;
   private decks: Record<DeckId, Deck>;
+  private gates: Record<DeckId, LoadGate> = { A: new LoadGate(), B: new LoadGate() };
   private mix: GainNode;
   private limiter: DynamicsCompressorNode;
   private master: GainNode;
@@ -110,14 +120,23 @@ export class AudioEngine {
 
   async loadDeck(id: DeckId, item: QueueItem): Promise<{ durationSec: number | null }> {
     const d = this.decks[id];
+    const token = this.gates[id].next();
     this.release(d);
     const el = new Audio();
     el.crossOrigin = "anonymous";
     el.preload = "auto";
+    let objectUrl: string | null = null;
+    // Libera el elemento local de ESTA carga (no el del deck): detiene la descarga y revoca su URL.
+    const dispose = () => {
+      el.pause();
+      el.removeAttribute("src");
+      el.load();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
     let src: string;
     if (item.file) {
-      d.objectUrl = URL.createObjectURL(item.file);
-      src = d.objectUrl;
+      objectUrl = URL.createObjectURL(item.file);
+      src = objectUrl;
     } else if (item.url) {
       src = item.url;
     } else {
@@ -143,16 +162,26 @@ export class AudioEngine {
         { once: true },
       );
     }).catch((e) => {
-      this.release(d);
+      dispose();
       throw e;
     });
+    if (!this.gates[id].isCurrent(token)) {
+      dispose();
+      throw new LoadSupersededError();
+    }
     d.el = el;
+    d.objectUrl = objectUrl;
     d.item = item;
     d.source = this.ctx.createMediaElementSource(el);
     d.source.connect(d.volume);
     el.addEventListener("ended", () => this.onDeckEnded?.(id));
     el.addEventListener("timeupdate", () => this.onDeckTime?.(id, el.currentTime, Number.isFinite(el.duration) ? el.duration : 0));
     return { durationSec: duration };
+  }
+
+  isPlaying(id: DeckId): boolean {
+    const el = this.decks[id].el;
+    return !!el && !el.paused && !el.ended;
   }
 
   async play(id: DeckId): Promise<void> {
@@ -191,6 +220,9 @@ export class AudioEngine {
   /** Fundido de potencia constante desde el otro deck hacia `to`, calculado sobre el reloj de audio. */
   async crossfadeTo(to: DeckId, fadeSec: number): Promise<void> {
     const from = other(to);
+    // Primero se confirma que la pista entrante suena; si play() falla, la saliente no se toca.
+    await this.play(to);
+    const outgoing = this.decks[from].el;
     const now = this.ctx.currentTime;
     const outCurve = new Float32Array(CURVE_POINTS);
     const inCurve = new Float32Array(CURVE_POINTS);
@@ -206,10 +238,10 @@ export class AudioEngine {
     t.setValueAtTime(0, now);
     f.setValueCurveAtTime(outCurve, now, fadeSec);
     t.setValueCurveAtTime(inCurve, now, fadeSec);
-    await this.play(to);
     const timer = setTimeout(() => {
       this.fadeTimers.delete(timer);
-      this.stopDeck(from);
+      // Si el deck saliente recibió otra pista mientras tanto, no se detiene la nueva.
+      if (this.decks[from].el === outgoing) this.stopDeck(from);
       f.cancelScheduledValues(this.ctx.currentTime);
       f.setValueAtTime(0, this.ctx.currentTime);
       t.setValueAtTime(1, this.ctx.currentTime);

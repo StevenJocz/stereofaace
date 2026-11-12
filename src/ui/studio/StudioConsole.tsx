@@ -5,9 +5,9 @@ import { DeckPanel, type DeckView } from "./DeckPanel";
 import { LibraryPanel } from "./LibraryPanel";
 import { LiveBar } from "./LiveBar";
 import { QueuePanel } from "./QueuePanel";
-import { AudioEngine, type DeckId } from "./engine/audio-engine";
+import { AudioEngine, LoadSupersededError, type DeckId } from "./engine/audio-engine";
 import { makeItems } from "./engine/audio-files";
-import { planCrossfade } from "./engine/crossfade";
+import { pickNext, shouldAdvanceOnEnd, shouldStartFade } from "./engine/autoplay";
 import { queueReducer, type QueueItem } from "./engine/queue";
 import { WEBCAST_MIME, WEBCAST_URL, WebcastSender, type LiveState, type RecorderLike, type SocketLike } from "./engine/webcast";
 
@@ -59,6 +59,8 @@ export function StudioConsole() {
   const autoRef = useRef(auto);
   const fadingRef = useRef(false);
   const startingRef = useRef(false);
+  // Un deck «cedió el aire» cuando ya empezó el fundido hacia el otro: no debe volver a disparar nada.
+  const handedOffRef = useRef<Record<DeckId, boolean>>({ A: false, B: false });
   const liveSinceRef = useRef<number | null>(null);
   useEffect(() => {
     queueRef.current = queue;
@@ -70,32 +72,75 @@ export function StudioConsole() {
     if (engineRef.current) return engineRef.current;
     const e = new AudioEngine();
     e.setMasterVolume(0.9);
+    const markActive = (id: DeckId) => {
+      activeRef.current = id; // síncrono: el siguiente timeupdate ya debe ver el deck nuevo
+      setActive(id);
+    };
+    const flow = (id: DeckId) => ({
+      deckId: id,
+      activeId: activeRef.current,
+      handedOff: handedOffRef.current[id],
+      fading: fadingRef.current,
+      auto: autoRef.current,
+    });
+    /** Pasa al siguiente: con fundido (pista que llega a su ventana final) o en seco (pista que ya terminó). */
+    const startNext = async (from: DeckId, mode: "fade" | "cut") => {
+      const to = other(from);
+      const pick = pickNext({
+        queue: queueRef.current,
+        otherDeckItem: e.deckItem(to),
+        otherDeckPlaying: e.isPlaying(to),
+        otherDeckConsumed: handedOffRef.current[to],
+      });
+      if (!pick) return;
+      fadingRef.current = true;
+      handedOffRef.current[from] = true; // antes de cualquier await: bloquea disparos repetidos
+      try {
+        let item: QueueItem;
+        if (pick.source === "queue") {
+          item = pick.item;
+          const { durationSec } = await e.loadDeck(to, item);
+          dispatch({ type: "remove", id: item.id }); // solo tras cargar bien: si falla, la pista sigue en la cola
+          setDecks((d) => ({ ...d, [to]: { ...d[to], item, durationSec, currentSec: 0, playing: false } }));
+        } else {
+          item = e.deckItem(to) as QueueItem;
+        }
+        handedOffRef.current[to] = false;
+        if (mode === "fade") {
+          await e.crossfadeTo(to, FADE_SEC);
+        } else {
+          e.cut(to);
+          await e.play(to);
+        }
+        setDecks((d) => ({ ...d, [to]: { ...d[to], playing: true } }));
+        markActive(to);
+        senderRef.current?.setMetadata({ title: item.title, artist: item.artist });
+      } catch (err) {
+        if (mode === "fade") handedOffRef.current[from] = false; // la saliente sigue siendo la dueña del aire
+        if (!(err instanceof LoadSupersededError)) {
+          setMessage(err instanceof Error ? err.message : "No se pudo pasar a la siguiente pista.");
+        }
+      } finally {
+        fadingRef.current = false;
+      }
+    };
     e.onDeckEnded = (id) => {
       setDecks((d) => ({ ...d, [id]: { ...d[id], playing: false } }));
+      const to = other(id);
+      const hasNext =
+        pickNext({
+          queue: queueRef.current,
+          otherDeckItem: e.deckItem(to),
+          otherDeckPlaying: e.isPlaying(to),
+          otherDeckConsumed: handedOffRef.current[to],
+        }) !== null;
+      const advance = shouldAdvanceOnEnd({ ...flow(id), hasNext });
+      handedOffRef.current[id] = true; // lo que terminó ya no cuenta como precarga
+      if (advance) void startNext(id, "cut");
     };
     e.onDeckTime = (id, current, duration) => {
       setDecks((d) => ({ ...d, [id]: { ...d[id], currentSec: current } }));
-      if (id !== activeRef.current || fadingRef.current || !autoRef.current) return;
-      const plan = planCrossfade({ durationSec: duration, fadeSec: FADE_SEC });
-      if (!plan || current < plan.startAtSec) return;
-      const next = queueRef.current[0];
-      if (!next) return;
-      fadingRef.current = true;
-      void (async () => {
-        try {
-          const to = other(id);
-          dispatch({ type: "remove", id: next.id });
-          const { durationSec } = await e.loadDeck(to, next);
-          setDecks((d) => ({ ...d, [to]: { ...d[to], item: next, durationSec, currentSec: 0, playing: true } }));
-          await e.crossfadeTo(to, plan.fadeSec);
-          setActive(to);
-          senderRef.current?.setMetadata({ title: next.title, artist: next.artist });
-        } catch (err) {
-          setMessage(err instanceof Error ? err.message : "No se pudo pasar a la siguiente pista.");
-        } finally {
-          fadingRef.current = false;
-        }
-      })();
+      if (shouldStartFade({ ...flow(id), current, duration, fadeSec: FADE_SEC })) void startNext(id, "fade");
     };
     engineRef.current = e;
     return e;
@@ -169,17 +214,20 @@ export function StudioConsole() {
         const e = getEngine();
         await e.resume();
         const { durationSec } = await e.loadDeck(id, item);
+        handedOffRef.current[id] = false;
         dispatch({ type: "remove", id: item.id });
         setDecks((d) => ({ ...d, [id]: { ...d[id], item, durationSec, currentSec: 0, playing: false } }));
-        if (!decks[other(id)].playing) {
+        if (!durationSec) setMessage(`No se pudo leer la duración de «${item.title}»: no habrá fundido automático al terminar.`);
+        if (!e.isPlaying(other(id))) {
           e.cut(id);
+          activeRef.current = id;
           setActive(id);
         }
       } catch (err) {
-        setMessage(err instanceof Error ? err.message : "No se pudo cargar la pista.");
+        if (!(err instanceof LoadSupersededError)) setMessage(err instanceof Error ? err.message : "No se pudo cargar la pista.");
       }
     },
-    [decks, getEngine],
+    [getEngine],
   );
 
   const play = useCallback(
@@ -189,17 +237,19 @@ export function StudioConsole() {
         await e.resume();
         await e.play(id);
         setDecks((d) => ({ ...d, [id]: { ...d[id], playing: true } }));
-        if (!decks[other(id)].playing) {
+        if (!e.isPlaying(other(id))) {
           e.cut(id);
+          handedOffRef.current[id] = false;
+          activeRef.current = id;
           setActive(id);
         }
-        const item = decks[id].item;
+        const item = e.deckItem(id);
         if (item) senderRef.current?.setMetadata({ title: item.title, artist: item.artist });
       } catch (err) {
         setMessage(err instanceof Error ? err.message : "No se pudo reproducir.");
       }
     },
-    [decks, getEngine],
+    [getEngine],
   );
 
   const pause = useCallback(
@@ -245,7 +295,7 @@ export function StudioConsole() {
         },
       });
       senderRef.current = sender;
-      const item = decks[activeRef.current].item;
+      const item = e.deckItem(activeRef.current);
       if (item) sender.setMetadata({ title: item.title, artist: item.artist });
       sender.start();
     } catch (err) {
@@ -254,7 +304,7 @@ export function StudioConsole() {
     } finally {
       startingRef.current = false;
     }
-  }, [live, creds, decks, getEngine]);
+  }, [live, creds, getEngine]);
 
   // Atajo: espacio = play/pausa del deck activo (fuera de campos de texto).
   useEffect(() => {

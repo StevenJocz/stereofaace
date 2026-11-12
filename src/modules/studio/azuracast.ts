@@ -41,7 +41,8 @@ export class AzuraClient {
   }
 
   private async request(path: string, extra: Record<string, string> = {}): Promise<Response> {
-    const res = await this.fetchImpl(this.url(path), { headers: { "X-API-Key": this.cfg.apiKey, ...extra } });
+    // redirect: "error" — la clave nunca debe viajar a otro host si AzuraCast redirige.
+    const res = await this.fetchImpl(this.url(path), { headers: { "X-API-Key": this.cfg.apiKey, ...extra }, redirect: "error" });
     if (res.status === 401 || res.status === 403) {
       throw new DomainError("azuracast_auth", "Clave API no válida o sin permisos en AzuraCast.");
     }

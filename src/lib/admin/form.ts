@@ -55,3 +55,10 @@ export async function guard(fd: FormData, label: string, work: () => Promise<str
     return { message: "No se pudo completar la acción. Inténtalo de nuevo.", values: snapshot(fd), nonce };
   }
 }
+
+/** Quita campos secretos (contraseñas, claves) de los valores que se devuelven al navegador tras un error. */
+export function withoutValues(state: FormState, keys: string[]): FormState {
+  if (!state?.values) return state;
+  const values = Object.fromEntries(Object.entries(state.values).filter(([k]) => !keys.includes(k)));
+  return { ...state, values };
+}

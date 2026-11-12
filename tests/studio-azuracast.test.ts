@@ -50,6 +50,12 @@ describe("AzuraClient", () => {
     expect(r.files).toEqual([{ id: "7", path: "carpeta/Tema A.mp3", title: "Tema A", artist: "Artista", durationSec: 180.5 }]);
   });
 
+  it("no sigue redirecciones: la clave no debe viajar a otro host", async () => {
+    const { impl, calls } = fakeFetch({ "/playlists": [] });
+    await new AzuraClient(cfg, impl).listPlaylists();
+    expect(calls[0].init?.redirect).toBe("error");
+  });
+
   it("una duración 0 o ausente queda como null", async () => {
     const { impl } = fakeFetch({
       "/files/list": [{ path: "a.mp3", text: "a.mp3", type: "media", media: { ...media(1, "A"), length: 0 } }],
