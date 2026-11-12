@@ -258,13 +258,13 @@ export function RadioBar() {
                   <span className="mono flex items-center gap-2 text-[0.6rem] text-accent-ink">
                     <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-accent live-dot" />
                     Al aire · hasta {new Date(program.endsAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota", hour12: false })}
+                    <span aria-hidden="true" className="hidden opacity-70 lg:inline">· ver programación ›</span>
                   </span>
                   <span className="block truncate font-bold leading-tight">{program.program.name}</span>
                   <span className="mono block truncate text-[0.66rem] text-muted">
                     {s.name}
                     {program.program.hosts ? ` · Con ${program.program.hosts}` : ""}
                   </span>
-                  <span className="mono hidden text-[0.62rem] text-accent-ink underline underline-offset-2 lg:inline">Ver programación</span>
                 </span>
               </button>
             ) : (
@@ -324,7 +324,9 @@ export function RadioBar() {
 
             <div className="min-w-0 flex-1 lg:flex-none">
               <div className="flex flex-wrap items-center gap-2">
-                <StatusPill status={r.status} attempt={r.attempt} max={r.maxAttempts} />
+                {!(own && tracks?.nowPlaying && ["idle", "paused", "playing"].includes(r.status)) && (
+                  <StatusPill status={r.status} attempt={r.attempt} max={r.maxAttempts} />
+                )}
                 {r.status === "error" && (
                   <button type="button" onClick={r.retry} className="mono text-accent-ink underline">
                     Reintentar

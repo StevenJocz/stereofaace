@@ -2113,3 +2113,51 @@ body[data-radio="on"] .adm-shell {
 .cart-progress-inline > span {
   background: var(--accent);
 }
+
+/* Barra de la radio: tarjeta «suena ahora» */
+.np-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.4rem 0.9rem 0.4rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+}
+.np-cover {
+  position: relative;
+  display: grid;
+  width: 3.4rem;
+  height: 3.4rem;
+  flex-shrink: 0;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.np-bars {
+  display: inline-flex;
+  height: 0.7rem;
+  align-items: flex-end;
+  gap: 2px;
+}
+.np-bars i {
+  display: block;
+  width: 2px;
+  background: var(--accent);
+  animation: np-bar 1s ease-in-out infinite;
+}
+.np-bars i:nth-child(2) {
+  animation-delay: 0.25s;
+}
+.np-bars i:nth-child(3) {
+  animation-delay: 0.5s;
+}
+@keyframes np-bar {
+  0%, 100% { height: 25%; }
+  50% { height: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .np-bars i { animation: none; height: 60%; }
+}
