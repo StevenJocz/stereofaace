@@ -2161,3 +2161,27 @@ body[data-radio="on"] .adm-shell {
 @media (prefers-reduced-motion: reduce) {
   .np-bars i { animation: none; height: 60%; }
 }
+
+/* Barra «EN VIVO» del panel */
+.onair-bar {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  padding: 0.55rem var(--gutter);
+  border-bottom: 1px solid color-mix(in srgb, #ff4d4d 55%, transparent);
+  background: color-mix(in srgb, #2a0d0d 92%, var(--bg));
+  font-size: 0.85rem;
+}
+.onair-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.25);
+  animation: studio-pulse 1s ease-in-out infinite;
+}

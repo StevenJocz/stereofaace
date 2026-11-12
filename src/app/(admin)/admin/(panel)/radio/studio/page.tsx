@@ -1,10 +1,7 @@
 import { requirePermission } from "@/lib/auth/session";
-import { getDb } from "@/lib/db";
-import { getRelayPublic } from "@/modules/studio/relay";
-import { StudioConsole } from "@/ui/studio/StudioConsole";
 
+/** La consola vive en el layout del panel (PersistentStudio) para que la transmisión siga al navegar; aquí solo se exige el permiso. */
 export default async function StudioPage() {
-  const user = await requirePermission("station:update");
-  const relay = await getRelayPublic(await getDb(), user);
-  return <StudioConsole relay={relay} />;
+  await requirePermission("station:update");
+  return null;
 }

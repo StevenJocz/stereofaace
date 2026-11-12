@@ -1,5 +1,6 @@
 "use client";
 
+import { AirClock } from "./AirClock";
 import { formatTime } from "./MeterBar";
 import { PollMeter } from "./PollMeter";
 import type { DjProgramInfo } from "@/modules/schedule/dj";
@@ -24,6 +25,7 @@ export function LiveBar({
   onPassword,
   onToggle,
   elapsedSec,
+  endsAt,
   readMaster,
   masterVolume,
   onMasterVolume,
@@ -41,6 +43,7 @@ export function LiveBar({
   onPassword: (v: string) => void;
   onToggle: () => void;
   elapsedSec: number;
+  endsAt: number | null;
   readMaster: () => number;
   masterVolume: number;
   onMasterVolume: (v: number) => void;
@@ -82,6 +85,7 @@ export function LiveBar({
           <span className="studio-dot" data-state={state} aria-hidden="true" />
           {LABEL[state]}
           {state === "live" && <span className="mono muted"> · {formatTime(elapsedSec)}</span>}
+          {on && endsAt !== null && <AirClock endsAt={endsAt} className="ml-2 block text-[0.78rem]" />}
         </p>
         <div className="ml-auto flex min-w-[16rem] flex-1 items-center gap-4 sm:max-w-[34rem]">
           <div className="flex-1">

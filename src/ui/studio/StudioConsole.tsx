@@ -10,6 +10,7 @@ import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
 import type { RelayTrack } from "@/modules/studio/relay-meta";
 import { RelayPanel } from "./RelayPanel";
+import { liveStore } from "./live-store";
 import { LiveBar } from "./LiveBar";
 import { MicPanel, type MicDevice } from "./MicPanel";
 import { QueuePanel } from "./QueuePanel";
@@ -52,13 +53,17 @@ const noopSubscribe = () => () => {};
 /** Primero la entrada del DJ (usuario, contraseña y programa); después, la consola. */
 export type RelayInfo = { configured: boolean; name: string };
 
-export function StudioConsole({ relay }: { relay: RelayInfo }) {
+export function StudioConsole({ relay, visible = true }: { relay: RelayInfo; visible?: boolean }) {
   const [entry, setEntry] = useState<DjEntry | null>(null);
   if (!entry) return <DjGate onEnter={setEntry} />;
-  return <StudioConsoleInner entry={entry} relay={relay} />;
+  return <StudioConsoleInner entry={entry} relay={relay} visible={visible} />;
 }
 
-function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo }) {
+function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: RelayInfo; visible: boolean }) {
+  const visibleRef = useRef(visible);
+  useEffect(() => {
+    visibleRef.current = visible; // los atajos del teclado solo valen con la consola a la vista
+  }, [visible]);
   const [queue, dispatch] = useReducer(queueReducer, [] as QueueItem[]);
   const [rejected, setRejected] = useState<string[]>([]);
   const [auto, setAuto] = useState(true);
@@ -526,7 +531,7 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
       return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
     };
     const down = (e: KeyboardEvent) => {
-      if (e.code !== "KeyV" || e.repeat || isTyping(e.target)) return;
+      if (!visibleRef.current || e.code !== "KeyV" || e.repeat || isTyping(e.target)) return;
       const eng = engineRef.current;
       if (!eng?.micActive || !voiceRef.current.micMuted) return;
       pttRef.current = true;
@@ -560,6 +565,7 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
 
   // Cart Wall: se cargan los audios y se decodifican de antemano para dispararlos al instante.
   useEffect(() => {
+    if (!visible) return; // al volver a la consola se recarga (por si se subió un jingle mientras tanto)
     let alive = true;
     fetch("/api/studio/carts")
       .then(async (r) => {
@@ -571,13 +577,13 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
         setCarts(list);
         setCartState("ready");
         const e = getEngine();
-        for (const c of list) void e.preloadCart(c.id, `/api/studio/cart/${c.id}`).catch(() => undefined);
+        for (const c of list) if (!e.hasCart(c.id)) void e.preloadCart(c.id, `/api/studio/cart/${c.id}`).catch(() => undefined);
       })
       .catch(() => alive && setCartState("error"));
     return () => {
       alive = false;
     };
-  }, [getEngine]);
+  }, [getEngine, visible]);
 
   const fireCart = useCallback(
     async (c: CartView) => {
@@ -609,7 +615,7 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
   useEffect(() => {
     const keys = hotkeyMap(carts);
     const h = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.altKey || e.metaKey || isTypingTarget(e.target as HTMLElement | null)) return;
+      if (!visibleRef.current || e.ctrlKey || e.altKey || e.metaKey || isTypingTarget(e.target as HTMLElement | null)) return;
       if (e.key === "Escape") {
         engineRef.current?.stopAllCarts();
         return;
@@ -629,12 +635,21 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
   const readMicLevel = useCallback(() => engineRef.current?.getMicLevelDb() ?? -100, []);
   const readDuckDb = useCallback(() => engineRef.current?.getDuckGainDb() ?? 0, []);
 
+  // Fin del horario del DJ: se fija al salir al aire y manda el cierre automático y la cuenta regresiva.
+  const scheduledEndsAt = useMemo(() => {
+    if (!djInfo?.scheduled) return null;
+    if (programChoice && programChoice !== djInfo.scheduled.program.id) return null; // «emitir como» otro programa: sin hora de fin
+    return Date.parse(djInfo.scheduled.endsAt);
+  }, [djInfo, programChoice]);
+  const [liveEndsAt, setLiveEndsAt] = useState<number | null>(null);
+
   const toggleLive = useCallback(async () => {
     if (live === "live" || live === "connecting" || live === "reconnecting") {
       senderRef.current?.stop();
       senderRef.current = null;
       liveSinceRef.current = null;
       setElapsed(0);
+      setLiveEndsAt(null);
       return;
     }
     if (senderRef.current || startingRef.current) return; // doble clic: ya hay una conexión en curso
@@ -643,6 +658,7 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
       return;
     }
     startingRef.current = true;
+    setLiveEndsAt(scheduledEndsAt);
     try {
       setMessage(null);
       const e = getEngine();
@@ -677,12 +693,53 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
     } finally {
       startingRef.current = false;
     }
-  }, [live, creds, getEngine, metaFor]);
+  }, [live, creds, getEngine, metaFor, scheduledEndsAt]);
+
+  const toggleRef = useRef(toggleLive);
+  useEffect(() => {
+    toggleRef.current = toggleLive;
+  }, [toggleLive]);
+
+  const onAir = live === "live" || live === "connecting" || live === "reconnecting";
+
+  // Barra «EN VIVO» del panel: estado compartido y botón Desconectar.
+  useEffect(() => {
+    liveStore.set(onAir ? { live: true, since: liveSinceRef.current, program: activeProgram?.name ?? null, endsAt: liveEndsAt } : { live: false, since: null, program: null, endsAt: null });
+  }, [onAir, activeProgram, liveEndsAt]);
+  useEffect(() => {
+    const off = liveStore.registerStop(() => {
+      if (senderRef.current) void toggleRef.current();
+    });
+    return () => {
+      off();
+      liveStore.set({ live: false, since: null, program: null, endsAt: null });
+    };
+  }, []);
+
+  // Al terminar el horario del programa se cierra la transmisión.
+  useEffect(() => {
+    if (!onAir || liveEndsAt === null) return;
+    const t = setInterval(() => {
+      if (Date.now() >= liveEndsAt) {
+        setMessage("Terminó el horario de tu programa: se cerró la transmisión.");
+        void toggleRef.current();
+      }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [onAir, liveEndsAt]);
+
+  // Recargar o cerrar la pestaña cortaría la emisión: se pide confirmación.
+  useEffect(() => {
+    if (!onAir) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [onAir]);
 
   // Atajo: espacio = play/pausa del deck activo (fuera de campos de texto).
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
+      if (!visibleRef.current || e.code !== "Space") return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.isContentEditable)) return;
       e.preventDefault();
@@ -704,6 +761,7 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
         onPassword={(password) => setEdits((c) => ({ ...c, password }))}
         onToggle={() => void toggleLive()}
         elapsedSec={elapsed}
+        endsAt={onAir ? liveEndsAt : null}
         readMaster={readMaster}
         masterVolume={masterVolume}
         onMasterVolume={(v) => {
