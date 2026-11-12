@@ -43,3 +43,18 @@ export async function removeStoredMedia(root: string, storageKey: string): Promi
   if (!target) return;
   await rm(target, { force: true });
 }
+
+/** Guarda bytes ya validados bajo una clave uuid con escritura atómica (archivo temporal + rename). */
+export async function storeBytesAtomically(root: string, storageKey: string, bytes: Uint8Array): Promise<void> {
+  const target = safePath(root, storageKey);
+  if (!target) throw new Error("Clave de almacenamiento inválida.");
+  await mkdir(root, { recursive: true, mode: 0o750 });
+  const temporary = path.join(root, `.${storageKey}.${randomUUID()}.upload`);
+  try {
+    await writeFile(temporary, bytes, { mode: 0o640, flag: "wx" });
+    await rename(temporary, target);
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
