@@ -1306,3 +1306,12 @@ textarea.input {
 .story-hero a:not(.btn) {
   color: inherit;
 }
+
+/* La imagen se diluye en el negro del lado del texto (escritorio). */
+@media (min-width: 1024px) {
+  .hero-art,
+  .story-hero-art {
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.25) 12%, rgba(0, 0, 0, 0.7) 28%, #000 48%);
+    mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.25) 12%, rgba(0, 0, 0, 0.7) 28%, #000 48%);
+  }
+}

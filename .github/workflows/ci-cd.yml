@@ -23,6 +23,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Next genera los tipos globales (LayoutProps, PageProps) y no se versionan.
+      - run: npx next typegen
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
