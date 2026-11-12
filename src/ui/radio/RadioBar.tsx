@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Art } from "@/ui/Art";
 import { useRadio, type RadioStatus } from "./RadioProvider";
+import { ScheduleModal } from "./ScheduleModal";
+import { OWN_STATION_SLUG, useNowPlayingProgram } from "./useNowPlayingProgram";
 import { Visualizer } from "./Visualizer";
 import type { PublicStation } from "@/modules/radio/service";
 
@@ -189,6 +191,9 @@ function StationPanel() {
 export function RadioBar() {
   const r = useRadio();
   const bar = useRef<HTMLElement>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  // La programación solo existe para la emisora propia (StereoFace Radio).
+  const program = useNowPlayingProgram(r.current?.slug === OWN_STATION_SLUG);
 
   // Publica la altura real para reservar espacio y colocar el panel.
   useEffect(() => {
@@ -203,6 +208,7 @@ export function RadioBar() {
 
   if (!r.loaded || r.stations.length === 0 || !r.current) return null;
   const s = r.current;
+  const own = s.slug === OWN_STATION_SLUG;
   const playing = r.status === "playing" || r.status === "loading" || r.status === "reconnecting";
   const isEmbed = s.streamKind === "embed";
   const silenced = r.muted || r.volume === 0;
@@ -220,24 +226,66 @@ export function RadioBar() {
   return (
     <>
       <StationPanel />
+      {own && <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />}
       <section ref={bar} aria-label="StereoFace Frequencies, radio en vivo" className="radio-bar">
         {/* Móvil: fila 1 = emisora + reproducir; fila 2 = estado + volumen y lista.
             Escritorio (lg): tres columnas con transporte y visualizador. */}
         <div className="wrap grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.5fr)_auto] lg:gap-x-4 lg:py-3">
           {/* Emisora */}
           <div className="flex min-w-0 items-center gap-3">
-            <Cover s={s} size="size-12 lg:size-14" />
-            <div className="min-w-0">
-              <p className="mono flex items-center gap-2 text-[0.6rem] text-accent-ink">
-                StereoFace Frequencies
-                {s.isDemo && <span className="tag tag-demo !px-1.5 !py-0 !text-[0.55rem]">Demo</span>}
-              </p>
-              <p className="truncate font-bold leading-tight">{s.name}</p>
-              <p className="mono truncate text-[0.66rem] text-muted">
-                {[s.country, s.genres.join(", ") || "Género por definir"].filter(Boolean).join(" · ")}
-              </p>
-              <Attribution s={s} className="hidden lg:inline-flex" />
-            </div>
+            {own && program ? (
+              <button
+                type="button"
+                className="program-block flex min-w-0 items-center gap-3 text-left"
+                onClick={() => setScheduleOpen(true)}
+                aria-label={`Al aire: ${program.program.name}. Ver programación completa`}
+              >
+                <span
+                  className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-[8px] border border-line lg:size-14"
+                  style={{ background: `linear-gradient(135deg, ${program.program.color}, #0c0c0c)` }}
+                >
+                  {program.program.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- imagen propia del programa servida por /media
+                    <img src={program.program.imageUrl} alt="" className="absolute inset-0 size-full object-cover" />
+                  ) : (
+                    <span className="display-up text-[1.2rem] text-black">{program.program.name.slice(0, 1)}</span>
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <span className="mono flex items-center gap-2 text-[0.6rem] text-accent-ink">
+                    <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-accent live-dot" />
+                    Al aire · hasta {new Date(program.endsAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota", hour12: false })}
+                  </span>
+                  <span className="block truncate font-bold leading-tight">{program.program.name}</span>
+                  <span className="mono block truncate text-[0.66rem] text-muted">
+                    {s.name}
+                    {program.program.hosts ? ` · Con ${program.program.hosts}` : ""}
+                  </span>
+                  <span className="mono hidden text-[0.62rem] text-accent-ink underline underline-offset-2 lg:inline">Ver programación</span>
+                </span>
+              </button>
+            ) : (
+              <>
+                <Cover s={s} size="size-12 lg:size-14" />
+                <div className="min-w-0">
+                  <p className="mono flex items-center gap-2 text-[0.6rem] text-accent-ink">
+                    StereoFace Frequencies
+                    {s.isDemo && <span className="tag tag-demo !px-1.5 !py-0 !text-[0.55rem]">Demo</span>}
+                  </p>
+                  <p className="truncate font-bold leading-tight">{s.name}</p>
+                  <p className="mono truncate text-[0.66rem] text-muted">
+                    {[s.country, s.genres.join(", ") || "Género por definir"].filter(Boolean).join(" · ")}
+                  </p>
+                  {own ? (
+                    <button type="button" className="mono hidden text-[0.62rem] text-accent-ink underline underline-offset-2 lg:inline" onClick={() => setScheduleOpen(true)}>
+                      Ver programación
+                    </button>
+                  ) : (
+                    <Attribution s={s} className="hidden lg:inline-flex" />
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Reproducir (solo móvil) */}

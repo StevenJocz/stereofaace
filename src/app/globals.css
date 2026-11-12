@@ -1617,3 +1617,73 @@ textarea.input {
 .studio-dialog::backdrop {
   background: rgba(0, 0, 0, 0.65);
 }
+
+/* Programación de StereoFace Radio: bloque del reproductor y ventana */
+.program-block {
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+.program-block:hover {
+  background: rgba(198, 255, 0, 0.07);
+}
+.schedule-dialog {
+  width: min(46rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 1.25rem 1.5rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel);
+  color: var(--fg);
+}
+.schedule-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.schedule-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+.schedule-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+.schedule-month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.3rem;
+}
+.schedule-day {
+  display: flex;
+  min-height: 3.1rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--fg);
+  font-size: 0.85rem;
+}
+.schedule-day[data-out="true"] {
+  opacity: 0.4;
+}
+.schedule-day[data-today="true"] {
+  border-color: var(--accent);
+}
+.schedule-day[aria-pressed="true"] {
+  background: rgba(198, 255, 0, 0.14);
+  border-color: var(--accent);
+}
+.schedule-dots {
+  display: flex;
+  gap: 2px;
+}
+.schedule-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
