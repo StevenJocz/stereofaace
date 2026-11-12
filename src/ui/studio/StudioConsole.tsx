@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { DeckPanel, type DeckView } from "./DeckPanel";
 import { LibraryPanel } from "./LibraryPanel";
+import type { DjProgramInfo, StudioProgram } from "@/modules/schedule/dj";
 import type { CartView } from "@/modules/studio/carts";
 import { CartWall } from "./CartWall";
 import { DuckingPanel } from "./DuckingPanel";
@@ -70,6 +71,8 @@ export function StudioConsole() {
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
+  const [djInfo, setDjInfo] = useState<DjProgramInfo | null>(null);
+  const [programChoice, setProgramChoice] = useState("");
   const [cartState, setCartState] = useState<"loading" | "ready" | "error">("loading");
   const [cartsPlaying, setCartsPlaying] = useState<ReadonlySet<string>>(new Set());
 
@@ -116,6 +119,10 @@ export function StudioConsole() {
       setDecks((d) => ({ ...d, [id]: { ...d[id], coverUrl: cover.url } }));
     });
   }, []);
+
+  // Programa del DJ: el que le toca a su hora (o el que elija para emitir fuera de horario).
+  const programRef = useRef<StudioProgram | null>(null);
+  const metaFor = useCallback((it: QueueItem) => ({ title: it.title, artist: it.artist || programRef.current?.name || "" }), []);
 
   const getEngine = useCallback((): AudioEngine => {
     if (engineRef.current) return engineRef.current;
@@ -182,7 +189,7 @@ export function StudioConsole() {
         }
         setDecks((d) => ({ ...d, [to]: { ...d[to], playing: true } }));
         markActive(to);
-        senderRef.current?.setMetadata({ title: item.title, artist: item.artist });
+        senderRef.current?.setMetadata(metaFor(item));
       } catch (err) {
         if (mode === "fade") handedOffRef.current[from] = false; // la saliente sigue siendo la dueña del aire
         if (!(err instanceof LoadSupersededError)) {
@@ -214,7 +221,7 @@ export function StudioConsole() {
     // Solo en desarrollo: permite verificar el audio desde el navegador con un micrófono simulado.
     if (process.env.NODE_ENV !== "production") Object.assign(window, { __studioEngine: e });
     return e;
-  }, [attachCover]);
+  }, [attachCover, metaFor]);
 
   // Los medidores consultan el motor por su cuenta (PollMeter): la consola no se re-renderiza por ellos.
   const levelsRef = useRef({ at: 0, value: { master: { rmsDb: -100, peakDb: -100 }, A: -100, B: -100 } });
@@ -284,6 +291,38 @@ export function StudioConsole() {
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
   }, []);
+
+  const djUser = creds.user.trim().toLowerCase();
+  useEffect(() => {
+    if (!/^[a-z0-9_.-]{2,50}$/.test(djUser)) return;
+    let alive = true;
+    const load = () =>
+      fetch(`/api/studio/my-program?dj=${encodeURIComponent(djUser)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: DjProgramInfo | null) => alive && setDjInfo(d))
+        .catch(() => undefined);
+    const first = setTimeout(load, 500); // espera a que termine de escribir el usuario
+    const t = setInterval(load, 60_000);
+    return () => {
+      alive = false;
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [djUser]);
+
+  const activeProgram: StudioProgram | null = useMemo(() => {
+    if (!djInfo) return null;
+    if (programChoice) return [...(djInfo.scheduled ? [djInfo.scheduled.program] : []), ...djInfo.others].find((p) => p.id === programChoice) ?? null;
+    return djInfo.scheduled?.program ?? null;
+  }, [djInfo, programChoice]);
+
+  // Si cambia el programa mientras se emite, se actualiza lo que ve el público.
+  useEffect(() => {
+    programRef.current = activeProgram;
+    if (liveRef.current !== "live") return;
+    const it = engineRef.current?.deckItem(activeRef.current);
+    if (it) senderRef.current?.setMetadata(metaFor(it));
+  }, [activeProgram, metaFor]);
 
   // Historial: una entrada por cada pista que pasa al aire mientras se está EN VIVO.
   useEffect(() => {
@@ -391,12 +430,12 @@ export function StudioConsole() {
           setActive(id);
         }
         const item = e.deckItem(id);
-        if (item) senderRef.current?.setMetadata({ title: item.title, artist: item.artist });
+        if (item) senderRef.current?.setMetadata(metaFor(item));
       } catch (err) {
         setMessage(err instanceof Error ? err.message : "No se pudo reproducir.");
       }
     },
-    [getEngine],
+    [getEngine, metaFor],
   );
 
   const pause = useCallback(
@@ -565,7 +604,7 @@ export function StudioConsole() {
       });
       senderRef.current = sender;
       const item = e.deckItem(activeRef.current);
-      if (item) sender.setMetadata({ title: item.title, artist: item.artist });
+      if (item) sender.setMetadata(metaFor(item));
       sender.start();
     } catch (err) {
       senderRef.current = null;
@@ -573,7 +612,7 @@ export function StudioConsole() {
     } finally {
       startingRef.current = false;
     }
-  }, [live, creds, getEngine]);
+  }, [live, creds, getEngine, metaFor]);
 
   // Atajo: espacio = play/pausa del deck activo (fuera de campos de texto).
   useEffect(() => {
@@ -612,6 +651,9 @@ export function StudioConsole() {
           engineRef.current?.setMonitor(v);
         }}
         message={message}
+        dj={/^[a-z0-9_.-]{2,50}$/.test(djUser) ? djInfo : null}
+        programChoice={programChoice}
+        onProgramChoice={setProgramChoice}
       />
       <div className="studio-decks">
         {(["A", "B"] as const).map((id) => (

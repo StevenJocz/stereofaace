@@ -1687,3 +1687,12 @@ textarea.input {
   height: 6px;
   border-radius: 50%;
 }
+
+.studio-program {
+  display: flex;
+  min-width: 0;
+  max-width: 24rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
