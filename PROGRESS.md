@@ -82,7 +82,7 @@
 - Usuarios y portada ya se editan desde el panel; `ADD_USER_*` en `migrate` sigue disponible para el primer arranque.
 - Radio: imágenes de emisora solo por URL https (la subida llega con el módulo de medios); sin prueba con una emisora real autorizada; Safari y Firefox sin probar; el visualizador con flujos directos CORS está implementado pero solo se verificó con HLS.
 - Windows con ruta larga: las herramientas con esbuild (drizzle-kit, tsx, vitest) fallan por MAX_PATH; se usó `ESBUILD_BINARY_PATH` con una copia en `C:/sfbin`. Desaparece al mover el proyecto a una ruta corta.
-- El proyecto no está en un repositorio git; no hay commits.
+- Repositorio: https://github.com/StevenJocz/stereofaace (rama `main`). Los commits se hacen con el flujo normal de git.
 
 ## Siguiente
 1. Fase 4: base de datos y datos reales (la portada pasa a leer de ahí).
@@ -92,3 +92,12 @@
 
 ## Notas del entorno
 Node 24, npm 11, git 2.55, Next.js 16.4, React 19, Tailwind 4, GSAP 3.15.
+
+## 2026-11-12 — Contenido real, portada automática, perfiles, GitHub y despliegue continuo
+- **Contenido:** 32 noticias reales (fuentes citadas en cada nota), 24 artistas, 7 lanzamientos y 23 eventos de Latinoamérica. Las portadas de las noticias son la imagen de la nota original con crédito al medio («Foto: {medio} (imagen de la nota original)»); 3 notas usan fotos de Wikimedia Commons con licencia libre. Atención: poner crédito no equivale a tener licencia; si un medio lo pide, se cambia desde el panel.
+- **Portada automática:** el carrusel (4) y los destacados (4) se llenan solos con lo más reciente, sin repetirse; los artículos «fijados» en el panel van primero. Código: `getHomeData` en `src/modules/content/service.ts`.
+- **Artistas:** perfiles públicos `/artistas` y `/artistas/<slug>` (bio, fechas, lanzamientos, noticias etiquetadas, redes oficiales). Las notas se etiquetan con artistas desde el editor. Redes: Spotify, SoundCloud, Bandcamp, YouTube, Instagram, X, Facebook, TikTok y web; 19 artistas tienen enlaces (Wikidata, comprobados). Sin redes aún: Carrera Séptima, MONOKOI, Mario Wellmann, Mirko y la Logia del Loop, ELLAESARIA.
+- **Cabeceras:** noticias y perfiles usan el estilo del carrusel (`StoryHero`), con el título sobre la imagen y la imagen diluida en negro del lado del texto.
+- **GitHub y CD:** `.github/workflows/ci-cd.yml`. Push o PR a `main`: `next typegen`, `tsc`, `eslint`, tests y `next build` en GitHub. Push a `main` con todo en verde: el runner autoalojado `github-runner-stereoface` (etiqueta `stereoface`, contenedor en el servidor con acceso a `/opt/stereoface` y a Docker) copia el código, ejecuta `docker compose build` y `up -d web` (aplica migraciones) y espera a que `stereoface-web` esté sano. No toca `.env`, `docker-compose.yml`, `Dockerfile` ni `infra/`. La versión desplegada queda en `/opt/stereoface/.deployed-version`. El primer despliegue automático fue el commit `c7a3ad7`.
+- **Radio (pospuesta):** AzuraCast ya corre en el servidor con la estación «Stereo Face» (Icecast + Liquidsoap), sin música y sin señal pública. Pendiente: música con licencia (propuesta: 27 pistas Creative Commons de archive.org), subdominio público (p. ej. `radio.stereoface.online` en Nginx Proxy Manager) y registrar la emisora en `/admin/radio`.
+- **Pendiente menor:** 9 archivos de imágenes sin uso en el volumen de medios de producción; no se pudieron borrar automáticamente.
