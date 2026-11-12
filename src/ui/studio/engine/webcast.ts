@@ -7,6 +7,7 @@ const CHUNK_MS = 1000;
 const LIVE_AFTER_MS = 1500;
 const METADATA_DELAY_MS = 1000;
 const MAX_FIELD = 200;
+const MAX_FIRST_RETRIES = 8; // reintentos antes de rendirse si nunca se llegó a estar en vivo
 
 export type LiveState = "offline" | "connecting" | "live" | "reconnecting" | "auth-error" | "error";
 
@@ -17,10 +18,13 @@ export function helloMessage(creds: Credentials, mime: string): string {
   return JSON.stringify({ type: "hello", data: { mime, user: creds.user, password: creds.password } });
 }
 
+/** Recorta por caracteres (no por unidades UTF-16) para no partir un emoji ni dejar sustitutos sueltos. */
+const clip = (s: string) => Array.from(s).slice(0, MAX_FIELD).join("");
+
 export function metadataMessage(m: TrackMetadata): string {
   return JSON.stringify({
     type: "metadata",
-    data: { title: m.title.slice(0, MAX_FIELD), artist: m.artist.slice(0, MAX_FIELD) },
+    data: { title: clip(m.title), artist: clip(m.artist) },
   });
 }
 
@@ -64,6 +68,7 @@ export class WebcastSender {
   private recorder: RecorderLike | null = null;
   private metadata: TrackMetadata | null = null;
   private attempt = 0;
+  private everLive = false;
   private stopping = false;
   private timers = new Set<ReturnType<typeof setTimeout>>();
 
@@ -73,6 +78,7 @@ export class WebcastSender {
     if (this.state !== "offline" && this.state !== "auth-error" && this.state !== "error") return;
     this.stopping = false;
     this.attempt = 0;
+    this.everLive = false;
     this.connect("connecting");
   }
 
@@ -143,6 +149,7 @@ export class WebcastSender {
       this.later(() => {
         if (this.socket === socket && socket.readyState === OPEN) {
           this.attempt = 0;
+          this.everLive = true;
           this.setState("live");
         }
       }, LIVE_AFTER_MS);
@@ -153,6 +160,10 @@ export class WebcastSender {
       this.teardown();
       if (/authentication/i.test(e.reason)) {
         this.setState("auth-error");
+        return;
+      }
+      if (!this.everLive && this.attempt >= MAX_FIRST_RETRIES) {
+        this.setState("error"); // la dirección o la red no responden: no se reintenta eternamente
         return;
       }
       this.setState("reconnecting");

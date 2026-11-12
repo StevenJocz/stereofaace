@@ -40,13 +40,13 @@ export class AzuraClient {
     return `${this.cfg.baseUrl.replace(/\/+$/, "")}/api/station/${this.cfg.stationId}${path}`;
   }
 
-  private async request(path: string, extra: Record<string, string> = {}): Promise<Response> {
+  private async request(path: string, extra: Record<string, string> = {}, passthrough: number[] = []): Promise<Response> {
     // redirect: "error" — la clave nunca debe viajar a otro host si AzuraCast redirige.
     const res = await this.fetchImpl(this.url(path), { headers: { "X-API-Key": this.cfg.apiKey, ...extra }, redirect: "error" });
     if (res.status === 401 || res.status === 403) {
       throw new DomainError("azuracast_auth", "Clave API no válida o sin permisos en AzuraCast.");
     }
-    if (!res.ok && res.status !== 206) {
+    if (!res.ok && res.status !== 206 && !passthrough.includes(res.status)) {
       throw new DomainError("azuracast_error", `AzuraCast respondió con el error ${res.status}.`);
     }
     return res;
@@ -106,6 +106,6 @@ export class AzuraClient {
   /** Audio de una pista, tal como lo entrega AzuraCast (respeta `Range`). */
   async fileStream(id: string, range: string | null): Promise<Response> {
     if (!/^\d+$/.test(id)) throw new DomainError("azuracast_bad_id", "Identificador de pista no válido.");
-    return this.request(`/file/${id}/play`, range ? { Range: range } : {});
+    return this.request(`/file/${id}/play`, range ? { Range: range } : {}, [416]); // 416: Range fuera de límites, se devuelve tal cual
   }
 }

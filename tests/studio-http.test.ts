@@ -125,6 +125,13 @@ describe("rutas del estudio", () => {
     expect(u.seen).toHaveLength(0);
   });
 
+  it("file pasa un 416 de AzuraCast como 416 (Range fuera de límites), no como 502", async () => {
+    const u = upstream(() => new Response(null, { status: 416, headers: { "content-range": "bytes */100" } }));
+    const r = await fileHandler(h.db, admin, "7", "bytes=500-600", u.impl);
+    expect(r.status).toBe(416);
+    expect(r.headers.get("content-range")).toBe("bytes */100");
+  });
+
   it("art devuelve la carátula con su tipo y caché privada", async () => {
     const u = upstream(() => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "content-type": "image/jpeg" } }));
     const r = await artHandler(h.db, editor, "7", u.impl);

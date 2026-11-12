@@ -23,7 +23,7 @@ import { WEBCAST_MIME, WEBCAST_URL, WebcastSender, type LiveState, type Recorder
 const FADE_SEC = 6;
 const CREDS_KEY = "sf-studio-dj";
 const other = (d: DeckId): DeckId => (d === "A" ? "B" : "A");
-const emptyDeck = (): DeckView => ({ item: null, durationSec: null, currentSec: 0, playing: false, levelDb: -100, volume: 1, coverUrl: null });
+const emptyDeck = (): DeckView => ({ item: null, durationSec: null, currentSec: 0, playing: false, volume: 1, coverUrl: null });
 
 type Creds = { user: string; password: string };
 
@@ -56,7 +56,6 @@ export function StudioConsole() {
   const [edits, setEdits] = useState<Partial<Creds>>({});
   const creds = useMemo<Creds>(() => ({ user: "", password: "", ...parseCreds(rawCreds), ...edits }), [rawCreds, edits]);
   const [elapsed, setElapsed] = useState(0);
-  const [masterDb, setMasterDb] = useState(-100);
   const [masterVolume, setMasterVolume] = useState(0.9);
   const [monitor, setMonitor] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
@@ -217,17 +216,56 @@ export function StudioConsole() {
     return e;
   }, [attachCover]);
 
-  // Niveles en vivo.
-  useEffect(() => {
-    const t = setInterval(() => {
-      const e = engineRef.current;
-      if (!e) return;
-      const l = e.getLevels();
-      setMasterDb(l.master.peakDb);
-      setDecks((d) => ({ A: { ...d.A, levelDb: l.A }, B: { ...d.B, levelDb: l.B } }));
-    }, 80);
-    return () => clearInterval(t);
+  // Los medidores consultan el motor por su cuenta (PollMeter): la consola no se re-renderiza por ellos.
+  const levelsRef = useRef({ at: 0, value: { master: { rmsDb: -100, peakDb: -100 }, A: -100, B: -100 } });
+  const readLevels = useCallback(() => {
+    const e = engineRef.current;
+    const now = performance.now();
+    if (e && now - levelsRef.current.at > 30) levelsRef.current = { at: now, value: e.getLevels() };
+    return levelsRef.current.value;
   }, []);
+  const readMaster = useCallback(() => readLevels().master.peakDb, [readLevels]);
+  const readDeckA = useCallback(() => readLevels().A, [readLevels]);
+  const readDeckB = useCallback(() => readLevels().B, [readLevels]);
+
+  // Evita que soltar un archivo fuera de la cola haga que el navegador lo abra y se pierda la sesión.
+  useEffect(() => {
+    const stop = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+    };
+    window.addEventListener("dragover", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragover", stop);
+      window.removeEventListener("drop", stop);
+    };
+  }, []);
+
+  // Pantalla encendida mientras se transmite (si el navegador lo permite).
+  useEffect(() => {
+    if (live !== "live" || !("wakeLock" in navigator)) return;
+    let lock: WakeLockSentinel | null = null;
+    let cancelled = false;
+    const acquire = () => {
+      navigator.wakeLock
+        .request("screen")
+        .then((l) => {
+          if (cancelled) void l.release();
+          else lock = l;
+        })
+        .catch(() => undefined);
+    };
+    acquire();
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && (!lock || lock.released)) acquire();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      void lock?.release();
+    };
+  }, [live]);
 
   // La consola ocupa el alto de la pantalla: solo la cola y la biblioteca hacen scroll.
   useEffect(() => {
@@ -496,6 +534,10 @@ export function StudioConsole() {
       return;
     }
     if (senderRef.current || startingRef.current) return; // doble clic: ya hay una conexión en curso
+    if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported(WEBCAST_MIME)) {
+      setMessage("Este navegador no puede emitir en vivo. Usa Chrome, Edge o Firefox actualizados.");
+      return;
+    }
     startingRef.current = true;
     try {
       setMessage(null);
@@ -558,7 +600,7 @@ export function StudioConsole() {
         onPassword={(password) => setEdits((c) => ({ ...c, password }))}
         onToggle={() => void toggleLive()}
         elapsedSec={elapsed}
-        masterDb={masterDb}
+        readMaster={readMaster}
         masterVolume={masterVolume}
         onMasterVolume={(v) => {
           setMasterVolume(v);
@@ -578,6 +620,7 @@ export function StudioConsole() {
             id={id}
             deck={decks[id]}
             active={active === id}
+            readLevel={id === "A" ? readDeckA : readDeckB}
             onPlay={() => void play(id)}
             onPause={() => pause(id)}
             onSeek={(s) => engineRef.current?.seek(id, s)}
@@ -641,6 +684,7 @@ export function StudioConsole() {
       <QueuePanel
         queue={queue}
         rejected={rejected}
+        onAir={decks[active].playing ? active : null}
         auto={auto}
         onAuto={setAuto}
         onAddFiles={addFiles}

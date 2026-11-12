@@ -101,6 +101,15 @@ describe("mensajes del protocolo", () => {
     expect(uni.data).toEqual({ title: "Señal ñandú — 日本語", artist: "Ōkami" });
   });
 
+  it("metadataMessage recorta por caracteres, no por unidades UTF-16: no parte un emoji", () => {
+    const t = "a".repeat(199) + "😀😀";
+    const m = JSON.parse(metadataMessage({ title: t, artist: "" })).data.title as string;
+    expect(Array.from(m)).toHaveLength(200);
+    expect(m.endsWith("😀")).toBe(true);
+    const loneSurrogate = new RegExp("[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?<![\\uD800-\\uDBFF])[\\uDC00-\\uDFFF]");
+    expect(loneSurrogate.test(m)).toBe(false);
+  });
+
   it("nextBackoffMs duplica y topa en 15 s", () => {
     expect([0, 1, 2, 3, 4, 5, 6].map(nextBackoffMs)).toEqual([1000, 2000, 4000, 8000, 15000, 15000, 15000]);
   });
@@ -175,6 +184,30 @@ describe("WebcastSender", () => {
     FakeSocket.all[0].serverClose(1011, "Authentication failed.");
     sender.start();
     expect(FakeSocket.all).toHaveLength(2);
+  });
+
+  it("tras 8 intentos fallidos sin haber llegado nunca a live pasa a error y deja de reintentar", () => {
+    const { sender, states } = make();
+    sender.start();
+    for (let i = 0; i < 12; i++) {
+      FakeSocket.all[FakeSocket.all.length - 1].serverClose(1006, "");
+      vi.advanceTimersByTime(20_000);
+    }
+    expect(states[states.length - 1]).toBe("error");
+    expect(FakeSocket.all).toHaveLength(9);
+  });
+
+  it("si ya estuvo en vivo, un corte sigue reintentando sin pasar a error", () => {
+    const { sender, states } = make();
+    sender.start();
+    FakeSocket.all[0].open();
+    vi.advanceTimersByTime(1500);
+    for (let i = 0; i < 12; i++) {
+      FakeSocket.all[FakeSocket.all.length - 1].serverClose(1006, "");
+      vi.advanceTimersByTime(20_000);
+    }
+    expect(states).not.toContain("error");
+    expect(FakeSocket.all.length).toBeGreaterThan(9);
   });
 
   it("stop() no reintenta y deja offline", () => {

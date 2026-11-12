@@ -13,10 +13,12 @@ function Row({
   item,
   onLoad,
   onRemove,
+  onAir,
 }: {
   item: QueueItem;
   onLoad: (id: DeckId) => void;
   onRemove: () => void;
+  onAir: DeckId | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   return (
@@ -35,10 +37,10 @@ function Row({
           {item.artist || "—"} · {item.durationSec ? formatTime(item.durationSec) : "--:--"}
         </span>
       </span>
-      <button type="button" className="btn !px-3 !py-1" onClick={() => onLoad("A")} aria-label={`Cargar ${item.title} en el deck A`}>
+      <button type="button" className="btn !px-3 !py-1" disabled={onAir === "A"} title={onAir === "A" ? "El deck A está al aire" : undefined} onClick={() => onLoad("A")} aria-label={`Cargar ${item.title} en el deck A`}>
         A
       </button>
-      <button type="button" className="btn !px-3 !py-1" onClick={() => onLoad("B")} aria-label={`Cargar ${item.title} en el deck B`}>
+      <button type="button" className="btn !px-3 !py-1" disabled={onAir === "B"} title={onAir === "B" ? "El deck B está al aire" : undefined} onClick={() => onLoad("B")} aria-label={`Cargar ${item.title} en el deck B`}>
         B
       </button>
       <button type="button" className="btn !px-3 !py-1" onClick={onRemove} aria-label={`Quitar ${item.title} de la cola`}>
@@ -51,6 +53,7 @@ function Row({
 export function QueuePanel({
   queue,
   rejected,
+  onAir,
   auto,
   onAuto,
   onAddFiles,
@@ -62,6 +65,7 @@ export function QueuePanel({
 }: {
   queue: QueueItem[];
   rejected: string[];
+  onAir: DeckId | null;
   auto: boolean;
   onAuto: (v: boolean) => void;
   onAddFiles: (files: File[]) => void;
@@ -144,7 +148,7 @@ export function QueuePanel({
           <SortableContext items={queue.map((i) => i.id)} strategy={verticalListSortingStrategy}>
             <ul className="studio-scroll mt-3">
               {queue.map((item) => (
-                <Row key={item.id} item={item} onLoad={(d) => onLoad(item, d)} onRemove={() => onRemove(item.id)} />
+                <Row key={item.id} item={item} onAir={onAir} onLoad={(d) => onLoad(item, d)} onRemove={() => onRemove(item.id)} />
               ))}
             </ul>
           </SortableContext>

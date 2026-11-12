@@ -1,6 +1,8 @@
 "use client";
 
-import { MeterBar, formatTime } from "./MeterBar";
+import { formatTime } from "./MeterBar";
+import { PollMeter } from "./PollMeter";
+import { ShortcutsHelp } from "./ShortcutsHelp";
 import type { LiveState } from "./engine/webcast";
 
 const LABEL: Record<LiveState, string> = {
@@ -20,7 +22,7 @@ export function LiveBar({
   onPassword,
   onToggle,
   elapsedSec,
-  masterDb,
+  readMaster,
   masterVolume,
   onMasterVolume,
   monitor,
@@ -34,7 +36,7 @@ export function LiveBar({
   onPassword: (v: string) => void;
   onToggle: () => void;
   elapsedSec: number;
-  masterDb: number;
+  readMaster: () => number;
   masterVolume: number;
   onMasterVolume: (v: number) => void;
   monitor: boolean;
@@ -75,7 +77,7 @@ export function LiveBar({
         <div className="ml-auto flex min-w-[16rem] flex-1 items-center gap-4 sm:max-w-[34rem]">
           <div className="flex-1">
             <span className="mono muted">Master</span>
-            <MeterBar db={masterDb} label="Nivel de salida (master)" className="mt-1" />
+            <PollMeter read={readMaster} label="Nivel de salida (master)" className="mt-1" />
           </div>
           <label className="mono muted flex items-center gap-2">
             Vol
@@ -90,6 +92,7 @@ export function LiveBar({
               onChange={(e) => onMasterVolume(Number(e.target.value))}
             />
           </label>
+          <ShortcutsHelp />
           <label className="mono muted flex items-center gap-2 whitespace-nowrap">
             <input type="checkbox" checked={monitor} onChange={(e) => onMonitor(e.target.checked)} /> Escuchar salida
           </label>

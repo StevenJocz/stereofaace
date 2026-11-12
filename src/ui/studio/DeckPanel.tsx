@@ -1,6 +1,7 @@
 "use client";
 
-import { MeterBar, formatTime } from "./MeterBar";
+import { formatTime } from "./MeterBar";
+import { PollMeter } from "./PollMeter";
 import { VinylDisc } from "./VinylDisc";
 import type { DeckId } from "./engine/audio-engine";
 import type { QueueItem } from "./engine/queue";
@@ -10,7 +11,6 @@ export type DeckView = {
   durationSec: number | null;
   currentSec: number;
   playing: boolean;
-  levelDb: number;
   volume: number;
   coverUrl: string | null;
 };
@@ -21,6 +21,7 @@ export function DeckPanel({
   id,
   deck,
   active,
+  readLevel,
   onPlay,
   onPause,
   onSeek,
@@ -29,6 +30,7 @@ export function DeckPanel({
   id: DeckId;
   deck: DeckView;
   active: boolean;
+  readLevel: () => number;
   onPlay: () => void;
   onPause: () => void;
   onSeek: (sec: number) => void;
@@ -88,7 +90,7 @@ export function DeckPanel({
               />
             </label>
           </div>
-          <MeterBar db={deck.levelDb} label={`Nivel del deck ${id}`} className="mt-2" />
+          <PollMeter read={readLevel} label={`Nivel del deck ${id}`} className="mt-2" />
         </div>
       </div>
     </section>
