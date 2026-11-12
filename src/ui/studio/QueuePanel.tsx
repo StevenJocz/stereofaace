@@ -142,7 +142,7 @@ export function QueuePanel({
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={queue.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-            <ul className="mt-3 grid gap-2">
+            <ul className="studio-scroll mt-3">
               {queue.map((item) => (
                 <Row key={item.id} item={item} onLoad={(d) => onLoad(item, d)} onRemove={() => onRemove(item.id)} />
               ))}

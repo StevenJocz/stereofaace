@@ -1407,3 +1407,128 @@ textarea.input {
   color: var(--muted);
   touch-action: none;
 }
+
+/* Platos de vinilo del estudio */
+.studio-vinyl {
+  position: relative;
+  width: clamp(7rem, 10.5vw, 9rem);
+  aspect-ratio: 1;
+  flex-shrink: 0;
+}
+.studio-vinyl-plate {
+  position: absolute;
+  inset: -3%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #2a2c30, #0d0e10 70%);
+  box-shadow: 0 0 0 2px #1d1f22, 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+.studio-vinyl-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  will-change: transform;
+}
+.studio-vinyl-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from 25deg, transparent 0 18%, rgba(255, 255, 255, 0.12) 24%, transparent 31% 68%, rgba(255, 255, 255, 0.09) 74%, transparent 81%);
+}
+.studio-tonearm {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform-origin: 89% 13%;
+  transform: rotate(-26deg);
+  transition: transform 0.7s cubic-bezier(0.3, 0.7, 0.3, 1);
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5));
+}
+.studio-vinyl[data-playing="true"] .studio-tonearm {
+  transform: rotate(0deg);
+}
+.studio-deck-body {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+.studio-deck-info {
+  min-width: 0;
+  flex: 1;
+}
+@media (max-width: 560px) {
+  .studio-deck-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .studio-vinyl {
+    align-self: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-tonearm {
+    transition: none;
+  }
+}
+
+/* Consola a pantalla completa: solo la cola y la biblioteca hacen scroll */
+.studio {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 0.7rem;
+}
+.studio .panel {
+  padding: 0.7rem 0.85rem;
+}
+.studio-decks,
+.studio-voice-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+.studio-voice-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.studio-bottom {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.7rem;
+  min-height: 0;
+}
+.studio-bottom > section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.studio-scroll {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  gap: 0.45rem;
+  align-content: start;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+.studio-voice .mono {
+  font-size: 0.72rem;
+}
+@media (min-width: 1024px) {
+  .studio {
+    margin-block: -1.25rem;
+  }
+}
+@media (max-width: 1023px) {
+  .studio {
+    grid-template-rows: none;
+  }
+  .studio-decks,
+  .studio-voice-row,
+  .studio-bottom {
+    grid-template-columns: 1fr;
+  }
+  .studio-scroll {
+    max-height: 22rem;
+  }
+}

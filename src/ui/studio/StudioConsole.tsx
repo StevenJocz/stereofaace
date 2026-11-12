@@ -3,10 +3,15 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { DeckPanel, type DeckView } from "./DeckPanel";
 import { LibraryPanel } from "./LibraryPanel";
+import { DuckingPanel } from "./DuckingPanel";
+import { EqPanel } from "./EqPanel";
 import { LiveBar } from "./LiveBar";
+import { MicPanel, type MicDevice } from "./MicPanel";
 import { QueuePanel } from "./QueuePanel";
 import { AudioEngine, LoadSupersededError, type DeckId } from "./engine/audio-engine";
 import { makeItems } from "./engine/audio-files";
+import { FLAT_EQ, type EqSettings } from "./engine/eq";
+import { DEFAULT_DUCK, type DuckSettings } from "./engine/voice";
 import { pickNext, shouldAdvanceOnEnd, shouldStartFade } from "./engine/autoplay";
 import { queueReducer, type QueueItem } from "./engine/queue";
 import { WEBCAST_MIME, WEBCAST_URL, WebcastSender, type LiveState, type RecorderLike, type SocketLike } from "./engine/webcast";
@@ -51,6 +56,16 @@ export function StudioConsole() {
   const [masterVolume, setMasterVolume] = useState(0.9);
   const [monitor, setMonitor] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [micActive, setMicActive] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
+  const [micGain, setMicGain] = useState(1);
+  const [gateDb, setGateDb] = useState(-55);
+  const [devices, setDevices] = useState<MicDevice[]>([]);
+  const [deviceId, setDeviceId] = useState("");
+  const [micError, setMicError] = useState<string | null>(null);
+  const [duck, setDuck] = useState<DuckSettings>(DEFAULT_DUCK);
+  const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
+  const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
 
   const engineRef = useRef<AudioEngine | null>(null);
   const senderRef = useRef<WebcastSender | null>(null);
@@ -59,19 +74,34 @@ export function StudioConsole() {
   const autoRef = useRef(auto);
   const fadingRef = useRef(false);
   const startingRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   // Un deck «cedió el aire» cuando ya empezó el fundido hacia el otro: no debe volver a disparar nada.
   const handedOffRef = useRef<Record<DeckId, boolean>>({ A: false, B: false });
+  const voiceRef = useRef({ duck, eqMusic, eqMic, micMuted, micGain, gateDb });
+  const pttRef = useRef(false);
   const liveSinceRef = useRef<number | null>(null);
   useEffect(() => {
     queueRef.current = queue;
     activeRef.current = active;
     autoRef.current = auto;
-  }, [queue, active, auto]);
+    voiceRef.current = { duck, eqMusic, eqMic, micMuted, micGain, gateDb };
+  }, [queue, active, auto, duck, eqMusic, eqMic, micMuted, micGain, gateDb]);
 
   const getEngine = useCallback((): AudioEngine => {
     if (engineRef.current) return engineRef.current;
     const e = new AudioEngine();
     e.setMasterVolume(0.9);
+    const v = voiceRef.current; // lo que el DJ ya ajustó antes de que existiera el motor
+    e.setDuck(v.duck);
+    e.setEq("music", v.eqMusic);
+    e.setEq("mic", v.eqMic);
+    e.setMicGain(v.micGain);
+    e.setMicMuted(v.micMuted);
+    e.setMicGateThreshold(v.gateDb);
+    e.onMicLost = () => {
+      setMicActive(false);
+      setMicError("Se perdió el micrófono (¿se desconectó?). Actívalo de nuevo.");
+    };
     const markActive = (id: DeckId) => {
       activeRef.current = id; // síncrono: el siguiente timeupdate ya debe ver el deck nuevo
       setActive(id);
@@ -158,6 +188,24 @@ export function StudioConsole() {
       setDecks((d) => ({ A: { ...d.A, levelDb: l.A }, B: { ...d.B, levelDb: l.B } }));
     }, 80);
     return () => clearInterval(t);
+  }, []);
+
+  // La consola ocupa el alto de la pantalla: solo la cola y la biblioteca hacen scroll.
+  useEffect(() => {
+    const fit = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      if (window.innerWidth < 1024) {
+        el.style.height = "";
+        return;
+      }
+      const pad = parseFloat(getComputedStyle(el.parentElement ?? el).paddingBottom) || 0;
+      const bleed = 20; // el margen negativo de .studio compensa parte del relleno del contenedor
+      el.style.height = `${Math.max(560, window.innerHeight - el.getBoundingClientRect().top - pad + bleed)}px`;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
   }, []);
 
   // Cronómetro al aire.
@@ -262,6 +310,56 @@ export function StudioConsole() {
     [],
   );
 
+  const startMic = useCallback(async () => {
+    try {
+      setMicError(null);
+      const e = getEngine();
+      await e.resume();
+      await e.startMic(deviceId || undefined);
+      setMicActive(true);
+      setDevices(await e.listMics()); // las etiquetas solo existen tras conceder el permiso
+    } catch (err) {
+      setMicActive(false);
+      setMicError(err instanceof Error ? err.message : "No se pudo abrir el micrófono.");
+    }
+  }, [deviceId, getEngine]);
+
+  const stopMic = useCallback(() => {
+    engineRef.current?.stopMic();
+    setMicActive(false);
+  }, []);
+
+  // Mantener V para hablar mientras el micrófono está silenciado.
+  useEffect(() => {
+    const isTyping = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+    };
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== "KeyV" || e.repeat || isTyping(e.target)) return;
+      const eng = engineRef.current;
+      if (!eng?.micActive || !voiceRef.current.micMuted) return;
+      pttRef.current = true;
+      eng.setMicMuted(false);
+      setMicMuted(false);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== "KeyV" || !pttRef.current) return;
+      pttRef.current = false;
+      engineRef.current?.setMicMuted(true);
+      setMicMuted(true);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
+
+  const readMicLevel = useCallback(() => engineRef.current?.getMicLevelDb() ?? -100, []);
+  const readDuckDb = useCallback(() => engineRef.current?.getDuckGainDb() ?? 0, []);
+
   const toggleLive = useCallback(async () => {
     if (live === "live" || live === "connecting" || live === "reconnecting") {
       senderRef.current?.stop();
@@ -324,7 +422,7 @@ export function StudioConsole() {
   }, [decks, play, pause]);
 
   return (
-    <div className="studio grid gap-4">
+    <div ref={rootRef} className="studio">
       <LiveBar
         state={live}
         user={creds.user}
@@ -346,7 +444,7 @@ export function StudioConsole() {
         }}
         message={message}
       />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="studio-decks">
         {(["A", "B"] as const).map((id) => (
           <DeckPanel
             key={id}
@@ -363,7 +461,55 @@ export function StudioConsole() {
           />
         ))}
       </div>
-      <div className="grid items-start gap-4 xl:grid-cols-[2fr_1fr]">
+      <div className="studio-voice-row">
+        <MicPanel
+          active={micActive}
+          muted={micMuted}
+          gain={micGain}
+          gateDb={gateDb}
+          devices={devices}
+          deviceId={deviceId}
+          error={micError}
+          readLevel={readMicLevel}
+          onStart={() => void startMic()}
+          onStop={stopMic}
+          onMuted={(m) => {
+            setMicMuted(m);
+            engineRef.current?.setMicMuted(m);
+          }}
+          onGain={(g) => {
+            setMicGain(g);
+            engineRef.current?.setMicGain(g);
+          }}
+          onGate={(db) => {
+            setGateDb(db);
+            engineRef.current?.setMicGateThreshold(db);
+          }}
+          onDevice={setDeviceId}
+        />
+        <DuckingPanel
+          settings={duck}
+          onChange={(d) => {
+            setDuck(d);
+            engineRef.current?.setDuck(d);
+          }}
+          onForce={(on) => engineRef.current?.setDuckForced(on)}
+          readDuckDb={readDuckDb}
+        />
+        <EqPanel
+          music={eqMusic}
+          mic={eqMic}
+          onMusic={(e) => {
+            setEqMusic(e);
+            engineRef.current?.setEq("music", e);
+          }}
+          onMic={(e) => {
+            setEqMic(e);
+            engineRef.current?.setEq("mic", e);
+          }}
+        />
+      </div>
+      <div className="studio-bottom">
       <QueuePanel
         queue={queue}
         rejected={rejected}

@@ -170,7 +170,7 @@ export function LibraryPanel({ onAdd }: { onAdd: (items: QueueItem[]) => void })
               Añadir todo ({files.length})
             </button>
           )}
-          <ul className="mt-3 grid max-h-[28rem] gap-2 overflow-y-auto">
+          <ul className="studio-scroll mt-3">
             {showLists &&
               lists.map((l) => (
                 <li key={l.id} className="studio-row">

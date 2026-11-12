@@ -44,15 +44,19 @@ export function LiveBar({
   const on = state === "live" || state === "connecting" || state === "reconnecting";
   return (
     <section className="studio-livebar panel" data-state={state} aria-label="Emisión">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+        <div className="mr-2">
+          <p className="mono text-accent-ink">StereoFace Radio</p>
+          <h1 className="display-up text-[1.5rem] leading-none">Estudio en vivo</h1>
+        </div>
         <label className="block">
           <span className="mono muted block">Usuario DJ</span>
-          <input className="input" value={user} onChange={(e) => onUser(e.target.value)} autoComplete="username" disabled={on} />
+          <input className="input !py-1.5" value={user} onChange={(e) => onUser(e.target.value)} autoComplete="username" disabled={on} />
         </label>
         <label className="block">
           <span className="mono muted block">Contraseña</span>
           <input
-            className="input"
+            className="input !py-1.5"
             type="password"
             value={password}
             onChange={(e) => onPassword(e.target.value)}
@@ -60,12 +64,7 @@ export function LiveBar({
             disabled={on}
           />
         </label>
-        <button
-          type="button"
-          className={on ? "btn" : "btn btn-accent"}
-          onClick={onToggle}
-          disabled={!on && (!user || !password)}
-        >
+        <button type="button" className={on ? "btn" : "btn btn-accent"} onClick={onToggle} disabled={!on && (!user || !password)}>
           {on ? "Terminar" : "EN VIVO"}
         </button>
         <p className="studio-status" role="status" aria-live="polite">
@@ -73,24 +72,17 @@ export function LiveBar({
           {LABEL[state]}
           {state === "live" && <span className="mono muted"> · {formatTime(elapsedSec)}</span>}
         </p>
-      </div>
-      {message && (
-        <p role="alert" className="mono mt-2 text-[var(--violet)]">
-          {message}
-        </p>
-      )}
-      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
-        <div>
-          <span className="mono muted">Master</span>
-          <MeterBar db={masterDb} label="Nivel de salida (master)" className="mt-1" />
-        </div>
-        <div className="flex items-center gap-4">
+        <div className="ml-auto flex min-w-[16rem] flex-1 items-center gap-4 sm:max-w-[34rem]">
+          <div className="flex-1">
+            <span className="mono muted">Master</span>
+            <MeterBar db={masterDb} label="Nivel de salida (master)" className="mt-1" />
+          </div>
           <label className="mono muted flex items-center gap-2">
             Vol
             <input
               type="range"
               aria-label="Volumen master"
-              className="studio-range"
+              className="studio-range w-24"
               min={0}
               max={1}
               step={0.01}
@@ -98,11 +90,16 @@ export function LiveBar({
               onChange={(e) => onMasterVolume(Number(e.target.value))}
             />
           </label>
-          <label className="mono muted flex items-center gap-2">
+          <label className="mono muted flex items-center gap-2 whitespace-nowrap">
             <input type="checkbox" checked={monitor} onChange={(e) => onMonitor(e.target.checked)} /> Escuchar salida
           </label>
         </div>
       </div>
+      {message && (
+        <p role="alert" className="mono mt-2 text-[var(--violet)]">
+          {message}
+        </p>
+      )}
     </section>
   );
 }
