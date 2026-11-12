@@ -146,6 +146,9 @@ function autoHeroConfig(c: StoryCard): HeroConfig {
  * tarjetas destacadas, los siguientes más recientes. Ninguno se repite entre carrusel, destacados y el resto de
  * secciones. Los bloques fijados a mano en el panel (opcionales) van primero y el resto se completa automáticamente.
  */
+/** «Lo más reciente» junto al carrusel: llena la altura del hero en pantallas anchas (debajo del hero solo se ven 3). */
+const RECENT_SIZE = 5;
+
 export async function getHomeData(db: Db, now = new Date()): Promise<HomeData> {
   const [pinnedHeroRows, pinnedFeatureRows] = await Promise.all([blocksOf(db, "hero", now), blocksOf(db, "feature", now)]);
   const pinnedHero: HeroSlide[] = pinnedHeroRows.map(({ config, ...r }) => ({ ...toCard(r), config: config as HeroConfig }));
@@ -171,7 +174,7 @@ export async function getHomeData(db: Db, now = new Date()): Promise<HomeData> {
   const blockIds = [...hero, ...features].map((a) => a.id);
 
   const [feed, electronica, indie, artists, releases, events, sectionRows] = await Promise.all([
-    latestIn(db, now, blockIds, 8),
+    latestIn(db, now, blockIds, 10),
     latestIn(db, now, blockIds, 3, "electronica"),
     latestIn(db, now, blockIds, 3, "indie"),
     listFeaturedArtists(db, 4),
@@ -183,8 +186,8 @@ export async function getHomeData(db: Db, now = new Date()): Promise<HomeData> {
   return {
     hero,
     features,
-    recent: feed.slice(0, 3),
-    latest: feed.slice(3, 8),
+    recent: feed.slice(0, RECENT_SIZE),
+    latest: feed.slice(RECENT_SIZE, RECENT_SIZE + 5),
     electronica,
     indie,
     artists,

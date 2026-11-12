@@ -202,7 +202,7 @@ async function HomeContent() {
                 return (
                   <li
                     key={s.id}
-                    className="hover-host grid grid-cols-[6.2rem_1fr] gap-4 border-b border-line py-4"
+                    className={`hover-host grid-cols-[6.2rem_1fr] gap-4 border-b border-line py-4 ${i >= 3 ? "hidden xl:grid" : "grid"}`}
                     data-reveal
                     data-delay={0.1 * i}
                   >

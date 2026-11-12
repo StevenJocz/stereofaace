@@ -30,7 +30,7 @@ describe("portada", () => {
     expect(d.hero[0].config.lines.length).toBeGreaterThan(1);
     expect(d.hero[0].config.figure).toBe(true);
     expect(d.features).toHaveLength(4);
-    expect(d.recent).toHaveLength(3);
+    expect(d.recent).toHaveLength(5);
     expect(d.latest).toHaveLength(5);
     expect(d.electronica.length).toBeGreaterThan(0);
     expect(d.indie.length).toBeGreaterThan(0);
