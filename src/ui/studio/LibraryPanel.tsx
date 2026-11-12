@@ -144,7 +144,7 @@ export function LibraryPanel({
     >
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="display-up text-[1.4rem]">Biblioteca</h2>
-        <div role="tablist" aria-label="Origen" className="flex gap-2">
+        <div role="tablist" aria-label="Origen" className="flex flex-wrap gap-1.5">
           {(["folders", "playlists", "saved", "history"] as const).map((t) => (
             <button
               key={t}

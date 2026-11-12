@@ -18,6 +18,7 @@ import { loadCover, type DeckCover } from "./engine/deck-cover";
 import { FLAT_EQ, type EqSettings } from "./engine/eq";
 import { DEFAULT_DUCK, type DuckSettings } from "./engine/voice";
 import { pickNext, shouldAdvanceOnEnd, shouldStartFade } from "./engine/autoplay";
+import { DjGate, type DjEntry } from "./DjGate";
 import { queueReducer, type QueueItem } from "./engine/queue";
 import { WEBCAST_MIME, WEBCAST_URL, WebcastSender, type LiveState, type RecorderLike, type SocketLike } from "./engine/webcast";
 
@@ -46,7 +47,14 @@ function parseCreds(raw: string): Partial<Creds> {
 
 const noopSubscribe = () => () => {};
 
+/** Primero la entrada del DJ (usuario, contraseña y programa); después, la consola. */
 export function StudioConsole() {
+  const [entry, setEntry] = useState<DjEntry | null>(null);
+  if (!entry) return <DjGate onEnter={setEntry} />;
+  return <StudioConsoleInner entry={entry} />;
+}
+
+function StudioConsoleInner({ entry }: { entry: DjEntry }) {
   const [queue, dispatch] = useReducer(queueReducer, [] as QueueItem[]);
   const [rejected, setRejected] = useState<string[]>([]);
   const [auto, setAuto] = useState(true);
@@ -54,7 +62,7 @@ export function StudioConsole() {
   const [active, setActive] = useState<DeckId>("A");
   const [live, setLive] = useState<LiveState>("offline");
   const rawCreds = useSyncExternalStore(noopSubscribe, storedCreds, () => "");
-  const [edits, setEdits] = useState<Partial<Creds>>({});
+  const [edits, setEdits] = useState<Partial<Creds>>({ user: entry.user, password: entry.password });
   const creds = useMemo<Creds>(() => ({ user: "", password: "", ...parseCreds(rawCreds), ...edits }), [rawCreds, edits]);
   const [elapsed, setElapsed] = useState(0);
   const [masterVolume, setMasterVolume] = useState(0.9);
@@ -71,8 +79,9 @@ export function StudioConsole() {
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
+  const [tool, setTool] = useState<"carts" | "voice" | "eq">("carts");
   const [djInfo, setDjInfo] = useState<DjProgramInfo | null>(null);
-  const [programChoice, setProgramChoice] = useState("");
+  const [programChoice, setProgramChoice] = useState(entry.programChoice);
   const [cartState, setCartState] = useState<"loading" | "ready" | "error">("loading");
   const [cartsPlaying, setCartsPlaying] = useState<ReadonlySet<string>>(new Set());
 
@@ -283,9 +292,9 @@ export function StudioConsole() {
         el.style.height = "";
         return;
       }
-      const pad = parseFloat(getComputedStyle(el.parentElement ?? el).paddingBottom) || 0;
+      const pad = (parseFloat(getComputedStyle(el.parentElement ?? el).paddingBottom) || 0) + (parseFloat(getComputedStyle(document.body).paddingBottom) || 0); // relleno del contenedor + espacio del reproductor fijo
       const bleed = 20; // el margen negativo de .studio compensa parte del relleno del contenedor
-      el.style.height = `${Math.max(560, window.innerHeight - el.getBoundingClientRect().top - pad + bleed)}px`;
+      el.style.height = `${Math.max(760, window.innerHeight - el.getBoundingClientRect().top - pad + bleed)}px`;
     };
     fit();
     window.addEventListener("resize", fit);
@@ -683,55 +692,6 @@ export function StudioConsole() {
             }}
           />
         ))}
-        <CartWall carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
-      </div>
-      <div className="studio-voice-row">
-        <MicPanel
-          active={micActive}
-          muted={micMuted}
-          gain={micGain}
-          gateDb={gateDb}
-          devices={devices}
-          deviceId={deviceId}
-          error={micError}
-          readLevel={readMicLevel}
-          onStart={() => void startMic()}
-          onStop={stopMic}
-          onMuted={(m) => {
-            setMicMuted(m);
-            engineRef.current?.setMicMuted(m);
-          }}
-          onGain={(g) => {
-            setMicGain(g);
-            engineRef.current?.setMicGain(g);
-          }}
-          onGate={(db) => {
-            setGateDb(db);
-            engineRef.current?.setMicGateThreshold(db);
-          }}
-          onDevice={setDeviceId}
-        />
-        <DuckingPanel
-          settings={duck}
-          onChange={(d) => {
-            setDuck(d);
-            engineRef.current?.setDuck(d);
-          }}
-          onForce={(on) => engineRef.current?.setDuckForced(on)}
-          readDuckDb={readDuckDb}
-        />
-        <EqPanel
-          music={eqMusic}
-          mic={eqMic}
-          onMusic={(e) => {
-            setEqMusic(e);
-            engineRef.current?.setEq("music", e);
-          }}
-          onMic={(e) => {
-            setEqMic(e);
-            engineRef.current?.setEq("mic", e);
-          }}
-        />
       </div>
       <div className="studio-bottom">
       <QueuePanel
@@ -748,6 +708,72 @@ export function StudioConsole() {
         onLoad={(item, id) => void loadToDeck(item, id)}
       />
       <LibraryPanel onAdd={(items) => dispatch({ type: "add", items })} queue={queue} />
+        <section className="studio-tools panel" aria-label="Herramientas">
+          <div role="tablist" aria-label="Herramientas del estudio" className="studio-tabs">
+            {([
+              ["carts", "Cart Wall", cartsPlaying.size > 0],
+              ["voice", "Voz", micActive && !micMuted],
+              ["eq", "Ecualizador", false],
+            ] as const).map(([k, label, hot]) => (
+              <button key={k} type="button" role="tab" id={`tool-tab-${k}`} aria-selected={tool === k} aria-controls={`tool-${k}`} className="studio-tab" data-hot={hot} onClick={() => setTool(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div id="tool-carts" role="tabpanel" aria-labelledby="tool-tab-carts" className="studio-tool-body" hidden={tool !== "carts"}>
+            <CartWall carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
+          </div>
+          <div id="tool-voice" role="tabpanel" aria-labelledby="tool-tab-voice" className="studio-tool-body grid content-start gap-4" hidden={tool !== "voice"}>
+            <MicPanel
+              active={micActive}
+              muted={micMuted}
+              gain={micGain}
+              gateDb={gateDb}
+              devices={devices}
+              deviceId={deviceId}
+              error={micError}
+              readLevel={readMicLevel}
+              onStart={() => void startMic()}
+              onStop={stopMic}
+              onMuted={(m) => {
+                setMicMuted(m);
+                engineRef.current?.setMicMuted(m);
+              }}
+              onGain={(g) => {
+                setMicGain(g);
+                engineRef.current?.setMicGain(g);
+              }}
+              onGate={(db) => {
+                setGateDb(db);
+                engineRef.current?.setMicGateThreshold(db);
+              }}
+              onDevice={setDeviceId}
+            />
+            <DuckingPanel
+              settings={duck}
+              onChange={(d) => {
+                setDuck(d);
+                engineRef.current?.setDuck(d);
+              }}
+              onForce={(on) => engineRef.current?.setDuckForced(on)}
+              readDuckDb={readDuckDb}
+            />
+          </div>
+          <div id="tool-eq" role="tabpanel" aria-labelledby="tool-tab-eq" className="studio-tool-body" hidden={tool !== "eq"}>
+            <EqPanel
+              music={eqMusic}
+              mic={eqMic}
+              onMusic={(e) => {
+                setEqMusic(e);
+                engineRef.current?.setEq("music", e);
+              }}
+              onMic={(e) => {
+                setEqMic(e);
+                engineRef.current?.setEq("mic", e);
+              }}
+            />
+          </div>
+        </section>
       </div>
     </div>
   );

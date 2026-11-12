@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
@@ -5,6 +6,7 @@ import { can } from "@/lib/rbac";
 import { getDashboardStats } from "@/modules/dashboard/service";
 import { ADMIN_NAV } from "@/ui/admin/nav";
 import { PageHead } from "@/ui/admin/fields";
+import { OnAirPanel } from "@/ui/admin/OnAirPanel";
 
 const dateTime = new Intl.DateTimeFormat("es-CO", {
   dateStyle: "short",
@@ -83,6 +85,12 @@ export default async function AdminHome({
         <p role="alert" className="mono mt-4 text-[#ffb020]">
           Tu rol no tiene acceso a esa sección.
         </p>
+      )}
+
+      {can(user.role, "station:read") && (
+        <Suspense fallback={<div className="panel mt-10 h-48 animate-pulse" aria-busy="true" />}>
+          <OnAirPanel actor={user} />
+        </Suspense>
       )}
 
       <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

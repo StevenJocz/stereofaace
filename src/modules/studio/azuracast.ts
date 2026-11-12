@@ -97,6 +97,11 @@ export class AzuraClient {
     return all.filter((m) => m.playlists?.some((p) => p.id === id)).map(toFile);
   }
 
+  /** Últimas reproducciones de la estación (respuesta cruda; requiere clave con permiso de lectura de la estación). */
+  async history(limit: number): Promise<unknown> {
+    return this.json<unknown>(`/history?per_page=${Math.min(Math.max(Math.trunc(limit) || 10, 1), 50)}`);
+  }
+
   /** Carátula de una pista (AzuraCast devuelve una imagen genérica si no tiene). */
   async art(id: string): Promise<Response> {
     if (!/^\d+$/.test(id)) throw new DomainError("azuracast_bad_id", "Identificador de pista no válido.");

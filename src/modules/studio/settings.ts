@@ -20,7 +20,8 @@ export const studioConfigSchema = z.object({
 });
 export type StudioConfigInput = z.input<typeof studioConfigSchema>;
 
-async function readStored(db: Db) {
+/** Solo servidor: incluye la clave. Nunca devolver este objeto al navegador. */
+export async function readStored(db: Db) {
   const [row] = await db.select().from(siteSettings).where(eq(siteSettings.key, KEY));
   const parsed = stored.safeParse(row?.value);
   return parsed.success ? parsed.data : { ...DEFAULTS, apiKey: "" };

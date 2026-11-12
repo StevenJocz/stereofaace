@@ -13,11 +13,17 @@ function Channel({ title, value, onChange }: { title: string; value: EqSettings;
     <div>
       <p className="display-up text-[1.1rem]">{title}</p>
       {BANDS.map((b) => (
-        <label key={b.key} className="mono muted mt-2 flex items-center gap-2">
-          <span className="w-16 shrink-0">{b.label}</span>
+        <label key={b.key} className="mono muted mt-2 block">
+          <span className="flex items-center justify-between gap-2">
+            <span>{b.label}</span>
+            <span className="whitespace-nowrap">
+              {value[b.key] > 0 ? "+" : ""}
+              {value[b.key]} dB
+            </span>
+          </span>
           <input
             type="range"
-            className="studio-range flex-1"
+            className="studio-range mt-0.5 w-full"
             aria-label={`${b.label} de ${title.toLowerCase()}`}
             min={-12}
             max={12}
@@ -25,7 +31,6 @@ function Channel({ title, value, onChange }: { title: string; value: EqSettings;
             value={value[b.key]}
             onChange={(e) => onChange({ ...value, [b.key]: Number(e.target.value) })}
           />
-          <span className="w-14 text-right">{value[b.key] > 0 ? "+" : ""}{value[b.key]} dB</span>
         </label>
       ))}
       <button type="button" className="btn mt-2 !px-3 !py-1" onClick={() => onChange(FLAT_EQ)}>

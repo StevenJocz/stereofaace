@@ -5,6 +5,8 @@ import { Art } from "@/ui/Art";
 import { useRadio, type RadioStatus } from "./RadioProvider";
 import { ScheduleModal } from "./ScheduleModal";
 import { OWN_STATION_SLUG, useNowPlayingProgram } from "./useNowPlayingProgram";
+import { TrackList } from "./StationTracks";
+import { useStationTracks } from "./useStationTracks";
 import { Visualizer } from "./Visualizer";
 import type { PublicStation } from "@/modules/radio/service";
 
@@ -194,6 +196,7 @@ export function RadioBar() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   // La programación solo existe para la emisora propia (StereoFace Radio).
   const program = useNowPlayingProgram(r.current?.slug === OWN_STATION_SLUG);
+  const tracks = useStationTracks(r.current?.slug === OWN_STATION_SLUG);
 
   // Publica la altura real para reservar espacio y colocar el panel.
   useEffect(() => {
@@ -329,14 +332,19 @@ export function RadioBar() {
                 )}
               </div>
               <p className="mono mt-1 truncate text-[0.62rem] text-muted lg:hidden">
-                <Attribution s={s} />
+                {own && tracks?.nowPlaying ? `♪ ${tracks.nowPlaying.artist ? `${tracks.nowPlaying.title} — ${tracks.nowPlaying.artist}` : tracks.nowPlaying.title}` : <Attribution s={s} />}
               </p>
               <span className="sr-only" role="status" aria-live="polite">
                 {STATUS[r.status].label}. {r.detail}
               </span>
             </div>
 
-            <div className="hidden h-11 min-w-0 flex-1 lg:block">
+            {own && tracks?.nowPlaying && (
+              <div className="hidden min-w-0 flex-1 lg:block">
+                <TrackList tracks={tracks} />
+              </div>
+            )}
+            <div className={own && tracks?.nowPlaying ? (r.analysable ? "hidden h-11 w-40 shrink-0 lg:block" : "hidden") : "hidden h-11 min-w-0 flex-1 lg:block"}>
               <Visualizer
                 active={r.status === "playing"}
                 analysable={r.analysable}
