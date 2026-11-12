@@ -97,6 +97,11 @@ export class AzuraClient {
     return all.filter((m) => m.playlists?.some((p) => p.id === id)).map(toFile);
   }
 
+  /** Salta la pista en curso del AutoDJ (para que un cambio de listas se oiga sin esperar). */
+  async skipCurrent(): Promise<void> {
+    await this.request("/backend/skip", {}, [], { method: "POST" });
+  }
+
   /** Listas de reproducción tal como las entrega AzuraCast (incluye el origen y la dirección remota). */
   async listPlaylistsRaw(): Promise<{ id: number; name: string; source?: string; type?: string; remote_url?: string | null; is_enabled?: boolean }[]> {
     return this.json("/playlists");

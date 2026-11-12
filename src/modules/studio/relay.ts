@@ -87,14 +87,21 @@ async function syncAutodj(db: Db, name: string, url: string, enabled: boolean, p
     const active = enabled && url !== "";
     const body = { name, source: "remote_url", remote_type: "stream", remote_url: url, is_enabled: active, type: "default" };
     let touched = false;
+    let skip = false;
     if (found) {
       await client.updatePlaylist(found.id, { ...body, weight: 25 });
       touched = true;
+      skip = found.remote_url !== url || found.is_enabled !== active;
     } else if (active) {
       await client.createPlaylist({ ...body, order: "shuffle", weight: 25, remote_buffer: 0 });
       touched = true;
+      skip = true;
     }
     if (active) {
+      // Una señal nueva reemplaza a la anterior: las otras listas «URL remota» encendidas se apagan (y no se restauran).
+      const oldSignals = lists.filter((p) => p.id !== found?.id && p.source === "remote_url" && p.is_enabled === true);
+      for (const p of oldSignals) await client.updatePlaylist(p.id, { is_enabled: false });
+      if (oldSignals.length > 0) skip = true;
       const music = lists.filter((p) => p.id !== found?.id && p.source === "songs" && p.type === "default" && p.is_enabled === true);
       for (const p of music) await client.updatePlaylist(p.id, { is_enabled: false });
       paused = [...new Set([...previouslyPaused, ...music.map((p) => p.id)])];
@@ -102,6 +109,7 @@ async function syncAutodj(db: Db, name: string, url: string, enabled: boolean, p
       for (const id of previouslyPaused) if (lists.some((p) => p.id === id)) await client.updatePlaylist(id, { is_enabled: true });
       paused = [];
     }
+    if (skip) await client.skipCurrent().catch(() => undefined); // si no hay permiso para saltar, el cambio se oye al terminar la pista
     return { autodj: touched || previouslyPaused.length > 0 ? "synced" : "skipped", paused };
   } catch (error) {
     return { autodj: "failed", paused, detail: error instanceof Error ? error.message : "Error desconocido." };

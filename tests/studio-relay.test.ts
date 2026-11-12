@@ -180,3 +180,25 @@ describe("estado del AutoDJ en AzuraCast (diagnóstico)", () => {
     expect(st.error).toMatch(/clave/i);
   });
 });
+
+describe("cambiar de señal reemplaza a la anterior en el AutoDJ", () => {
+  const old = { id: 11, name: "Trance Is Star Radio", source: "remote_url", type: "default", is_enabled: true, remote_url: "https://myradio24.org/tisradio" };
+  const music = { id: 3, name: "Creative Commons", source: "songs", type: "default", is_enabled: false };
+  const input = (autodj: boolean) => ({ name: "Legacy Oldies", url: "https://stream.example.org/oldies.mp3", autodj });
+
+  it("al activar una señal nueva apaga las listas de señal anteriores y salta la pista en curso", async () => {
+    const { f, calls } = azura([old, music]);
+    await saveRelayConfig(h.db, admin, input(true), f);
+    const off = calls.filter((c) => c.method === "PUT" && (c.body as { is_enabled?: boolean }).is_enabled === false);
+    expect(off.map((c) => c.url.split("/").pop())).toContain("11"); // la señal vieja deja de sonar
+    expect(calls.find((c) => c.method === "POST" && c.url.endsWith("/playlists"))?.body).toMatchObject({ name: "Legacy Oldies", remote_url: "https://stream.example.org/oldies.mp3" });
+    expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/backend/skip"))).toBe(true); // para que el cambio se oiga ya
+  });
+
+  it("al desactivar el AutoDJ no vuelve a encender la señal vieja (solo la música que se pausó)", async () => {
+    const { f, calls } = azura([{ ...old, is_enabled: false }, { ...music, is_enabled: false }]);
+    await saveRelayConfig(h.db, admin, input(false), f);
+    const on = calls.filter((c) => c.method === "PUT" && (c.body as { is_enabled?: boolean }).is_enabled === true);
+    expect(on.map((c) => c.url.split("/").pop())).not.toContain("11");
+  });
+});
