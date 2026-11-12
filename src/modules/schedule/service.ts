@@ -59,6 +59,7 @@ export type ProgramAdminView = {
   hosts: string | null;
   djUsername: string | null;
   photoId: string | null;
+  photoUrl: string | null;
   color: string;
   active: boolean;
   slots: number;
@@ -67,11 +68,12 @@ export type ProgramAdminView = {
 export async function listProgramsAdmin(db: Db, actor: Actor | null): Promise<ProgramAdminView[]> {
   assertCan(actor, "station:update");
   const rows = await db
-    .select({ p: radioPrograms, slots: sql<number>`(select count(*) from radio_schedule where radio_schedule.program_id = radio_programs.id)`.mapWith(Number) })
+    .select({ p: radioPrograms, key: media.storageKey, slots: sql<number>`(select count(*) from radio_schedule where radio_schedule.program_id = radio_programs.id)`.mapWith(Number) })
     .from(radioPrograms)
+    .leftJoin(media, eq(media.id, radioPrograms.photoId))
     .where(live)
     .orderBy(asc(radioPrograms.name));
-  return rows.map(({ p, slots }) => ({
+  return rows.map(({ p, key, slots }) => ({
     id: p.id,
     slug: p.slug,
     name: p.name,
@@ -79,6 +81,7 @@ export async function listProgramsAdmin(db: Db, actor: Actor | null): Promise<Pr
     hosts: p.hosts,
     djUsername: p.djUsername,
     photoId: p.photoId,
+    photoUrl: key ? `/media/${key}` : null,
     color: p.color,
     active: p.active,
     slots,
