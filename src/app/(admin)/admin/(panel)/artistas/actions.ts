@@ -7,7 +7,7 @@ import { DomainError } from "@/lib/errors";
 import { guard, str, strs, type FormState } from "@/lib/admin/form";
 import { createArtist, deleteArtist, restoreArtist, updateArtist } from "@/modules/artists/admin";
 
-const LINK_KEYS = ["spotify", "soundcloud", "bandcamp", "youtube", "instagram", "web"] as const;
+const LINK_KEYS = ["spotify", "soundcloud", "bandcamp", "youtube", "instagram", "x", "facebook", "tiktok", "web"] as const;
 
 function artistRaw(fd: FormData) {
   const scene = str(fd, "scene");

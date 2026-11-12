@@ -20,6 +20,9 @@ const LINK_LABEL: Record<string, string> = {
   bandcamp: "Bandcamp",
   youtube: "YouTube",
   instagram: "Instagram",
+  x: "X",
+  facebook: "Facebook",
+  tiktok: "TikTok",
   web: "Sitio web",
 };
 
@@ -65,7 +68,10 @@ async function ProfileView({ params }: { params: Promise<Params> }) {
   const p = await getArtistProfile(await getDb(), slug);
   if (!p) notFound();
   const country = countryName(p.country);
-  const links = Object.entries(p.links).filter(([, url]) => !!url) as [string, string][];
+  const order = Object.keys(LINK_LABEL);
+  const links = (Object.entries(p.links).filter(([, url]) => !!url) as [string, string][]).sort(
+    ([a], [b]) => order.indexOf(a) - order.indexOf(b),
+  );
   const art = p.coverArt ?? { scene: "wave" as const, tone: "acid" as const, seed: 7 };
 
   const jsonLd = {

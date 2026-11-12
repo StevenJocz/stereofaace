@@ -17,6 +17,9 @@ export const artistInputSchema = z.object({
       bandcamp: httpsUrlSchema.optional(),
       youtube: httpsUrlSchema.optional(),
       instagram: httpsUrlSchema.optional(),
+      x: httpsUrlSchema.optional(),
+      facebook: httpsUrlSchema.optional(),
+      tiktok: httpsUrlSchema.optional(),
       web: httpsUrlSchema.optional(),
     })
     .default({}),

@@ -17,7 +17,7 @@ export type ArtistFormValues = {
   featured?: boolean;
   photo?: { id: string; url: string } | null;
   coverArt?: { scene: string; tone: string; seed: number } | null;
-  links?: Partial<Record<"spotify" | "soundcloud" | "bandcamp" | "youtube" | "instagram" | "web", string>>;
+  links?: Partial<Record<"spotify" | "soundcloud" | "bandcamp" | "youtube" | "instagram" | "x" | "facebook" | "tiktok" | "web", string>>;
 };
 
 const LINKS: [keyof NonNullable<ArtistFormValues["links"]>, string][] = [
@@ -26,6 +26,9 @@ const LINKS: [keyof NonNullable<ArtistFormValues["links"]>, string][] = [
   ["bandcamp", "Bandcamp"],
   ["youtube", "YouTube"],
   ["instagram", "Instagram"],
+  ["x", "X (Twitter)"],
+  ["facebook", "Facebook"],
+  ["tiktok", "TikTok"],
   ["web", "Sitio web"],
 ];
 

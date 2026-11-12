@@ -60,7 +60,7 @@ jobs:
 
       - name: Construir imagen
         working-directory: /opt/stereoface
-        run: docker compose build web
+        run: docker compose build
 
       - name: Reiniciar (aplica migraciones)
         working-directory: /opt/stereoface

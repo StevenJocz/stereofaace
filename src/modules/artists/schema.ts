@@ -5,7 +5,7 @@ import { genres } from "@/modules/taxonomy/schema";
 import type { CoverArt } from "@/modules/media/cover-art";
 
 export type ArtistLinks = Partial<
-  Record<"spotify" | "soundcloud" | "bandcamp" | "youtube" | "instagram" | "web", string>
+  Record<"spotify" | "soundcloud" | "bandcamp" | "youtube" | "instagram" | "x" | "facebook" | "tiktok" | "web", string>
 >;
 
 export const artists = pgTable(
