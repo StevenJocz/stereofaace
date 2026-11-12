@@ -177,7 +177,7 @@ export async function getHomeData(db: Db, now = new Date()): Promise<HomeData> {
     latestIn(db, now, blockIds, 10),
     latestIn(db, now, blockIds, 3, "electronica"),
     latestIn(db, now, blockIds, 3, "indie"),
-    listFeaturedArtists(db, 4),
+    listFeaturedArtists(db, 4, { random: true }),
     listLatestReleases(db, 6, now),
     listUpcomingEvents(db, { limit: 6 }, now),
     db.select({ name: categories.name }).from(categories).orderBy(asc(categories.position)).limit(8),

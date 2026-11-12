@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/lib/db";
 import type { CoverArt } from "@/modules/media/cover-art";
 import { media } from "@/modules/media/schema";
@@ -17,7 +17,11 @@ export type ArtistCard = {
   isDemo: boolean;
 };
 
-export async function listFeaturedArtists(db: Db, limit = 4): Promise<ArtistCard[]> {
+/**
+ * Artistas para tarjetas. Por defecto, los destacados ordenados por nombre (estable).
+ * Con `random` se eligen al azar entre todos los artistas activos: cada visita ve otros.
+ */
+export async function listFeaturedArtists(db: Db, limit = 4, opts: { random?: boolean } = {}): Promise<ArtistCard[]> {
   const rows = await db
     .select({
       id: artists.id,
@@ -30,8 +34,8 @@ export async function listFeaturedArtists(db: Db, limit = 4): Promise<ArtistCard
     })
     .from(artists)
     .leftJoin(media, eq(media.id, artists.photoId))
-    .where(and(eq(artists.featured, true), isNull(artists.deletedAt)))
-    .orderBy(asc(artists.name))
+    .where(opts.random ? isNull(artists.deletedAt) : and(eq(artists.featured, true), isNull(artists.deletedAt)))
+    .orderBy(opts.random ? sql`random()` : asc(artists.name))
     .limit(limit);
   if (rows.length === 0) return [];
 

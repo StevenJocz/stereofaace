@@ -434,12 +434,12 @@ async function HomeContent() {
       {data.artists.length > 0 && (
         <>
           <div className="mt-28" />
-          <SectionHead n="04" label="Artistas destacados" id="artistas">
+          <SectionHead n="04" label="Artistas" id="artistas">
             <Link href="/artistas" className="mono hover:text-accent-ink">
               Ver todos →
             </Link>
           </SectionHead>
-          <section aria-label="Artistas destacados" className="wrap">
+          <section aria-label="Artistas" className="wrap">
             <h2 className="display t-xl">
               <Mask>Artistas</Mask>
             </h2>

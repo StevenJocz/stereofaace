@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import type { DbHandle } from "@/lib/db";
 import { ForbiddenError } from "@/lib/rbac";
 import { rateLimit, resetRateLimits } from "@/lib/rate-limit";
-import { articles, auditLogs, articleRevisions, categories, events, genres, homeBlocks, users } from "@/db/schema";
+import { artists, articles, auditLogs, articleRevisions, categories, events, genres, homeBlocks, users } from "@/db/schema";
 import { getArticleBySlug, getHomeData, listPublishedArticles } from "@/modules/content/service";
 import { createArticle } from "@/modules/content/admin";
 import { listUpcomingEvents } from "@/modules/events/service";
@@ -40,6 +40,25 @@ describe("portada", () => {
     expect(d.releases[0].artistNames.length).toBeGreaterThan(0);
     expect(d.events).toHaveLength(6);
     expect(d.sections.length).toBeGreaterThan(3);
+  });
+
+  it("los artistas de la portada cambian en cada visita (al azar, sin repetirse dentro de una misma)", async () => {
+    // El seed trae pocos artistas: se suman otros (demo) para que haya de dónde elegir.
+    await h.db.insert(artists).values(Array.from({ length: 10 }, (_, i) => ({ slug: `azar-${i}`, name: `Azar ${i}`, isDemo: true })));
+    const sets = new Set<string>();
+    for (let i = 0; i < 15; i++) {
+      const d = await getHomeData(h.db, NOW);
+      const ids = d.artists.map((a) => a.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      sets.add([...ids].sort().join(","));
+    }
+    expect(sets.size).toBeGreaterThan(1);
+  });
+
+  it("el listado de destacados sigue siendo estable (por nombre) para el resto del sitio", async () => {
+    const a = (await listFeaturedArtists(h.db, 20)).map((x) => x.id);
+    const b = (await listFeaturedArtists(h.db, 20)).map((x) => x.id);
+    expect(a).toEqual(b);
   });
 
   it("no repite artículos entre hero, destacados y feed", async () => {
