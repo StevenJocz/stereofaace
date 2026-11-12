@@ -42,7 +42,7 @@ Por qué: hoy los DJs solo tienen el WebDJ genérico de AzuraCast (dos listas, s
 - La mezcla ocurre en el navegador del DJ: si la pestaña se cierra o el equipo se duerme, la transmisión se corta y vuelve el AutoDJ. Se mitiga con Wake Lock, aviso al cerrar y reconexión automática.
 - Navegadores objetivo: Chrome y Edge (principal), Firefox. Safari sin garantía.
 - Next.js 16 con Cache Components: la página del estudio es dinámica y 100 % cliente (Web Audio), bajo `Suspense` y `connection()` como el resto del admin.
-- Permisos: reutilizar el recurso `station` del RBAC existente. Mi decisión: acceso al estudio con `station:update` (superadmin y admin). Un rol «DJ» propio requiere una migración y queda para después.
+- Permisos: reutilizar el recurso `station` del RBAC existente. Decisión: acceso al estudio con `station:update` (superadmin, admin y editor, según el RBAC existente); los ajustes con la clave de AzuraCast exigen `station:manage` (solo admin y superadmin). Un rol «DJ» propio requiere una migración y queda para después.
 - Las credenciales del DJ (usuario y contraseña de AzuraCast) se escriben en la consola y viven solo en `sessionStorage`; nunca se envían a StereoFace ni se guardan.
 
 ## 6. Arquitectura
@@ -78,7 +78,7 @@ Cada fase termina con pruebas automatizadas del motor (vitest) y una verificaci�
 2. Una canción arrastrada a la cola suena en el deck libre; al acabar la actual, entra la siguiente con crossfade sin cortes audibles.
 3. Un jingle lanzado durante una canción se oye encima, y la música baja si el ducking está activo.
 4. El nivel de salida no supera 0 dBFS (limitador activo).
-5. Al desconectar o cerrar la pestaña, la radio vuelve al AutoDJ en menos de 15 s.
+5. Al desconectar o cerrar la pestaña, la radio vuelve al AutoDJ. Medido desde el oyente (2026-11-12): 16–18 s, por los buffers de AzuraCast (≈5 s en `input.harbor`), de Icecast y del navegador del oyente.
 6. Si se pierde la conexión, la consola reintenta y avisa claramente del estado.
 
 ## 9. Decisiones mías (revisables)
