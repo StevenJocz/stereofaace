@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/session";
-import { getRelayConfig } from "@/modules/studio/relay";
+import { getAutodjStatus, getRelayConfig } from "@/modules/studio/relay";
 import { getStudioConfig } from "@/modules/studio/settings";
 import { PageHead } from "@/ui/admin/fields";
 import { RelaySettingsForm, StudioSettingsForm } from "@/ui/studio/StudioSettingsForm";
@@ -8,7 +8,7 @@ import { RelaySettingsForm, StudioSettingsForm } from "@/ui/studio/StudioSetting
 export default async function StudioSettingsPage() {
   const user = await requirePermission("station:manage");
   const db = await getDb();
-  const [config, relay] = await Promise.all([getStudioConfig(db, user), getRelayConfig(db, user)]);
+  const [config, relay, autodj] = await Promise.all([getStudioConfig(db, user), getRelayConfig(db, user), getAutodjStatus(db, user)]);
   return (
     <>
       <PageHead eyebrow="StereoFace Radio" title="Ajustes del estudio" />
@@ -27,6 +27,26 @@ export default async function StudioSettingsPage() {
       <div className="mt-6">
         <RelaySettingsForm initial={relay} />
       </div>
+      <h3 className="display-up mt-10 text-[1.15rem]">Estado del AutoDJ en AzuraCast</h3>
+      {!autodj.hasKey ? (
+        <p className="mt-2 text-muted">Guarda la clave API de AzuraCast para ver aquí qué listas están activas.</p>
+      ) : autodj.error ? (
+        <p role="alert" className="mono mt-2 text-[var(--violet)]">
+          No se pudo leer AzuraCast: {autodj.error}
+        </p>
+      ) : (
+        <ul className="mt-3 grid max-w-[60ch] gap-1.5">
+          {autodj.lists.map((l) => (
+            <li key={l.name} className="flex items-center justify-between gap-3 rounded-[8px] border border-line px-3 py-2">
+              <span className="min-w-0 truncate font-bold">{l.name}</span>
+              <span className="mono flex shrink-0 items-center gap-2 text-[0.7rem]">
+                <span className="text-muted">{l.kind}</span>
+                <span className={l.enabled ? "badge badge-ok" : "badge"}>{l.enabled ? "Activa" : "Pausada"}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }

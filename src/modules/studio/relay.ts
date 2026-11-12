@@ -70,7 +70,7 @@ export async function loadRelayUrl(db: Db, actor: Actor | null): Promise<string 
   return c.url || null;
 }
 
-type SyncResult = { autodj: AutodjSync; paused: number[] };
+type SyncResult = { autodj: AutodjSync; paused: number[]; detail?: string };
 
 /**
  * Deja el AutoDJ de AzuraCast como pide la configuración. Con la señal activa se pausan las listas de música normales
@@ -103,13 +103,13 @@ async function syncAutodj(db: Db, name: string, url: string, enabled: boolean, p
       paused = [];
     }
     return { autodj: touched || previouslyPaused.length > 0 ? "synced" : "skipped", paused };
-  } catch {
-    return { autodj: "failed", paused };
+  } catch (error) {
+    return { autodj: "failed", paused, detail: error instanceof Error ? error.message : "Error desconocido." };
   }
 }
 
 /** Guarda la señal externa y, si hay clave de AzuraCast, deja la lista «URL remota» del AutoDJ al día. */
-export async function saveRelayConfig(db: Db, actor: Actor | null, raw: RelayInput, fetchImpl: typeof fetch = fetch): Promise<{ autodj: AutodjSync }> {
+export async function saveRelayConfig(db: Db, actor: Actor | null, raw: RelayInput, fetchImpl: typeof fetch = fetch): Promise<{ autodj: AutodjSync; detail?: string }> {
   assertCan(actor, "station:manage");
   const input = relayInputSchema.parse(raw);
   const before = await read(db);
@@ -124,5 +124,28 @@ export async function saveRelayConfig(db: Db, actor: Actor | null, raw: RelayInp
   await recordAudit(db, { userId: actor.id, action: "studio.relay.update", entity: "settings", diff: { name: input.name, url: input.url, autodj: input.autodj } });
   const r = await syncAutodj(db, input.name, input.url, input.autodj, before.paused, fetchImpl);
   if (r.paused !== before.paused) await persist(r.paused);
-  return { autodj: r.autodj };
+  return { autodj: r.autodj, detail: r.detail };
+}
+
+export type AutodjStatus = {
+  hasKey: boolean;
+  lists: { name: string; kind: "música" | "señal" | "otra"; enabled: boolean }[];
+  error: string | null;
+};
+
+/** Diagnóstico: cómo están hoy las listas del AutoDJ en AzuraCast (para ver por qué suena lo que suena). */
+export async function getAutodjStatus(db: Db, actor: Actor | null, fetchImpl: typeof fetch = fetch): Promise<AutodjStatus> {
+  assertCan(actor, "station:manage");
+  const cfg = await readStored(db);
+  if (!cfg.apiKey) return { hasKey: false, lists: [], error: null };
+  try {
+    const lists = await new AzuraClient(cfg, fetchImpl).listPlaylistsRaw();
+    return {
+      hasKey: true,
+      error: null,
+      lists: lists.map((p) => ({ name: p.name, kind: p.source === "remote_url" ? "señal" : p.source === "songs" ? "música" : "otra", enabled: p.is_enabled === true })),
+    };
+  } catch (error) {
+    return { hasKey: true, lists: [], error: error instanceof Error ? error.message : "No se pudo consultar AzuraCast." };
+  }
 }

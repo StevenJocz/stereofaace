@@ -4,7 +4,7 @@ import type { DbHandle } from "@/lib/db";
 import type { Actor } from "@/lib/rbac";
 import { ForbiddenError } from "@/lib/rbac";
 import { users } from "@/db/schema";
-import { getRelayConfig, getRelayPublic, saveRelayConfig } from "@/modules/studio/relay";
+import { getAutodjStatus, getRelayConfig, getRelayPublic, saveRelayConfig } from "@/modules/studio/relay";
 import { relayStreamHandler } from "@/modules/studio/relay-http";
 import { saveStudioConfig } from "@/modules/studio/settings";
 import { makeDb } from "./helpers";
@@ -94,6 +94,7 @@ describe("AutoDJ: lista «URL remota» en AzuraCast", () => {
     const bad = (async () => new Response("{}", { status: 500 })) as unknown as typeof fetch;
     const r = await saveRelayConfig(h.db, admin, { name: "Trance Is Star Radio", url: "https://stream.example.org/otra.mp3", autodj: true }, bad);
     expect(r.autodj).toBe("failed");
+    expect(r.detail).toContain("500"); // dice por qué falló, no solo que falló
     expect((await getRelayConfig(h.db, admin)).url).toBe("https://stream.example.org/otra.mp3");
   });
 });
@@ -153,5 +154,29 @@ describe("AutoDJ exclusivo: la señal manda mientras esté activa", () => {
     const again = azura(lists());
     await saveRelayConfig(h.db, admin, input(false), again.f);
     expect(again.calls.filter((c) => c.method === "PUT" && (c.body as { is_enabled?: boolean }).is_enabled === true)).toHaveLength(0); // ya no hay nada pausado por ella
+  });
+});
+
+describe("estado del AutoDJ en AzuraCast (diagnóstico)", () => {
+  const lists = [
+    { id: 3, name: "Creative Commons", source: "songs", type: "default", is_enabled: true },
+    { id: 9, name: "Trance Is Star Radio", source: "remote_url", type: "default", is_enabled: true, remote_url: "https://myradio24.org/tisradio" },
+  ];
+  it("solo la administración lo ve", async () => {
+    await expect(getAutodjStatus(h.db, editor, azura(lists).f)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+  it("lista las listas con su estado y marca cuál es la señal", async () => {
+    const st = await getAutodjStatus(h.db, admin, azura(lists).f);
+    expect(st).toMatchObject({ hasKey: true, error: null });
+    expect(st.lists).toEqual([
+      { name: "Creative Commons", kind: "música", enabled: true },
+      { name: "Trance Is Star Radio", kind: "señal", enabled: true },
+    ]);
+  });
+  it("si AzuraCast rechaza la clave, devuelve el motivo en vez de fallar", async () => {
+    const denied = (async () => new Response("{}", { status: 403 })) as unknown as typeof fetch;
+    const st = await getAutodjStatus(h.db, admin, denied);
+    expect(st.lists).toEqual([]);
+    expect(st.error).toMatch(/clave/i);
   });
 });

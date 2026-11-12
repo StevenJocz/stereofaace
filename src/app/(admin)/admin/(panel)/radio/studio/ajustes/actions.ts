@@ -25,7 +25,7 @@ const AUTODJ_NOTE = {
   skipped: "",
   synced: " Lista del AutoDJ actualizada en AzuraCast.",
   no_key: " Falta la clave API de AzuraCast: guárdala arriba para activarla en el AutoDJ.",
-  failed: " No se pudo actualizar el AutoDJ en AzuraCast (revisa la clave y sus permisos sobre las listas).",
+  failed: " No se pudo actualizar el AutoDJ en AzuraCast.",
 } as const;
 
 export async function saveRelayConfigAction(_prev: FormState, fd: FormData): Promise<FormState> {
@@ -36,6 +36,6 @@ export async function saveRelayConfigAction(_prev: FormState, fd: FormData): Pro
       url: val(fd, "relayUrl"),
       autodj: fd.get("relayAutodj") === "on",
     });
-    return `Señal externa guardada.${AUTODJ_NOTE[r.autodj]}`;
+    return `Señal externa guardada.${AUTODJ_NOTE[r.autodj]}${r.detail ? ` Motivo: ${r.detail}` : ""}`;
   });
 }
