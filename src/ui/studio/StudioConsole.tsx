@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { DeckPanel, type DeckView } from "./DeckPanel";
+import { LibraryPanel } from "./LibraryPanel";
 import { LiveBar } from "./LiveBar";
 import { QueuePanel } from "./QueuePanel";
 import { AudioEngine, type DeckId } from "./engine/audio-engine";
@@ -306,17 +307,21 @@ export function StudioConsole() {
           />
         ))}
       </div>
+      <div className="grid items-start gap-4 xl:grid-cols-[2fr_1fr]">
       <QueuePanel
         queue={queue}
         rejected={rejected}
         auto={auto}
         onAuto={setAuto}
         onAddFiles={addFiles}
+        onAddItems={(items) => dispatch({ type: "add", items })}
         onMove={(from, to) => dispatch({ type: "move", from, to })}
         onRemove={(id) => dispatch({ type: "remove", id })}
         onClear={() => dispatch({ type: "clear" })}
         onLoad={(item, id) => void loadToDeck(item, id)}
       />
+      <LibraryPanel onAdd={(items) => dispatch({ type: "add", items })} />
+      </div>
     </div>
   );
 }

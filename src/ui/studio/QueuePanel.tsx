@@ -6,6 +6,7 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalList
 import { CSS } from "@dnd-kit/utilities";
 import { formatTime } from "./MeterBar";
 import type { DeckId } from "./engine/audio-engine";
+import { DRAG_TYPE, azToQueueItem, parseDragItems } from "./engine/library";
 import type { QueueItem } from "./engine/queue";
 
 function Row({
@@ -53,6 +54,7 @@ export function QueuePanel({
   auto,
   onAuto,
   onAddFiles,
+  onAddItems,
   onMove,
   onRemove,
   onClear,
@@ -63,6 +65,7 @@ export function QueuePanel({
   auto: boolean;
   onAuto: (v: boolean) => void;
   onAddFiles: (files: File[]) => void;
+  onAddItems: (items: QueueItem[]) => void;
   onMove: (from: number, to: number) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
@@ -75,6 +78,11 @@ export function QueuePanel({
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);
+    const lib = parseDragItems(e.dataTransfer.getData(DRAG_TYPE));
+    if (lib.length) {
+      onAddItems(lib.map(azToQueueItem));
+      return;
+    }
     if (e.dataTransfer.files.length) onAddFiles(Array.from(e.dataTransfer.files));
   };
 
@@ -91,7 +99,7 @@ export function QueuePanel({
       data-over={over}
       aria-label="Cola de reproducción"
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("Files")) {
+        if (e.dataTransfer.types.includes("Files") || e.dataTransfer.types.includes(DRAG_TYPE)) {
           e.preventDefault();
           setOver(true);
         }
