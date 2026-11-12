@@ -479,17 +479,28 @@ export function StudioConsole() {
       eng.setMicMuted(false);
       setMicMuted(false);
     };
-    const up = (e: KeyboardEvent) => {
-      if (e.code !== "KeyV" || !pttRef.current) return;
+    const release = () => {
+      if (!pttRef.current) return;
       pttRef.current = false;
       engineRef.current?.setMicMuted(true);
       setMicMuted(true);
     };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "KeyV") release();
+    };
+    // Si la ventana pierde el foco con V pulsada, el «keyup» nunca llega: el micrófono no puede quedar abierto al aire.
+    const hide = () => {
+      if (document.visibilityState === "hidden") release();
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
+    window.addEventListener("blur", release);
+    document.addEventListener("visibilitychange", hide);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", release);
+      document.removeEventListener("visibilitychange", hide);
     };
   }, []);
 

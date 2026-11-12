@@ -1,5 +1,5 @@
 import { LoadGate } from "./autoplay";
-import { equalPowerGains } from "./crossfade";
+import { equalPowerGains, FadeGeneration } from "./crossfade";
 import { EQ_BANDS, FLAT_EQ, clampEq, type EqSettings } from "./eq";
 import { peakToDb, rmsToDb } from "./meter";
 import { DEFAULT_DUCK, DuckController, GateController, dbToGain, gainToDb, type DuckSettings } from "./voice";
@@ -74,6 +74,7 @@ export class AudioEngine {
   private cartPlaying = new Map<string, { src: AudioBufferSourceNode; duck: boolean; endsAt: number }>();
   private manualForce = false;
   private fadeTimers = new Set<ReturnType<typeof setTimeout>>();
+  private fadeGen = new FadeGeneration();
 
   onDeckEnded: ((deck: DeckId) => void) | null = null;
   onDeckTime: ((deck: DeckId, current: number, duration: number) => void) | null = null;
@@ -284,6 +285,7 @@ export class AudioEngine {
       outCurve[i] = g.out;
       inCurve[i] = g.in;
     }
+    const gen = this.fadeGen.begin();
     const f = this.decks[from].fade.gain;
     const t = this.decks[to].fade.gain;
     f.cancelScheduledValues(now);
@@ -293,6 +295,7 @@ export class AudioEngine {
     t.setValueCurveAtTime(inCurve, now, fadeSec);
     const timer = setTimeout(() => {
       this.fadeTimers.delete(timer);
+      if (!this.fadeGen.isCurrent(gen)) return; // otro fundido o un corte tomó el control de las ganancias
       // Si el deck saliente recibió otra pista mientras tanto, no se detiene la nueva.
       if (this.decks[from].el === outgoing) this.stopDeck(from);
       f.cancelScheduledValues(this.ctx.currentTime);
@@ -304,6 +307,7 @@ export class AudioEngine {
 
   /** Deja `id` como único deck audible (sin fundido). */
   cut(id: DeckId): void {
+    this.fadeGen.begin();
     const now = this.ctx.currentTime;
     this.decks[id].fade.gain.cancelScheduledValues(now);
     this.decks[other(id)].fade.gain.cancelScheduledValues(now);

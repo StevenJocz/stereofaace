@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { equalPowerGains, planCrossfade } from "@/ui/studio/engine/crossfade";
+import { equalPowerGains, FadeGeneration, planCrossfade } from "@/ui/studio/engine/crossfade";
 
 describe("planCrossfade", () => {
   it("empieza fadeSec antes del final", () => {
@@ -41,5 +41,16 @@ describe("equalPowerGains", () => {
   it("acota valores fuera de [0,1]", () => {
     expect(equalPowerGains(-1)).toEqual(equalPowerGains(0));
     expect(equalPowerGains(2)).toEqual(equalPowerGains(1));
+  });
+});
+
+describe("FadeGeneration", () => {
+  it("el temporizador de un fundido solo es vigente hasta que empieza otro fundido o un corte", () => {
+    const g = new FadeGeneration();
+    const first = g.begin();
+    expect(g.isCurrent(first)).toBe(true);
+    const second = g.begin(); // un segundo crossfadeTo, o un cut()
+    expect(g.isCurrent(first)).toBe(false);
+    expect(g.isCurrent(second)).toBe(true);
   });
 });

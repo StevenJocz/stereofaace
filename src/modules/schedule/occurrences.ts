@@ -111,7 +111,8 @@ export function occurrencesBetween(slots: Slot[], from: Date, to: Date): Occurre
 
 export function currentOccurrence(slots: Slot[], now: Date): Occurrence | null {
   const n = now.getTime();
-  return occurrencesBetween(slots, new Date(n), new Date(n + 1)).find((o) => o.startsAt.getTime() <= n && o.endsAt.getTime() > n) ?? null;
+  // Ventana amplia: los horarios puntuales vecinos recortan el tramo vigente y deben contarse para que sus límites sean los reales.
+  return occurrencesBetween(slots, new Date(n - 86_400_000), new Date(n + 86_400_000)).find((o) => o.startsAt.getTime() <= n && o.endsAt.getTime() > n) ?? null;
 }
 
 /** Medianoche local de Bogotá de una fecha YYYY-MM-DD (null si no es una fecha real). */

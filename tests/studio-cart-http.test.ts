@@ -7,6 +7,7 @@ import type { Actor } from "@/lib/rbac";
 import { users } from "@/db/schema";
 import { cartAudioHandler, cartUploadHandler, cartsListHandler } from "@/modules/studio/cart-http";
 import { createCart } from "@/modules/studio/carts";
+import { bodyGate } from "@/modules/studio/http";
 import { makeDb } from "./helpers";
 
 let h: DbHandle;
@@ -108,5 +109,23 @@ describe("rutas de carts", () => {
   it("subir sin sesión 401 y como redactor 403", async () => {
     expect((await cartUploadHandler(h.db, null, root, form({ hotkey: "k" }))).status).toBe(401);
     expect((await cartUploadHandler(h.db, redactor, root, form({ hotkey: "k" }))).status).toBe(403);
+  });
+});
+
+describe("bodyGate: auth y tamaño antes de leer el cuerpo", () => {
+  const req = (headers: Record<string, string>) => new Request("http://x/api/studio/carts", { method: "POST", headers });
+
+  it("sin sesión 401 y sin permiso 403, aunque el cuerpo sea enorme", () => {
+    expect(bodyGate(null, req({ "content-length": "1" }), 1000)?.status).toBe(401);
+    expect(bodyGate(redactor, req({ "content-length": "1" }), 1000)?.status).toBe(403);
+  });
+
+  it("rechaza con 413 un cuerpo declarado más grande que el máximo y con 411 si no declara tamaño", () => {
+    expect(bodyGate(admin, req({ "content-length": "1001" }), 1000)?.status).toBe(413);
+    expect(bodyGate(admin, req({}), 1000)?.status).toBe(411);
+  });
+
+  it("deja pasar un cuerpo dentro del máximo", () => {
+    expect(bodyGate(admin, req({ "content-length": "1000" }), 1000)).toBeNull();
   });
 });

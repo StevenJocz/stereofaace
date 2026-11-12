@@ -70,6 +70,18 @@ describe("currentOccurrence", () => {
     expect(currentOccurrence(slots, new Date("2026-11-16T23:30:00Z"))?.programId).toBe("p1"); // 18:30
     expect(currentOccurrence(slots, new Date("2026-11-17T01:00:00Z"))).toBeNull(); // 20:00 exacto: ya terminó
   });
+
+  it("un horario puntual que empieza más tarde recorta el tramo semanal vigente", () => {
+    const slots = [weekly("w", "w", 4, "08:00", "12:00"), once("o", "o", "2026-11-12", "10:00", "11:00")];
+    const cur = currentOccurrence(slots, new Date("2026-11-12T14:00:00Z")); // jueves 09:00 Bogotá
+    expect([cur?.programId, cur?.startsAt.toISOString(), cur?.endsAt.toISOString()]).toEqual(["w", "2026-11-12T13:00:00.000Z", "2026-11-12T15:00:00.000Z"]);
+  });
+
+  it("un horario puntual que ya terminó recorta el inicio del tramo semanal vigente", () => {
+    const slots = [weekly("w", "w", 4, "08:00", "12:00"), once("o", "o", "2026-11-12", "09:00", "10:00")];
+    const cur = currentOccurrence(slots, new Date("2026-11-12T16:00:00Z")); // 11:00 Bogotá
+    expect([cur?.programId, cur?.startsAt.toISOString(), cur?.endsAt.toISOString()]).toEqual(["w", "2026-11-12T15:00:00.000Z", "2026-11-12T17:00:00.000Z"]);
+  });
 });
 
 describe("localDateToUtc", () => {

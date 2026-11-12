@@ -1,7 +1,7 @@
 import { ZodError } from "zod";
 import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
-import { ForbiddenError, type Actor } from "@/lib/rbac";
+import { can, ForbiddenError, type Actor } from "@/lib/rbac";
 import { loadAzuraClient } from "./settings";
 
 export const reply = (status: number, error: string) => Response.json({ error }, { status });
@@ -24,6 +24,21 @@ export async function guarded(actor: Actor | null, work: () => Promise<Response>
     console.error("[studio]", error);
     return reply(500, "No se pudo completar la petición.");
   }
+}
+
+/**
+ * Puerta previa a leer un cuerpo: sesión, permiso y tamaño declarado. Se evalúa ANTES de `request.json()` /
+ * `request.formData()` para que nadie sin permiso pueda hacer que el servidor almacene un cuerpo enorme.
+ */
+export function bodyGate(actor: Actor | null, request: Request, maxBytes: number): Response | null {
+  if (!actor) return reply(401, "Inicia sesión para usar el estudio.");
+  if (!can(actor.role, "station:update")) return reply(403, "No tienes permiso para usar el estudio.");
+  const declared = request.headers.get("content-length");
+  if (declared === null) return reply(411, "Falta el tamaño del contenido.");
+  const n = Number(declared);
+  if (!Number.isFinite(n) || n < 0) return reply(400, "Tamaño de contenido no válido.");
+  if (n > maxBytes) return reply(413, "El contenido es demasiado grande.");
+  return null;
 }
 
 const safePath = (p: string) => p.length <= 500 && !p.split("/").includes("..") && !p.includes("\0");
