@@ -381,17 +381,6 @@ export function RadioBar() {
               style={{ ["--v" as string]: `${(r.muted ? 0 : r.volume) * 100}%` }}
               className="radio-range hidden w-24 lg:block"
             />
-            <button
-              type="button"
-              className="btn !px-3.5 !py-2"
-              onClick={() => r.setPanelOpen(!r.panelOpen)}
-              aria-expanded={r.panelOpen}
-              aria-controls="radio-panel"
-            >
-              <Ico name="list" size={15} />
-              <span className="hidden sm:inline">Emisoras</span>
-              <span className="text-accent-ink">{r.stations.length}</span>
-            </button>
           </div>
         </div>
       </section>

@@ -46,6 +46,8 @@ export class LoadSupersededError extends Error {
  * Grafo de audio del estudio (solo navegador):
  * deck → volumen → fundido → analizador → bus → limitador → master → [analizador | destino de emisión | monitor].
  */
+export type RelayState = "idle" | "connecting" | "playing" | "error";
+
 export class AudioEngine {
   readonly ctx: AudioContext;
   private decks: Record<DeckId, Deck>;
@@ -79,6 +81,9 @@ export class AudioEngine {
   onDeckEnded: ((deck: DeckId) => void) | null = null;
   onDeckTime: ((deck: DeckId, current: number, duration: number) => void) | null = null;
   onMicLost: (() => void) | null = null;
+  onRelayState: ((s: RelayState) => void) | null = null;
+  private relayEl: HTMLAudioElement | null = null;
+  private relayGain: GainNode | null = null;
   onCartEnded: ((id: string) => void) | null = null;
 
   constructor() {
@@ -570,7 +575,48 @@ export class AudioEngine {
     return this.decks[id].item;
   }
 
+  // ───────────── Señal externa (retransmisión autorizada, por el proxy del servidor) ─────────────
+
+  /** Empieza a mezclar la señal externa con la música (pasa por el mismo bus: EQ y ducking la afectan). */
+  async startRelay(): Promise<void> {
+    if (!this.relayEl) {
+      const el = new Audio();
+      el.preload = "none";
+      const gain = this.ctx.createGain();
+      this.ctx.createMediaElementSource(el).connect(gain);
+      gain.connect(this.musicBus);
+      el.addEventListener("playing", () => this.onRelayState?.("playing"));
+      el.addEventListener("waiting", () => this.onRelayState?.("connecting"));
+      el.addEventListener("error", () => this.onRelayState?.("error"));
+      el.addEventListener("ended", () => this.onRelayState?.("error"));
+      this.relayEl = el;
+      this.relayGain = gain;
+    }
+    this.onRelayState?.("connecting");
+    await this.resume();
+    this.relayEl.src = `/api/studio/relay?t=${Date.now()}`; // cada inicio abre una conexión nueva
+    try {
+      await this.relayEl.play();
+    } catch {
+      this.onRelayState?.("error");
+    }
+  }
+
+  stopRelay(): void {
+    const el = this.relayEl;
+    if (!el) return;
+    el.pause();
+    el.removeAttribute("src");
+    el.load(); // corta la conexión con el servidor
+    this.onRelayState?.("idle");
+  }
+
+  setRelayVolume(v: number): void {
+    if (this.relayGain) this.relayGain.gain.value = Math.min(1, Math.max(0, v));
+  }
+
   dispose(): void {
+    this.stopRelay();
     this.stopAllCarts();
     this.stopMic();
     if (this.controlTimer) clearInterval(this.controlTimer);

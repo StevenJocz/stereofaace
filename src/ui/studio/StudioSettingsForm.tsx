@@ -1,9 +1,38 @@
 "use client";
 
 import { useActionState } from "react";
-import { saveStudioConfigAction } from "@/app/(admin)/admin/(panel)/radio/studio/ajustes/actions";
+import { saveRelayConfigAction, saveStudioConfigAction } from "@/app/(admin)/admin/(panel)/radio/studio/ajustes/actions";
 import type { FormState } from "@/lib/admin/form";
 import { Field, Message } from "@/ui/admin/fields";
+
+export function RelaySettingsForm({ initial }: { initial: { name: string; url: string; autodj: boolean } }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(saveRelayConfigAction, null);
+  const v = (k: string, fallback: string) => String(state?.values?.[k] ?? fallback);
+  const e = (k: string) => state?.errors?.[k];
+  return (
+    <form key={state?.nonce ?? "init"} action={action} className="grid max-w-[60ch] gap-4" noValidate>
+      <Field label="Nombre" name="relayName" errors={e("name")}>
+        <input id="relayName" name="relayName" className="input" defaultValue={v("relayName", initial.name)} />
+      </Field>
+      <Field label="Dirección de la señal" name="relayUrl" errors={e("url")} hint="La dirección del stream (https://… o http://…). Vacía = sin señal externa.">
+        <input id="relayUrl" name="relayUrl" type="url" className="input" defaultValue={v("relayUrl", initial.url)} placeholder="https://myradio24.org/tisradio" />
+      </Field>
+      <label className="flex items-start gap-2">
+        <input type="checkbox" name="relayAutodj" className="mt-1" defaultChecked={state?.values ? state.values.relayAutodj === "on" : initial.autodj} />
+        <span>
+          Sonar en el AutoDJ mientras no haya música ni transmisión en vivo
+          <span className="mono muted block">Crea o actualiza una lista «URL remota» en AzuraCast. Al desmarcarla se apaga. Requiere la clave API de arriba.</span>
+        </span>
+      </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="submit" className="btn btn-accent" disabled={pending}>
+          Guardar señal
+        </button>
+        <Message state={state} />
+      </div>
+    </form>
+  );
+}
 
 export function StudioSettingsForm({ initial }: { initial: { baseUrl: string; stationId: string; hasKey: boolean } }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveStudioConfigAction, null);

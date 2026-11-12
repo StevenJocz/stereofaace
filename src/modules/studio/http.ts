@@ -15,7 +15,8 @@ export async function guarded(actor: Actor | null, work: () => Promise<Response>
     if (error instanceof ForbiddenError) return reply(403, "No tienes permiso para usar el estudio.");
     if (error instanceof ZodError) return reply(400, error.issues[0]?.message ?? "Datos no válidos.");
     if (error instanceof DomainError) {
-      if (error.code === "studio_no_key" || error.code === "cart_hotkey_taken") return reply(409, error.message);
+      if (error.code === "studio_no_key" || error.code === "cart_hotkey_taken" || error.code === "relay_not_configured") return reply(409, error.message);
+      if (error.code === "relay_upstream") return reply(502, error.message);
       if (error.code === "cart_not_found" || error.code === "playlist_not_found") return reply(404, error.message);
       if (error.code === "azuracast_bad_id" || error.code === "cart_bad_audio") return reply(400, error.message);
       if (error.code.startsWith("azuracast")) return reply(502, error.message);

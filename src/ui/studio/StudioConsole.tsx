@@ -8,10 +8,11 @@ import type { CartView } from "@/modules/studio/carts";
 import { CartWall } from "./CartWall";
 import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
+import { RelayPanel } from "./RelayPanel";
 import { LiveBar } from "./LiveBar";
 import { MicPanel, type MicDevice } from "./MicPanel";
 import { QueuePanel } from "./QueuePanel";
-import { AudioEngine, LoadSupersededError, type DeckId } from "./engine/audio-engine";
+import { AudioEngine, LoadSupersededError, type DeckId, type RelayState } from "./engine/audio-engine";
 import { makeItems } from "./engine/audio-files";
 import { hotkeyMap, isTypingTarget } from "./engine/carts";
 import { loadCover, type DeckCover } from "./engine/deck-cover";
@@ -48,13 +49,15 @@ function parseCreds(raw: string): Partial<Creds> {
 const noopSubscribe = () => () => {};
 
 /** Primero la entrada del DJ (usuario, contraseña y programa); después, la consola. */
-export function StudioConsole() {
+export type RelayInfo = { configured: boolean; name: string };
+
+export function StudioConsole({ relay }: { relay: RelayInfo }) {
   const [entry, setEntry] = useState<DjEntry | null>(null);
   if (!entry) return <DjGate onEnter={setEntry} />;
-  return <StudioConsoleInner entry={entry} />;
+  return <StudioConsoleInner entry={entry} relay={relay} />;
 }
 
-function StudioConsoleInner({ entry }: { entry: DjEntry }) {
+function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo }) {
   const [queue, dispatch] = useReducer(queueReducer, [] as QueueItem[]);
   const [rejected, setRejected] = useState<string[]>([]);
   const [auto, setAuto] = useState(true);
@@ -79,7 +82,9 @@ function StudioConsoleInner({ entry }: { entry: DjEntry }) {
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
-  const [tool, setTool] = useState<"carts" | "voice" | "eq">("carts");
+  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay">("carts");
+  const [relayState, setRelayState] = useState<RelayState>("idle");
+  const [relayVolume, setRelayVolume] = useState(0.8);
   const [djInfo, setDjInfo] = useState<DjProgramInfo | null>(null);
   const [programChoice, setProgramChoice] = useState(entry.programChoice);
   const [cartState, setCartState] = useState<"loading" | "ready" | "error">("loading");
@@ -151,6 +156,7 @@ function StudioConsoleInner({ entry }: { entry: DjEntry }) {
         n.delete(id);
         return n;
       });
+    e.onRelayState = setRelayState;
     e.onMicLost = () => {
       setMicActive(false);
       setMicError("Se perdió el micrófono (¿se desconectó?). Actívalo de nuevo.");
@@ -469,6 +475,18 @@ function StudioConsoleInner({ entry }: { entry: DjEntry }) {
     }
   }, [deviceId, getEngine]);
 
+  const toggleRelay = useCallback(async () => {
+    const e = getEngine();
+    if (relayState === "playing" || relayState === "connecting") {
+      e.stopRelay();
+      return;
+    }
+    e.setRelayVolume(relayVolume);
+    await e.startRelay();
+    // En directo, quien escucha ve de qué señal se trata mientras no suene una pista.
+    if (liveRef.current === "live") senderRef.current?.setMetadata({ title: relay.name, artist: "" });
+  }, [getEngine, relayState, relayVolume, relay.name]);
+
   const stopMic = useCallback(() => {
     engineRef.current?.stopMic();
     setMicActive(false);
@@ -713,6 +731,7 @@ function StudioConsoleInner({ entry }: { entry: DjEntry }) {
             {([
               ["carts", "Cart Wall", cartsPlaying.size > 0],
               ["voice", "Voz", micActive && !micMuted],
+              ["relay", "Señal", relayState === "playing" || relayState === "connecting"],
               ["eq", "Ecualizador", false],
             ] as const).map(([k, label, hot]) => (
               <button key={k} type="button" role="tab" id={`tool-tab-${k}`} aria-selected={tool === k} aria-controls={`tool-${k}`} className="studio-tab" data-hot={hot} onClick={() => setTool(k)}>
@@ -757,6 +776,19 @@ function StudioConsoleInner({ entry }: { entry: DjEntry }) {
               }}
               onForce={(on) => engineRef.current?.setDuckForced(on)}
               readDuckDb={readDuckDb}
+            />
+          </div>
+          <div id="tool-relay" role="tabpanel" aria-labelledby="tool-tab-relay" className="studio-tool-body" hidden={tool !== "relay"}>
+            <RelayPanel
+              name={relay.name}
+              configured={relay.configured}
+              state={relayState}
+              volume={relayVolume}
+              onToggle={() => void toggleRelay()}
+              onVolume={(v) => {
+                setRelayVolume(v);
+                engineRef.current?.setRelayVolume(v);
+              }}
             />
           </div>
           <div id="tool-eq" role="tabpanel" aria-labelledby="tool-tab-eq" className="studio-tool-body" hidden={tool !== "eq"}>

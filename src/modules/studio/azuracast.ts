@@ -40,9 +40,9 @@ export class AzuraClient {
     return `${this.cfg.baseUrl.replace(/\/+$/, "")}/api/station/${this.cfg.stationId}${path}`;
   }
 
-  private async request(path: string, extra: Record<string, string> = {}, passthrough: number[] = []): Promise<Response> {
+  private async request(path: string, extra: Record<string, string> = {}, passthrough: number[] = [], init: { method?: string; body?: string } = {}): Promise<Response> {
     // redirect: "error" — la clave nunca debe viajar a otro host si AzuraCast redirige.
-    const res = await this.fetchImpl(this.url(path), { headers: { "X-API-Key": this.cfg.apiKey, ...extra }, redirect: "error" });
+    const res = await this.fetchImpl(this.url(path), { ...init, headers: { "X-API-Key": this.cfg.apiKey, ...extra }, redirect: "error" });
     if (res.status === 401 || res.status === 403) {
       throw new DomainError("azuracast_auth", "Clave API no válida o sin permisos en AzuraCast.");
     }
@@ -95,6 +95,19 @@ export class AzuraClient {
   async playlistFiles(id: number): Promise<AzFile[]> {
     const all = await this.json<RawMedia[]>("/files");
     return all.filter((m) => m.playlists?.some((p) => p.id === id)).map(toFile);
+  }
+
+  /** Listas de reproducción tal como las entrega AzuraCast (incluye el origen y la dirección remota). */
+  async listPlaylistsRaw(): Promise<{ id: number; name: string; source?: string; remote_url?: string | null; is_enabled?: boolean }[]> {
+    return this.json("/playlists");
+  }
+
+  async createPlaylist(body: Record<string, unknown>): Promise<void> {
+    await this.request("/playlists", { "Content-Type": "application/json" }, [], { method: "POST", body: JSON.stringify(body) });
+  }
+
+  async updatePlaylist(id: number, body: Record<string, unknown>): Promise<void> {
+    await this.request(`/playlist/${Math.trunc(id)}`, { "Content-Type": "application/json" }, [], { method: "PUT", body: JSON.stringify(body) });
   }
 
   /** Últimas reproducciones de la estación (respuesta cruda; requiere clave con permiso de lectura de la estación). */
