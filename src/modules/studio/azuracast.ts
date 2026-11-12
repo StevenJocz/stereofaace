@@ -86,6 +86,12 @@ export class AzuraClient {
     return rows.map((p) => ({ id: p.id, name: p.name, trackCount: p.num_songs ?? 0 }));
   }
 
+  /** Ids de todas las pistas de la biblioteca (para comprobar que una lista guardada sigue siendo válida). */
+  async allFileIds(): Promise<Set<string>> {
+    const all = await this.json<RawMedia[]>("/files");
+    return new Set(all.map((m) => String(m.id ?? "")));
+  }
+
   async playlistFiles(id: number): Promise<AzFile[]> {
     const all = await this.json<RawMedia[]>("/files");
     return all.filter((m) => m.playlists?.some((p) => p.id === id)).map(toFile);

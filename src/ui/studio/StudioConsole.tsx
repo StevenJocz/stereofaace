@@ -86,6 +86,9 @@ export function StudioConsole() {
   const handedOffRef = useRef<Record<DeckId, boolean>>({ A: false, B: false });
   const voiceRef = useRef({ duck, eqMusic, eqMic, micMuted, micGain, gateDb });
   const pttRef = useRef(false);
+  const liveRef = useRef<LiveState>("offline");
+  const djRef = useRef("");
+  const loggedRef = useRef<string | null>(null);
   const coversRef = useRef<Record<DeckId, DeckCover | null>>({ A: null, B: null });
   const coverSeqRef = useRef<Record<DeckId, number>>({ A: 0, B: 0 });
   const liveSinceRef = useRef<number | null>(null);
@@ -94,7 +97,9 @@ export function StudioConsole() {
     activeRef.current = active;
     autoRef.current = auto;
     voiceRef.current = { duck, eqMusic, eqMic, micMuted, micGain, gateDb };
-  }, [queue, active, auto, duck, eqMusic, eqMic, micMuted, micGain, gateDb]);
+    liveRef.current = live;
+    djRef.current = creds.user;
+  }, [queue, active, auto, duck, eqMusic, eqMic, micMuted, micGain, gateDb, live, creds.user]);
 
   /** Busca la carátula de la pista cargada en un deck (sin bloquear la reproducción). */
   const attachCover = useCallback((id: DeckId, item: QueueItem) => {
@@ -241,6 +246,23 @@ export function StudioConsole() {
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
   }, []);
+
+  // Historial: una entrada por cada pista que pasa al aire mientras se está EN VIVO.
+  useEffect(() => {
+    if (live !== "live") {
+      loggedRef.current = null;
+      return;
+    }
+    const d = decks[active];
+    const it = d.item;
+    if (!it || !d.playing || loggedRef.current === it.id) return;
+    loggedRef.current = it.id;
+    void fetch("/api/studio/history", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: it.title, artist: it.artist, source: it.source === "azuracast" ? "azuracast" : "local", djName: creds.user || undefined }),
+    }).catch(() => undefined);
+  }, [live, active, decks, creds.user]);
 
   // Cronómetro al aire.
   useEffect(() => {
@@ -421,7 +443,16 @@ export function StudioConsole() {
         const e = getEngine();
         await e.resume();
         if (!e.hasCart(c.id)) await e.preloadCart(c.id, `/api/studio/cart/${c.id}`);
-        if (e.playCart(c.id, { gainDb: c.gainDb, duck: c.duck })) setCartsPlaying((s) => new Set(s).add(c.id));
+        if (e.playCart(c.id, { gainDb: c.gainDb, duck: c.duck })) {
+          setCartsPlaying((s) => new Set(s).add(c.id));
+          if (liveRef.current === "live") {
+            void fetch("/api/studio/history", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ title: c.name, artist: "", source: "cart", djName: djRef.current || undefined }),
+            }).catch(() => undefined);
+          }
+        }
       } catch (err) {
         setMessage(err instanceof Error ? err.message : "No se pudo reproducir el cart.");
       }
@@ -619,7 +650,7 @@ export function StudioConsole() {
         onClear={() => dispatch({ type: "clear" })}
         onLoad={(item, id) => void loadToDeck(item, id)}
       />
-      <LibraryPanel onAdd={(items) => dispatch({ type: "add", items })} />
+      <LibraryPanel onAdd={(items) => dispatch({ type: "add", items })} queue={queue} />
       </div>
     </div>
   );
