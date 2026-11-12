@@ -233,7 +233,7 @@ export function RadioBar() {
       <section ref={bar} aria-label="StereoFace Frequencies, radio en vivo" className="radio-bar">
         {/* Móvil: fila 1 = emisora + reproducir; fila 2 = estado + volumen y lista.
             Escritorio (lg): tres columnas con transporte y visualizador. */}
-        <div className="wrap grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.5fr)_auto] lg:gap-x-4 lg:py-3">
+        <div className="wrap grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.5fr)_auto] lg:gap-x-4 lg:py-3 xl:grid-cols-[minmax(0,22rem)_minmax(0,46rem)_auto] xl:justify-between xl:gap-x-8">
           {/* Emisora */}
           <div className="flex min-w-0 items-center gap-3">
             {own && program ? (
@@ -255,10 +255,10 @@ export function RadioBar() {
                   )}
                 </span>
                 <span className="min-w-0">
-                  <span className="mono flex items-center gap-2 text-[0.6rem] text-accent-ink">
+                  <span className="mono flex items-center gap-2 whitespace-nowrap text-[0.6rem] text-accent-ink">
                     <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-accent live-dot" />
                     Al aire · hasta {new Date(program.endsAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota", hour12: false })}
-                    <span aria-hidden="true" className="hidden opacity-70 lg:inline">· ver programación ›</span>
+                    <span aria-hidden="true" className="hidden opacity-70 lg:inline">›</span>
                   </span>
                   <span className="block truncate font-bold leading-tight">{program.program.name}</span>
                   <span className="mono block truncate text-[0.66rem] text-muted">
@@ -299,6 +299,7 @@ export function RadioBar() {
           {/* Estado; en escritorio también transporte y visualizador */}
           <div className="flex min-w-0 items-center gap-3 lg:gap-4">
             <div className="hidden items-center gap-2 lg:flex">
+              {!own && (
               <button
                 type="button"
                 className="btn-icon !size-9"
@@ -308,9 +309,11 @@ export function RadioBar() {
               >
                 <Ico name="prev" size={16} />
               </button>
+              )}
               <button type="button" onClick={onPlay} className="radio-play" aria-label={playLabel}>
                 <Ico name={playIcon} size={22} />
               </button>
+              {!own && (
               <button
                 type="button"
                 className="btn-icon !size-9"
@@ -320,6 +323,7 @@ export function RadioBar() {
               >
                 <Ico name="next" size={16} />
               </button>
+              )}
             </div>
 
             <div className="min-w-0 flex-1 lg:flex-none">
@@ -343,7 +347,7 @@ export function RadioBar() {
 
             {own && tracks?.nowPlaying && (
               <div className="hidden min-w-0 flex-1 lg:block">
-                <TrackList tracks={tracks} />
+                <TrackList tracks={tracks} fallbackArt={program?.program.imageUrl ?? null} />
               </div>
             )}
             {/* Con la tarjeta de canciones no se muestra el visualizador: queda más limpio. */}
