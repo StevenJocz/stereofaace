@@ -37,6 +37,12 @@ describe("queueReducer", () => {
     expect(queueReducer([], { type: "shift" })).toEqual([]);
   });
 
+  it("duration fija la duración solo del elemento indicado", () => {
+    const s = queueReducer([item("a"), item("b")], { type: "duration", id: "b", durationSec: 93.5 });
+    expect(s.map((i) => i.durationSec)).toEqual([null, 93.5]);
+    expect(queueReducer(s, { type: "duration", id: "zzz", durationSec: 5 })).toBe(s);
+  });
+
   it("clear vacía la cola", () => {
     expect(queueReducer([item("a")], { type: "clear" })).toEqual([]);
   });

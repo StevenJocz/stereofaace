@@ -16,6 +16,7 @@ export type QueueAction =
   | { type: "remove"; id: string }
   | { type: "move"; from: number; to: number }
   | { type: "shift" }
+  | { type: "duration"; id: string; durationSec: number }
   | { type: "clear" };
 
 export function queueReducer(state: QueueItem[], action: QueueAction): QueueItem[] {
@@ -34,6 +35,10 @@ export function queueReducer(state: QueueItem[], action: QueueAction): QueueItem
     }
     case "shift":
       return state.slice(1);
+    case "duration":
+      return state.some((i) => i.id === action.id)
+        ? state.map((i) => (i.id === action.id ? { ...i, durationSec: action.durationSec } : i))
+        : state;
     case "clear":
       return [];
   }

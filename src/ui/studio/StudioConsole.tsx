@@ -153,6 +153,7 @@ export function StudioConsole() {
       a.preload = "metadata";
       a.src = url;
       a.onloadedmetadata = () => {
+        if (Number.isFinite(a.duration) && a.duration > 0) dispatch({ type: "duration", id: it.id, durationSec: a.duration });
         URL.revokeObjectURL(url);
       };
       a.onerror = () => URL.revokeObjectURL(url);
