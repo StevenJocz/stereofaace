@@ -1,21 +1,25 @@
+import { ZodError } from "zod";
 import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { ForbiddenError, type Actor } from "@/lib/rbac";
 import { loadAzuraClient } from "./settings";
 
-const reply = (status: number, error: string) => Response.json({ error }, { status });
+export const reply = (status: number, error: string) => Response.json({ error }, { status });
 
 /** Traduce la sesión y los errores esperables a respuestas HTTP; la clave de AzuraCast nunca sale de aquí. */
-async function guarded(actor: Actor | null, work: () => Promise<Response>): Promise<Response> {
+export async function guarded(actor: Actor | null, work: () => Promise<Response>): Promise<Response> {
   if (!actor) return reply(401, "Inicia sesión para usar el estudio.");
   try {
     return await work();
   } catch (error) {
     if (error instanceof ForbiddenError) return reply(403, "No tienes permiso para usar el estudio.");
+    if (error instanceof ZodError) return reply(400, error.issues[0]?.message ?? "Datos no válidos.");
     if (error instanceof DomainError) {
-      if (error.code === "studio_no_key") return reply(409, error.message);
-      if (error.code === "azuracast_bad_id") return reply(400, error.message);
-      return reply(502, error.message);
+      if (error.code === "studio_no_key" || error.code === "cart_hotkey_taken") return reply(409, error.message);
+      if (error.code === "cart_not_found") return reply(404, error.message);
+      if (error.code === "azuracast_bad_id" || error.code === "cart_bad_audio") return reply(400, error.message);
+      if (error.code.startsWith("azuracast")) return reply(502, error.message);
+      return reply(400, error.message);
     }
     console.error("[studio]", error);
     return reply(500, "No se pudo completar la petición.");
