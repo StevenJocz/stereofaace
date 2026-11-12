@@ -113,3 +113,11 @@ export function currentOccurrence(slots: Slot[], now: Date): Occurrence | null {
   const n = now.getTime();
   return occurrencesBetween(slots, new Date(n), new Date(n + 1)).find((o) => o.startsAt.getTime() <= n && o.endsAt.getTime() > n) ?? null;
 }
+
+/** Medianoche local de Bogotá de una fecha YYYY-MM-DD (null si no es una fecha real). */
+export function localDateToUtc(date: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const d = new Date(localToUtc(date, 0));
+  return Number.isNaN(d.getTime()) || bogotaParts(d).date !== date ? null : d;
+}
+

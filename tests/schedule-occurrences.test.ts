@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bogotaParts, currentOccurrence, occurrencesBetween, type Slot } from "@/modules/schedule/occurrences";
+import { bogotaParts, currentOccurrence, localDateToUtc, occurrencesBetween, type Slot } from "@/modules/schedule/occurrences";
 
 const weekly = (id: string, programId: string, weekday: number, start: string, end: string): Slot => ({ id, programId, kind: "weekly", weekday, date: null, start, end });
 const once = (id: string, programId: string, date: string, start: string, end: string): Slot => ({ id, programId, kind: "once", weekday: null, date, start, end });
@@ -71,3 +71,16 @@ describe("currentOccurrence", () => {
     expect(currentOccurrence(slots, new Date("2026-11-17T01:00:00Z"))).toBeNull(); // 20:00 exacto: ya terminó
   });
 });
+
+describe("localDateToUtc", () => {
+  it("medianoche local de Bogotá como instante UTC", () => {
+    expect(localDateToUtc("2026-11-16")?.toISOString()).toBe("2026-11-16T05:00:00.000Z");
+  });
+  it("fechas mal formadas o imposibles dan null", () => {
+    expect(localDateToUtc("16/11/2026")).toBeNull();
+    expect(localDateToUtc("2026-13-01")).toBeNull();
+    expect(localDateToUtc("2026-02-30")).toBeNull();
+    expect(localDateToUtc("")).toBeNull();
+  });
+});
+
