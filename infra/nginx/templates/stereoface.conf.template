@@ -1,0 +1,76 @@
+# StereoFace — Nginx como proxy inverso + TLS. ${DOMAIN} lo sustituye la imagen oficial de Nginx.
+# Sin ejecutar en desarrollo: validar con `docker compose exec nginx nginx -t` (ver DEPLOY.md).
+
+# Límites de tasa (zonas en memoria compartida)
+limit_req_zone $binary_remote_addr zone=general:10m rate=20r/s;
+# Solo se cuentan los POST al login (la clave vacía no se limita): 10 intentos por minuto por IP.
+map $request_method $login_key {
+    POST    $binary_remote_addr;
+    default "";
+}
+limit_req_zone $login_key zone=login:10m rate=10r/m;
+
+server_tokens off;
+
+# HTTP: solo el desafío ACME y la redirección a HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # HSTS: activar solo cuando HTTPS esté confirmado (el navegador lo recuerda un año).
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    client_max_body_size 2m;
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json application/xml application/rss+xml image/svg+xml;
+
+    # El healthcheck es interno (Docker): no se expone al exterior.
+    location = /api/health {
+        return 404;
+    }
+
+    # Archivos estáticos con hash en el nombre: caché de un año
+    location /_next/static/ {
+        proxy_pass http://web:3000;
+        proxy_set_header Host $host;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Inicio de sesión: límite de intentos además del de la aplicación
+    location = /admin/login {
+        limit_req zone=login burst=5 nodelay;
+        include /etc/nginx/conf.d/proxy_params.inc;
+        proxy_pass http://web:3000;
+    }
+
+    location / {
+        limit_req zone=general burst=60 nodelay;
+        include /etc/nginx/conf.d/proxy_params.inc;
+        proxy_pass http://web:3000;
+    }
+}

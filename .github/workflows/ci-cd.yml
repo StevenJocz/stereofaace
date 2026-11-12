@@ -1,0 +1,81 @@
+name: CI/CD
+
+# Pull request y push a main: comprobaciones. Push a main (y solo si pasan): despliegue en el servidor.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: Comprobaciones
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Compilación de producción
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SITE_URL: https://stereoface.online
+
+  deploy:
+    name: Desplegar en el servidor
+    needs: checks
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # Runner autoalojado del servidor (etiqueta «stereoface»). No hay entrada SSH desde Internet.
+    runs-on: [self-hosted, stereoface]
+    concurrency:
+      group: deploy-stereoface
+      cancel-in-progress: false
+    env:
+      APP_DIR: /opt/stereoface
+    steps:
+      - uses: actions/checkout@v4
+
+      # Solo se sincroniza el código. Nunca se tocan .env, docker-compose.yml, Dockerfile ni infra/ del servidor.
+      - name: Sincronizar código
+        run: |
+          set -euo pipefail
+          for d in src public drizzle scripts docs; do
+            rm -rf "$APP_DIR/$d"
+            cp -a "$d" "$APP_DIR/$d"
+          done
+          for f in package.json package-lock.json next.config.ts tsconfig.json drizzle.config.ts eslint.config.mjs vitest.config.ts PROGRESS.md; do
+            [ -f "$f" ] && cp -a "$f" "$APP_DIR/$f"
+          done
+          date -u +"%Y-%m-%dT%H:%M:%SZ ${GITHUB_SHA}" > "$APP_DIR/.deployed-version"
+
+      - name: Construir imagen
+        working-directory: /opt/stereoface
+        run: docker compose build web
+
+      - name: Reiniciar (aplica migraciones)
+        working-directory: /opt/stereoface
+        run: docker compose up -d web
+
+      - name: Esperar a que esté sano
+        run: |
+          for i in $(seq 1 30); do
+            s=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' stereoface-web || echo missing)
+            echo "estado: $s"
+            [ "$s" = "healthy" ] && exit 0
+            sleep 5
+          done
+          docker logs --tail 50 stereoface-web
+          exit 1
+
+      - name: Limpiar imágenes huérfanas
+        run: docker image prune -f

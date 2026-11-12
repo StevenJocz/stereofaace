@@ -1,0 +1,125 @@
+# StereoFace — producción en un solo servidor (Ubuntu + Docker Compose).
+# Sin ejecutar en desarrollo (no había Docker): validar según DEPLOY.md.
+# Variables: archivo .env junto a este (copiar de .env.production.example).
+name: stereoface
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  # PostgreSQL. NO publica puertos: solo es alcanzable desde la red interna de Compose.
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stereoface}
+      POSTGRES_USER: ${POSTGRES_USER:-stereoface}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # Tarea de una sola ejecución: migraciones + datos base + primer superadministrador (si procede).
+  migrate:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?define NEXT_PUBLIC_SITE_URL}
+    image: stereoface-web:latest
+    command: ["node", "migrate.mjs"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-stereoface}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stereoface}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+      ADD_USER_EMAIL: ${ADD_USER_EMAIL:-}
+      ADD_USER_PASSWORD: ${ADD_USER_PASSWORD:-}
+      ADD_USER_NAME: ${ADD_USER_NAME:-}
+      ADD_USER_ROLE: ${ADD_USER_ROLE:-editor}
+      DB_POOL_MAX: "2"
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+
+  web:
+    image: stereoface-web:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-stereoface}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-stereoface}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      RADIO_EMBED_HOSTS: ${RADIO_EMBED_HOSTS:-}
+      MEDIA_ROOT: /data/media
+    volumes:
+      # Fotografías editoriales: no se pierden al recrear o actualizar el contenedor web.
+      - stereoface_media:/data/media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Sin `ports`: solo Nginx lo alcanza. El healthcheck viene del Dockerfile (/api/health).
+    expose:
+      - "3000"
+    logging: *logging
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?define DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # La imagen sustituye ${DOMAIN} en *.template y lo escribe en /etc/nginx/conf.d
+      - ./infra/nginx/templates:/etc/nginx/templates:ro
+      - ./infra/nginx/proxy_params.inc:/etc/nginx/conf.d/proxy_params.inc:ro
+      - ./infra/certbot/conf:/etc/letsencrypt:ro
+      - ./infra/certbot/www:/var/www/certbot:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    logging: *logging
+
+  # Solo para obtener/renovar certificados (ver infra/scripts/init-tls.sh y DEPLOY.md).
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["tls"]
+    volumes:
+      - ./infra/certbot/conf:/etc/letsencrypt
+      - ./infra/certbot/www:/var/www/certbot
+
+  # Copia diaria de PostgreSQL (pg_dump formato custom) con retención. Copiar ./backups FUERA del servidor.
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-stereoface}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-stereoface}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+      - ./infra/backup/backup.sh:/backup.sh:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+
+volumes:
+  pgdata:
+  stereoface_media:
+
+# Pendiente a propósito (no hay código que lo use todavía): Redis + worker BullMQ (motor de noticias, fase 6)
+# y almacenamiento S3/MinIO (módulo de medios). Se añadirán cuando existan.

@@ -1,0 +1,94 @@
+# StereoFace — Estado real del proyecto
+
+Última actualización: 2026-11-11 (administrador completo)
+
+## Hecho y verificado
+- **Fase 1.** Investigación, tres direcciones, decisión y revisión «Neon Signal» (`docs/01-direccion-artistica.md`), arquitectura, mapa del sitio, modelo de datos y roadmap (`ARCHITECTURE.md`).
+- **Fase 2 (parcial).** Tokens (color, escala fluida, claro/oscuro), Archivo + JetBrains Mono, escenas generativas SVG (`ui/Art.tsx`, `ui/HeroFigure.tsx`), imagen estéreo L/R, ticker, ficha técnica, código de barras, etiquetas inclinadas, cabecera con menú móvil y tema.
+- **Movimiento (GSAP + ScrollTrigger).** Intro, carrusel del hero (`ui/HeroSlider.tsx`), reveals, máscaras, contadores, ticker con skew por velocidad, cabecera que se oculta al bajar. Respeta `prefers-reduced-motion` y tiene salvavidas a los 6 s.
+- **Fase 3 (parcial).** Portada con contenido DEMO: hero carrusel + «Lo más reciente», riel de categorías con flechas, tarjetas destacadas, ticker, última hora, dos canales Electrónica | Indie, artistas, lanzamientos, agenda, selección del editor, cultura, newsletter, pie.
+- Verificado en esta revisión: `tsc --noEmit`, `eslint` y `next build` sin errores; navegador a 1440 px y 375 px: intro, las cuatro transiciones del carrusel con vuelta al inicio, secciones inferiores, sin scroll horizontal en móvil, modo claro (se corrigió el contraste de las etiquetas).
+
+## Auditoría (build de producción, portada)
+- **Lighthouse** (Edge headless, sin pantalla real): móvil 98 rendimiento / 100 accesibilidad / 100 buenas prácticas / 100 SEO; escritorio 99 / 100 / 100 / 100. CLS 0. LCP 1,2 s móvil y 0,3 s escritorio; TBT 120 ms móvil. Speed Index móvil 3,7 s (0,85): incluye el intro de la primera visita. Después se acortó el intro de ~2,6 s a ~2,2 s y no se volvió a medir.
+- **axe-core** sin violaciones: oscuro, claro, los 4 slides del hero y menú móvil abierto (Escape lo cierra).
+- **prefers-reduced-motion** emulado con CDP: sin intro, sin autoplay, ticker estático, todo el contenido visible, el cambio de slide por botón sigue funcionando y el botón de pausa se oculta.
+- **Responsive:** 375, 768 y 1024 px sin scroll horizontal. A <1280 px el hero ocupa todo el ancho y «Lo más reciente» pasa a una fila.
+- **Correcciones de esta ronda:** contraste del texto decorativo del pie (ahora pseudo-elemento), hero a ancho completo bajo 1280 px, controles del hero legibles en modo claro y sobre la ilustración, fondo para las coordenadas, etiquetas de color legibles en ambos temas.
+
+## Fase 4 y radio (esta ronda)
+- **Base de datos real:** esquema Drizzle completo (usuarios, sesiones, auditoría, taxonomía, medios, artistas, lanzamientos, eventos, artículos con revisiones y bloques de portada, ajustes, suscriptores, fuentes/ítems/ejecuciones/IA, emisoras), 2 migraciones y seed demo marcado `is_demo`. La portada lee de PostgreSQL (PGlite en esta máquina; `pg` con `DATABASE_URL`).
+- **Servicios y validación Zod:** portada, listado con búsqueda de texto completo en español, agenda con filtros, artistas, lanzamientos, newsletter **real** (guarda como «pendiente»; no envía correo todavía), creación de artículos con permisos en el servidor, auditoría.
+- **Pruebas:** 69 (Vitest + PGlite en memoria con las mismas migraciones). Encontraron y corrigieron un fallo real: los comodines `%` y `_` del filtro de ciudad actuaban como patrón.
+- **Radio StereoFace Frequencies:** reproductor persistente (HLS.js, nativo y directo), visualizador con datos reales, estados y reconexión, atribución siempre visible, Media Session. Verificado en navegador: conecta y suena un stream HLS de pruebas, el elemento de audio **sigue sonando al navegar entre páginas**, y un error de red lleva a reconexión 4/5 y «Error de conexión · Reintentar».
+- **Administración:** login (scrypt, sesión HttpOnly), `/admin`, `/admin/radio` (listar, crear, editar, autorizar, activar, borrar). Verificado en navegador con una cuenta local de prueba (ya eliminada): sin sesión redirige al login; The Lot Radio no se puede activar; cambiar la URL de una emisora activa la desactiva.
+- **The Lot Radio:** registrada desactivada, pendiente y sin URL, a la espera de autorización (ver ARCHITECTURE sección 9).
+- **Lighthouse** (producción, Edge headless): escritorio 99/100/100/100; móvil accesibilidad, buenas prácticas y SEO 100 y rendimiento **83–84**. Causa: el LCP simulado (4,2 s) lo marca el texto de la barra de radio, que se pinta tras hidratar y pedir la lista; el LCP real sin throttling fue ~0,26 s. Si se quiere subir: pintar la barra desde el servidor (lista en caché con `use cache`) en vez de pedirla en el cliente.
+- **Accesibilidad:** Lighthouse/axe 100 en portada y login (corregido un contraste de botones por orden de capas CSS).
+
+## CMS y editor (esta ronda)
+- **Editor Tiptap** con título, citas, cita destacada, imágenes, galerías, video/audio de proveedores oficiales, tablas y enlaces; **autoguardado**, **historial con restauración**, **vista previa**, **programación**, SEO por artículo y control de conflictos. Detalle en ARCHITECTURE sección 12.
+- **Saneamiento del servidor** de todo el HTML (lista blanca estricta) con 11 pruebas XSS. Una prueba encontró un fallo real: un `<iframe>` con host no permitido quedaba como etiqueta vacía; ahora se elimina.
+- **Público:** `/noticias` y `/noticias/[slug]` (JSON-LD, Open Graph, canónica, relacionados, compartir con enlaces reales y copiar enlace, fuentes). La portada y el hero ya enlazan a estas páginas.
+- **Pruebas:** 97 (28 nuevas: servicios de artículos, permisos, conflictos, revisiones, programación, saneamiento).
+- **Verificado en navegador** con una cuenta local de prueba (ya eliminada): crear borrador, escribir en el editor, insertar video (rechaza hosts no permitidos), cita destacada y tabla, autoguardado, recarga conserva el contenido, vista previa, publicar, página pública con metadatos y JSON-LD, búsqueda en `/noticias`.
+- **Lighthouse** (producción): artículo y listado 100 en rendimiento, accesibilidad y buenas prácticas; SEO 90–91 por dos puntos corregidos después (canónica absoluta con `metadataBase`; la descripción del artículo llega por streaming de metadatos y el HTML sí la contiene).
+- Cambios de diseño asociados: la cabecera pasa a menú desplegable por debajo de 1280 px; el botón de reproducir de la radio ya se oculta correctamente en escritorio.
+
+## Despliegue (esta ronda)
+- **Documentado para que lo ejecute otra IA:** `DEPLOY.md` (arquitectura, qué falta pedir al humano, variables, pasos en orden, comprobaciones con resultado esperado, prueba de login, renovación de TLS, copias y restauración, actualización y vuelta atrás, reglas de seguridad, diagnóstico). `README.md` reescrito.
+- **Archivos de infraestructura:** `Dockerfile`, `.dockerignore`, `docker-compose.yml` (db, migrate, web, nginx, certbot, backup), `infra/nginx/*`, `infra/backup/backup.sh`, `infra/scripts/init-tls.sh`, `.env.production.example`.
+- **Código preparado para producción:** salida `standalone`, `GET /api/health`, `robots.txt`, `sitemap.xml` y `rss.xml` dinámicos, `metadataBase`, guarda que impide arrancar sin `DATABASE_URL`, `seedBase` separado del seed demo, `scripts/migrate-prod.ts` (espera a Postgres, migra, siembra base, crea primer superadministrador y usuarios extra con `ADD_USER_*`), portada con estado «Próximamente» cuando no hay artículos.
+- **Verificado en local:** build standalone ejecutada con `node server.js` y el controlador `pg` real contra PGlite con socket; las rutas operativas responden 200 con cabeceras de seguridad; `migrate.mjs` es idempotente y rechaza entradas inválidas; compose válido como YAML; scripts con `bash -n`; lockfile con binarios Linux musl.
+- **NO verificado:** `docker build`, `docker compose up`, `nginx -t`, emisión/renovación de certificados, copia y restauración, y el **inicio de sesión con Server Actions en la build standalone detrás de Nginx**. Son lo primero que debe comprobar quien despliegue (DEPLOY.md, secciones 7 y 8).
+- **The Lot Radio** sigue desactivada, a petición del usuario; la radio propia queda para más adelante.
+
+## Administrador completo (2026-11-11)
+- **Secciones nuevas en `/admin`** (diseño: `docs/superpowers/specs/2026-11-11-admin-completo-design.md`; plan: `docs/superpowers/plans/2026-11-11-admin-completo.md`): panel de inicio con cifras reales y navegación agrupada; **Portada** (hero y destacados: orden, activar, configurar slide); **Artistas**, **Lanzamientos** y **Agenda** (alta, edición, publicar, ocultar/restaurar); **Taxonomía** (categorías, etiquetas, géneros, con control de «en uso»); **Medios** (biblioteca, metadatos, borrado solo si no está en uso, selector reutilizable); **Suscriptores** (filtros, estado, borrado, CSV seguro); **Ajustes** (nombre/descripción, newsletter, pie, redes) y **Páginas** fijas (`/pagina/<slug>`, editor Tiptap); **Usuarios** (alta, rol, activar, restablecer contraseña; nunca queda el sistema sin superadmin activo) y **Auditoría**; **Fuentes** de noticias (solo registro: nacen desactivadas, se activan tras verificar términos).
+- **Web pública:** la foto de un artista sustituye a la ilustración; el pie, el bloque de newsletter y el título/descripción de la portada leen los ajustes (sin ajustes guardados se ve exactamente igual que antes).
+- **Pruebas:** 189 (Vitest, una por servicio: permisos por rol, validación, borrado lógico, auditoría, reglas de «en uso», inyección CSV, último superadmin, anti-SSRF). `tsc`, `eslint` y `next build` sin errores.
+- **Verificado en navegador** (BD temporal con datos demo, superadmin y editor locales ya descartados): todas las pantallas cargan; crear artista, lanzamiento, evento y página (con cuerpo del editor); publicar página y verla en `/pagina/<slug>`; guardar ajustes y verlos en el HTML de la portada; el editor no ve Ajustes ni Auditoría y la URL directa redirige con aviso; panel sin scroll horizontal a 375 px.
+- **Encontrado y corregido al verificar:** valores exportados desde módulos `"use client"` (listas de opciones) llegaban al servidor como referencias y rompían los listados de lanzamientos y agenda; ahora viven en `src/ui/admin/options.ts`. Un `generateMetadata()` dinámico en el layout raíz rompía `/_not-found` en `next build`; el título/descripción editables se aplican solo a la portada.
+- **Revisión final independiente:** corregidos tres hallazgos (cada uno con prueba que fallaba antes): borrar un medio usado en el cuerpo de una página fija; la ficha de agenda mostraba el día en UTC (un evento a las 21:00 de Bogotá salía al día siguiente); el redactor veía los últimos cambios de auditoría en el panel. Diferidos (menores): `?usuario=` no-uuid en Auditoría da 500; alta/edición de artista, lanzamiento y evento sin transacción (un género/artista borrado a mitad deja el registro a medias); un artículo programado a futuro no se marca como problema en Portada; la biblioteca de medios hace 3 consultas por imagen.
+- **Reglas que conviene recordar:** la portada muestra los lanzamientos publicados de los últimos 30 días y los próximos; los destacados de artistas son 4 (alfabético); `setting:update` es solo admin/superadmin; un cambio de estado en lanzamientos/eventos exige permiso de publicar.
+- **NO verificado:** el intercambio de bloques en streaming del pie en un navegador con la pestaña visible (en la pestaña oculta de la herramienta de pruebas el navegador pausa `requestAnimationFrame`; el HTML del servidor sí trae el texto editado); subida real de una imagen desde el selector; el flujo completo con lector de pantalla/teclado; Safari y Firefox.
+
+## Despliegue del administrador completo (2026-11-11, servidor 192.168.0.10)
+- **Qué se hizo:** copia de seguridad (código + `pg_dump` -Fc de la base `stereoface` + imagen anterior etiquetada `stereoface-web:pre-admin-20261111-1919`, en `/root/stereoface-backups/`), subida de `src/`, `tests/`, `docs/` y `PROGRESS.md`, `docker compose build migrate`, `docker compose run --rm migrate` (sin migraciones nuevas), `docker compose up -d web`.
+- **No se tocó:** `docker-compose.yml` del servidor (base externa `postgres` en la red `backend` + red de nginx-proxy-manager), `.env`, `Dockerfile`, `infra/`.
+- **Comprobado desde dentro del contenedor:** `web` healthy; `/`, `/noticias`, `/rss.xml`, `/sitemap.xml`, `/robots.txt`, `/api/radio/stations` y `/api/health` responden 200; las rutas `/admin/*` redirigen al login sin sesión y `/admin/suscriptores/export` y `/api/media` dan 401; sin errores en los logs.
+- **NO verificado en producción:** inicio de sesión y las pantallas del panel con datos reales (no se usó ninguna contraseña); acceso desde el dominio público y Cloudflare.
+- **Volver atrás:** `docker tag stereoface-web:pre-admin-20261111-1919 stereoface-web:latest && docker compose up -d web` (no hay migraciones nuevas; la base no cambió de esquema).
+
+## Contenido editorial cargado en producción (2026-11-11)
+- **Qué se cargó** (revisado y aprobado por el humano; detalle en `docs/contenido-a-publicar.md`): 22 artículos con fuente enlazada (Colectivo Sonoro, La X Medellín, Vanguardia, Chilango y otros; redacción propia, sin copiar textos), 17 artistas, 7 lanzamientos, 23 eventos de Latinoamérica (Colombia, México, Brasil, Argentina, Chile) y 17 fotos de Wikimedia Commons con autor y licencia guardados (visibles en el pie de foto). Portada: el artículo de Till Lindemann queda de primer slide y se añaden 4 slides y 4 destacados.
+- **Cómo:** `pg_dump` previo (`/root/stereoface-backups/stereoface-db-before-content-20261111-1946.dump`), imágenes copiadas al volumen `stereoface_stereoface_media` (`/data/media/<uuid>`), SQL idempotente (`ON CONFLICT DO NOTHING`, hijos por subconsulta de slug) ejecutado en una transacción contra la base `stereoface`. Es aditivo: no borra ni modifica contenido existente.
+- **Comprobado:** 29 artículos, 17 artistas, 7 lanzamientos, 23 eventos, 17 medios; portada, `/noticias`, 3 artículos, `/sitemap.xml` (29 URL de noticias), `/rss.xml` y una imagen servidas con 200; `https://stereoface.online/` responde 200; contenedor healthy y sin errores en logs.
+- **Límites conocidos:** las fotos son de archivo (no del evento) y los pies lo indican; los artistas sin foto libre y las portadas de lanzamientos usan la ilustración generativa; los eventos se guardaron a las 12:00 (hora de Bogotá) porque las fuentes no dan la hora y cada descripción dice «hora por confirmar»; Lollapalooza Chile/Argentina, la sede de Vive Latino y el cartel de EDC México se confirmaron solo con resúmenes de búsqueda y conviene revisarlos.
+- **Pendiente humano:** revisar fechas/horas con los organizadores antes de promocionarlas; cambiar la contraseña de root (se compartió en un chat).
+
+## Limitaciones conocidas (no esconder)
+- El contenido de la portada es **demo y ficticio** (marcado en BD). Ya se gestiona todo desde el panel; faltan las páginas públicas de artistas, lanzamientos y agenda.
+- CMS: las imágenes y la portada se ponen por URL https (la subida llega con el módulo de medios); no hay vista previa por enlace compartible ni comentarios; el autoguardado no cubre artículos ya publicados a propósito.
+- Solo se probó el editor con el navegador del panel (Chromium); falta una prueba con lector de pantalla y con teclado completo.
+- Las tarjetas no enlazan a páginas: solo funcionan las anclas del menú y del riel hacia secciones de la propia portada. Las rutas `/noticias`, `/artistas`, `/agenda`, etc. no existen.
+- Newsletter: guarda el correo como pendiente; **no hay envío de correos** ni confirmación (sin proveedor configurado).
+- Pendiente de probar: dispositivos físicos y red lenta real (Lighthouse usa throttling simulado), lectores de pantalla reales (NVDA/VoiceOver), Firefox y Safari (solo se probó Chromium/Edge), navegación solo con teclado por todo el sitio.
+- Las ilustraciones (figura de portada, escenas) son marcadores de posición vectoriales, no fotografía; el efecto visual final depende de contar con imágenes licenciadas o propias.
+- Redes sociales, búsqueda y «Radio en vivo» del concepto no se implementaron (sin enlaces, rutas ni reproductor autorizado).
+- No hay Docker, PostgreSQL ni pnpm en esta máquina: se probó con PGlite (y con `pg` contra PGlite-socket); Docker, Nginx y TLS están sin ejecutar (ver sección Despliegue).
+- Sin Redis/worker/MinIO: motor de noticias automático y subida de medios siguen pendientes; límites de tasa en memoria (una sola instancia de `web`).
+- CSP parcial: sin `script-src` estricto (hay script de arranque en línea y JSON-LD); mejora pendiente con nonces.
+- Usuarios y portada ya se editan desde el panel; `ADD_USER_*` en `migrate` sigue disponible para el primer arranque.
+- Radio: imágenes de emisora solo por URL https (la subida llega con el módulo de medios); sin prueba con una emisora real autorizada; Safari y Firefox sin probar; el visualizador con flujos directos CORS está implementado pero solo se verificó con HLS.
+- Windows con ruta larga: las herramientas con esbuild (drizzle-kit, tsx, vitest) fallan por MAX_PATH; se usó `ESBUILD_BINARY_PATH` con una copia en `C:/sfbin`. Desaparece al mover el proyecto a una ruta corta.
+- El proyecto no está en un repositorio git; no hay commits.
+
+## Siguiente
+1. Fase 4: base de datos y datos reales (la portada pasa a leer de ahí).
+2. Esquema Drizzle, migraciones, seeds, servicios y validaciones Zod; sustituir `src/data/demo.ts`.
+3. Fase 3: rutas de listado y detalle sobre datos reales.
+4. Fase 2: primitivos restantes (formularios, paginación, migas de pan).
+
+## Notas del entorno
+Node 24, npm 11, git 2.55, Next.js 16.4, React 19, Tailwind 4, GSAP 3.15.
