@@ -11,7 +11,13 @@ import { readStored } from "./settings";
 const KEY = "studio.relay";
 const DEFAULT_NAME = "Trance Is Star Radio";
 
-const stored = z.object({ name: z.string().default(DEFAULT_NAME), url: z.string().default(""), autodj: z.boolean().default(false) });
+const stored = z.object({
+  name: z.string().default(DEFAULT_NAME),
+  url: z.string().default(""),
+  autodj: z.boolean().default(false),
+  /** Listas de música de AzuraCast que se pausaron al activar la señal en el AutoDJ (para devolverlas al apagarla). */
+  paused: z.array(z.number()).default([]),
+});
 
 export const relayInputSchema = z.object({
   name: z.string().trim().min(1, "Pon un nombre").max(60).default(DEFAULT_NAME),
@@ -41,7 +47,7 @@ export type AutodjSync = "skipped" | "no_key" | "synced" | "failed";
 async function read(db: Db) {
   const [row] = await db.select().from(siteSettings).where(eq(siteSettings.key, KEY));
   const parsed = stored.safeParse(row?.value);
-  return parsed.success ? parsed.data : { name: DEFAULT_NAME, url: "", autodj: false };
+  return parsed.success ? parsed.data : { name: DEFAULT_NAME, url: "", autodj: false, paused: [] as number[] };
 }
 
 /** Para los ajustes (administración de la emisora): incluye la dirección. */
@@ -64,22 +70,41 @@ export async function loadRelayUrl(db: Db, actor: Actor | null): Promise<string 
   return c.url || null;
 }
 
-async function syncAutodj(db: Db, name: string, url: string, enabled: boolean, fetchImpl: typeof fetch): Promise<AutodjSync> {
+type SyncResult = { autodj: AutodjSync; paused: number[] };
+
+/**
+ * Deja el AutoDJ de AzuraCast como pide la configuración. Con la señal activa se pausan las listas de música normales
+ * (para que suene solo la señal); al apagarla se vuelven a encender las que se pausaron. Los jingles no se tocan.
+ */
+async function syncAutodj(db: Db, name: string, url: string, enabled: boolean, previouslyPaused: number[], fetchImpl: typeof fetch): Promise<SyncResult> {
   const cfg = await readStored(db);
-  if (!cfg.apiKey) return enabled ? "no_key" : "skipped";
+  if (!cfg.apiKey) return { autodj: enabled ? "no_key" : "skipped", paused: previouslyPaused };
+  let paused = previouslyPaused;
   try {
     const client = new AzuraClient(cfg, fetchImpl);
-    const found = (await client.listPlaylistsRaw()).find((p) => p.source === "remote_url" && p.name.toLowerCase() === name.toLowerCase());
-    const body = { name, source: "remote_url", remote_type: "stream", remote_url: url, is_enabled: enabled && url !== "", type: "default" };
+    const lists = await client.listPlaylistsRaw();
+    const found = lists.find((p) => p.source === "remote_url" && p.name.toLowerCase() === name.toLowerCase());
+    const active = enabled && url !== "";
+    const body = { name, source: "remote_url", remote_type: "stream", remote_url: url, is_enabled: active, type: "default" };
+    let touched = false;
     if (found) {
-      await client.updatePlaylist(found.id, body);
-      return "synced";
+      await client.updatePlaylist(found.id, { ...body, weight: 25 });
+      touched = true;
+    } else if (active) {
+      await client.createPlaylist({ ...body, order: "shuffle", weight: 25, remote_buffer: 0 });
+      touched = true;
     }
-    if (!enabled || !url) return "skipped";
-    await client.createPlaylist({ ...body, order: "shuffle", weight: 3, remote_buffer: 0 });
-    return "synced";
+    if (active) {
+      const music = lists.filter((p) => p.id !== found?.id && p.source === "songs" && p.type === "default" && p.is_enabled === true);
+      for (const p of music) await client.updatePlaylist(p.id, { is_enabled: false });
+      paused = [...new Set([...previouslyPaused, ...music.map((p) => p.id)])];
+    } else {
+      for (const id of previouslyPaused) if (lists.some((p) => p.id === id)) await client.updatePlaylist(id, { is_enabled: true });
+      paused = [];
+    }
+    return { autodj: touched || previouslyPaused.length > 0 ? "synced" : "skipped", paused };
   } catch {
-    return "failed";
+    return { autodj: "failed", paused };
   }
 }
 
@@ -87,10 +112,17 @@ async function syncAutodj(db: Db, name: string, url: string, enabled: boolean, f
 export async function saveRelayConfig(db: Db, actor: Actor | null, raw: RelayInput, fetchImpl: typeof fetch = fetch): Promise<{ autodj: AutodjSync }> {
   assertCan(actor, "station:manage");
   const input = relayInputSchema.parse(raw);
-  await db
-    .insert(siteSettings)
-    .values({ key: KEY, value: input, updatedBy: actor.id })
-    .onConflictDoUpdate({ target: siteSettings.key, set: { value: input, updatedBy: actor.id } });
+  const before = await read(db);
+  const persist = async (paused: number[]) => {
+    const value = { ...input, paused };
+    await db
+      .insert(siteSettings)
+      .values({ key: KEY, value, updatedBy: actor.id })
+      .onConflictDoUpdate({ target: siteSettings.key, set: { value, updatedBy: actor.id } });
+  };
+  await persist(before.paused);
   await recordAudit(db, { userId: actor.id, action: "studio.relay.update", entity: "settings", diff: { name: input.name, url: input.url, autodj: input.autodj } });
-  return { autodj: await syncAutodj(db, input.name, input.url, input.autodj, fetchImpl) };
+  const r = await syncAutodj(db, input.name, input.url, input.autodj, before.paused, fetchImpl);
+  if (r.paused !== before.paused) await persist(r.paused);
+  return { autodj: r.autodj };
 }

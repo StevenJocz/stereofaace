@@ -98,7 +98,7 @@ export class AzuraClient {
   }
 
   /** Listas de reproducción tal como las entrega AzuraCast (incluye el origen y la dirección remota). */
-  async listPlaylistsRaw(): Promise<{ id: number; name: string; source?: string; remote_url?: string | null; is_enabled?: boolean }[]> {
+  async listPlaylistsRaw(): Promise<{ id: number; name: string; source?: string; type?: string; remote_url?: string | null; is_enabled?: boolean }[]> {
     return this.json("/playlists");
   }
 

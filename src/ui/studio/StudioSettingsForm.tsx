@@ -21,7 +21,7 @@ export function RelaySettingsForm({ initial }: { initial: { name: string; url: s
         <input type="checkbox" name="relayAutodj" className="mt-1" defaultChecked={state?.values ? state.values.relayAutodj === "on" : initial.autodj} />
         <span>
           Sonar en el AutoDJ mientras no haya música ni transmisión en vivo
-          <span className="mono muted block">Crea o actualiza una lista «URL remota» en AzuraCast. Al desmarcarla se apaga. Requiere la clave API de arriba.</span>
+          <span className="mono muted block">Crea o actualiza una lista «URL remota» en AzuraCast y pausa las listas de música normales para que suene solo la señal (los jingles siguen). Al desmarcarla, la música vuelve a sonar. Requiere la clave API de arriba.</span>
         </span>
       </label>
       <div className="flex flex-wrap items-center gap-3">

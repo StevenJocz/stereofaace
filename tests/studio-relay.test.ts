@@ -127,3 +127,31 @@ describe("proxy de la señal para el mezclador", () => {
     expect((await relayStreamHandler(h.db, editor, req(), f)).status).toBe(502);
   });
 });
+
+describe("AutoDJ exclusivo: la señal manda mientras esté activa", () => {
+  const lists = () => [
+    { id: 3, name: "Creative Commons", source: "songs", type: "default", is_enabled: true },
+    { id: 4, name: "Jingles StereoFace", source: "songs", type: "once_per_x_songs", is_enabled: true },
+    { id: 5, name: "Antigua", source: "songs", type: "default", is_enabled: false },
+  ];
+  const input = (autodj: boolean) => ({ name: "Trance Is Star Radio", url: "https://stream.example.org/live.mp3", autodj });
+
+  it("al activarla pausa solo las listas de música normales que estaban encendidas y la señal pesa al máximo", async () => {
+    const { f, calls } = azura(lists());
+    await saveRelayConfig(h.db, admin, input(true), f);
+    const puts = calls.filter((c) => c.method === "PUT");
+    expect(puts.map((c) => c.url.split("/").pop())).toEqual(["3"]); // ni los jingles ni la que ya estaba apagada
+    expect(puts[0].body).toMatchObject({ is_enabled: false });
+    expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ weight: 25 });
+  });
+
+  it("al desactivarla vuelve a encender exactamente las que ella pausó", async () => {
+    const { f, calls } = azura([...lists().map((p) => (p.id === 3 ? { ...p, is_enabled: false } : p)), { id: 9, name: "Trance Is Star Radio", source: "remote_url", type: "default", is_enabled: true }]);
+    await saveRelayConfig(h.db, admin, input(false), f);
+    const on = calls.filter((c) => c.method === "PUT" && (c.body as { is_enabled?: boolean }).is_enabled === true);
+    expect(on.map((c) => c.url.split("/").pop())).toEqual(["3"]);
+    const again = azura(lists());
+    await saveRelayConfig(h.db, admin, input(false), again.f);
+    expect(again.calls.filter((c) => c.method === "PUT" && (c.body as { is_enabled?: boolean }).is_enabled === true)).toHaveLength(0); // ya no hay nada pausado por ella
+  });
+});
