@@ -9,3 +9,5 @@ export * from "@/modules/content/schema";
 export * from "@/modules/settings/schema";
 export * from "@/modules/ingest/schema";
 export * from "@/modules/radio/schema";
+export * from "@/modules/studio/schema";
+export * from "@/modules/schedule/schema";
