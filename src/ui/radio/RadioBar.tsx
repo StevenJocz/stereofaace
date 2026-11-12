@@ -346,14 +346,17 @@ export function RadioBar() {
                 <TrackList tracks={tracks} />
               </div>
             )}
-            <div className={own && tracks?.nowPlaying ? (r.analysable ? "hidden h-11 w-40 shrink-0 lg:block" : "hidden") : "hidden h-11 min-w-0 flex-1 lg:block"}>
-              <Visualizer
-                active={r.status === "playing"}
-                analysable={r.analysable}
-                silenced={silenced}
-                getAnalyser={r.getAnalyser}
-              />
-            </div>
+            {/* Con la tarjeta de canciones no se muestra el visualizador: queda más limpio. */}
+            {!(own && tracks?.nowPlaying) && (
+              <div className="hidden h-11 min-w-0 flex-1 lg:block">
+                <Visualizer
+                  active={r.status === "playing"}
+                  analysable={r.analysable}
+                  silenced={silenced}
+                  getAnalyser={r.getAnalyser}
+                />
+              </div>
+            )}
           </div>
 
           {/* Volumen y lista */}
