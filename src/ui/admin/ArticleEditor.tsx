@@ -359,7 +359,7 @@ export function ArticleEditor({
         </div>
 
         {/* Lateral */}
-        <aside className="grid content-start gap-4" aria-label="Ajustes del artículo">
+        <aside className="editor-side grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4" aria-label="Ajustes del artículo">
           <Section title="Publicación" id="s-pub">
             <div className="flex flex-wrap gap-2">
               {status === "draft" && canEdit && (

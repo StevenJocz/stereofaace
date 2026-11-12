@@ -2185,3 +2185,31 @@ body[data-radio="on"] .adm-shell {
   box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.25);
   animation: studio-pulse 1s ease-in-out infinite;
 }
+
+/* Editor de artículos: las columnas de cada panel nunca crecen más que el panel (los textos largos se cortan, no desbordan) */
+.editor-side > section > .grid:not([class*="grid-cols"]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.editor-side > section {
+  min-width: 0;
+}
+
+/* Parrilla: botón de quitar compacto dentro de la tarjeta del horario */
+.slot-x {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.slot-x:hover {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}

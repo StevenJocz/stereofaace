@@ -139,23 +139,25 @@ export function SchedulePreview({ programs, slots }: { programs: ProgramAdminVie
   const Row = ({ s }: { s: SlotAdminView }) => {
     const p = byId.get(s.programId);
     return (
-      <li className="flex items-center justify-between gap-2 rounded-md border border-line px-2 py-1" style={{ borderLeft: `4px solid ${p?.color ?? "#888"}` }}>
-        <span className="min-w-0">
-          <span className="block truncate font-bold">{p?.name ?? "—"}</span>
-          <span className="mono muted">
-            {s.kind === "once" ? `${s.date} · ` : ""}
-            {s.start}–{s.end}
-          </span>
+      <li className="slot-card relative min-w-0 rounded-md border border-line py-1.5 pl-3 pr-9" style={{ borderLeft: `4px solid ${p?.color ?? "#888"}` }}>
+        <span className="block truncate text-[0.88rem] font-bold leading-tight" title={p?.name}>
+          {p?.name ?? "—"}
         </span>
-        <RowAction action={removeSlotAction} fields={{ id: s.id }} label="✕" ariaLabel={`Quitar el horario de ${p?.name ?? "programa"} ${s.start}`} />
+        <span className="mono muted block text-[0.7rem]">
+          {s.kind === "once" ? `${s.date} · ` : ""}
+          {s.start}–{s.end}
+        </span>
+        <span className="absolute right-1.5 top-1.5">
+          <RowAction action={removeSlotAction} fields={{ id: s.id }} label="✕" className="slot-x" ariaLabel={`Quitar el horario de ${p?.name ?? "programa"} ${s.start}`} />
+        </span>
       </li>
     );
   };
   return (
     <section aria-label="Parrilla semanal" className="grid gap-4">
-      <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         {WEEK_ORDER.map((d) => (
-          <div key={d}>
+          <div key={d} className="min-w-0">
             <p className="display-up text-[1.05rem]">{DAYS[d]}</p>
             <ul className="mt-2 grid gap-2">
               {weekly(d).map((s) => (
