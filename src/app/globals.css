@@ -1315,3 +1315,95 @@ textarea.input {
     mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.25) 12%, rgba(0, 0, 0, 0.7) 28%, #000 48%);
   }
 }
+
+/* ───────────── Estudio en vivo (/admin/radio/studio) ───────────── */
+.studio-deck,
+.studio-queue,
+.studio-livebar {
+  padding: 1rem 1.1rem;
+}
+.studio-deck[data-active="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.studio-livebar[data-state="live"] {
+  border-color: #ff3b3b;
+  box-shadow: 0 0 0 1px #ff3b3b inset;
+}
+.studio-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+.studio-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--muted);
+}
+.studio-dot[data-state="live"] {
+  background: #ff3b3b;
+  animation: studio-pulse 1.2s ease-in-out infinite;
+}
+.studio-dot[data-state="connecting"],
+.studio-dot[data-state="reconnecting"] {
+  background: #ffb020;
+}
+.studio-dot[data-state="auth-error"],
+.studio-dot[data-state="error"] {
+  background: var(--violet);
+}
+@keyframes studio-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.studio-meter {
+  height: 0.7rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(242, 242, 238, 0.1);
+}
+.studio-meter-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #f4d000);
+  transition: width 70ms linear;
+}
+.studio-meter-fill[data-hot="true"] {
+  background: #ff3b3b;
+}
+.studio-range {
+  accent-color: var(--accent);
+}
+.studio-empty {
+  margin-top: 1rem;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  text-align: center;
+  color: var(--muted);
+}
+.studio-queue[data-over="true"] {
+  border-color: var(--accent);
+  background: rgba(198, 255, 0, 0.06);
+}
+.studio-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel-2);
+}
+.studio-row[data-dragging="true"] {
+  opacity: 0.7;
+  border-color: var(--accent);
+}
+.studio-handle {
+  cursor: grab;
+  padding: 0.2rem 0.4rem;
+  color: var(--muted);
+  touch-action: none;
+}
