@@ -58,6 +58,7 @@ export function StudioConsole() {
   const activeRef = useRef(active);
   const autoRef = useRef(auto);
   const fadingRef = useRef(false);
+  const startingRef = useRef(false);
   const liveSinceRef = useRef<number | null>(null);
   useEffect(() => {
     queueRef.current = queue;
@@ -217,7 +218,8 @@ export function StudioConsole() {
       setElapsed(0);
       return;
     }
-    if (senderRef.current) return; // doble clic: ya hay una conexión en curso
+    if (senderRef.current || startingRef.current) return; // doble clic: ya hay una conexión en curso
+    startingRef.current = true;
     try {
       setMessage(null);
       const e = getEngine();
@@ -249,6 +251,8 @@ export function StudioConsole() {
     } catch (err) {
       senderRef.current = null;
       setMessage(err instanceof Error ? err.message : "No se pudo iniciar la emisión.");
+    } finally {
+      startingRef.current = false;
     }
   }, [live, creds, decks, getEngine]);
 
