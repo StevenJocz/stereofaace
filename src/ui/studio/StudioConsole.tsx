@@ -143,6 +143,8 @@ export function StudioConsole() {
       if (shouldStartFade({ ...flow(id), current, duration, fadeSec: FADE_SEC })) void startNext(id, "fade");
     };
     engineRef.current = e;
+    // Solo en desarrollo: permite verificar el audio desde el navegador con un micrófono simulado.
+    if (process.env.NODE_ENV !== "production") Object.assign(window, { __studioEngine: e });
     return e;
   }, []);
 

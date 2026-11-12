@@ -1,6 +1,8 @@
 import { LoadGate } from "./autoplay";
 import { equalPowerGains } from "./crossfade";
+import { EQ_BANDS, FLAT_EQ, clampEq, type EqSettings } from "./eq";
 import { peakToDb, rmsToDb } from "./meter";
+import { DEFAULT_DUCK, DuckController, GateController, gainToDb, type DuckSettings } from "./voice";
 import type { QueueItem } from "./queue";
 
 export type DeckId = "A" | "B";
@@ -20,6 +22,17 @@ type Deck = {
 export type Levels = { master: { rmsDb: number; peakDb: number }; A: number; B: number };
 
 const CURVE_POINTS = 64;
+const CONTROL_MS = 30;
+
+type MicChain = {
+  stream: MediaStream;
+  nodes: AudioNode[];
+  gate: GainNode;
+  gain: GainNode;
+  eq: BiquadFilterNode[];
+  analyser: AnalyserNode;
+  buf: Float32Array<ArrayBuffer>;
+};
 
 /** Una carga fue reemplazada por otra más reciente en el mismo deck; no es un error para el usuario. */
 export class LoadSupersededError extends Error {
@@ -44,10 +57,23 @@ export class AudioEngine {
   private masterBuf: Float32Array<ArrayBuffer>;
   private dest: MediaStreamAudioDestinationNode;
   private monitor: GainNode;
+  private musicBus: GainNode;
+  private musicEq: BiquadFilterNode[];
+  private duckGain: GainNode;
+  private mic: MicChain | null = null;
+  private micMuted = false;
+  private micGain = 1;
+  private pendingMicEq: EqSettings = FLAT_EQ;
+  private gateCtl = new GateController(-55);
+  private duckCtl = new DuckController(DEFAULT_DUCK);
+  private duckDb = 0;
+  private micDb = -100;
+  private controlTimer: ReturnType<typeof setInterval> | null = null;
   private fadeTimers = new Set<ReturnType<typeof setTimeout>>();
 
   onDeckEnded: ((deck: DeckId) => void) | null = null;
   onDeckTime: ((deck: DeckId, current: number, duration: number) => void) | null = null;
+  onMicLost: (() => void) | null = null;
 
   constructor() {
     this.ctx = new AudioContext({ sampleRate: 48000 });
@@ -65,6 +91,17 @@ export class AudioEngine {
     this.dest = this.ctx.createMediaStreamDestination();
     this.dest.channelCount = 2;
     this.monitor = this.ctx.createGain();
+    // Música: decks → bus → EQ de 3 bandas → ducker → mezcla.
+    this.musicBus = this.ctx.createGain();
+    this.musicEq = EQ_BANDS.map((b) => this.biquad(b.type, b.frequency, b.q));
+    this.duckGain = this.ctx.createGain();
+    let prev: AudioNode = this.musicBus;
+    for (const f of this.musicEq) {
+      prev.connect(f);
+      prev = f;
+    }
+    prev.connect(this.duckGain);
+    this.duckGain.connect(this.mix);
     this.mix.connect(this.limiter);
     this.limiter.connect(this.master);
     this.master.connect(this.masterAnalyser);
@@ -75,6 +112,14 @@ export class AudioEngine {
     this.decks.B.fade.gain.value = 0;
   }
 
+  private biquad(type: BiquadFilterType, frequency: number, q: number): BiquadFilterNode {
+    const f = this.ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = frequency;
+    f.Q.value = q;
+    return f;
+  }
+
   private makeDeck(): Deck {
     const volume = this.ctx.createGain();
     const fade = this.ctx.createGain();
@@ -82,7 +127,7 @@ export class AudioEngine {
     analyser.fftSize = 1024;
     volume.connect(fade);
     fade.connect(analyser);
-    analyser.connect(this.mix);
+    analyser.connect(this.musicBus);
     return {
       el: null,
       source: null,
@@ -258,6 +303,167 @@ export class AudioEngine {
     this.decks[other(id)].fade.gain.setValueAtTime(0, now);
   }
 
+  // ───────────── Micrófono, ducking y ecualizador ─────────────
+
+  async listMics(): Promise<{ id: string; label: string }[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices
+      .filter((d) => d.kind === "audioinput")
+      .map((d, i) => ({ id: d.deviceId, label: d.label || `Micrófono ${i + 1}` }));
+  }
+
+  /** Pide el micrófono (sin procesado del navegador: la cadena propia se encarga) y lo conecta a la emisión. */
+  async startMic(deviceId?: string): Promise<void> {
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") throw new Error("Permiso de micrófono denegado.");
+      if (name === "NotFoundError" || name === "OverconstrainedError") throw new Error("No se encontró ningún micrófono.");
+      throw new Error("No se pudo abrir el micrófono.");
+    }
+    this.attachMicStream(stream);
+  }
+
+  /** Punto de entrada común (también permite inyectar un flujo de prueba). El micrófono NO va al monitor local. */
+  attachMicStream(stream: MediaStream): void {
+    this.stopMic();
+    const source = this.ctx.createMediaStreamSource(stream);
+    const hp = this.biquad("highpass", 80, 0.7);
+    const analyser = this.ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    const gate = this.ctx.createGain();
+    const comp = this.ctx.createDynamicsCompressor();
+    comp.threshold.value = -24;
+    comp.knee.value = 12;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.005;
+    comp.release.value = 0.2;
+    const eq = EQ_BANDS.map((b) => this.biquad(b.type, b.frequency, b.q));
+    eq.forEach((f, i) => (f.gain.value = this.pendingMicEq[EQ_BANDS[i].key]));
+    const gain = this.ctx.createGain();
+    gain.gain.value = this.micMuted ? 0 : this.micGain;
+    const chain: AudioNode[] = [source, hp, gate, comp, ...eq, gain];
+    for (let i = 0; i < chain.length - 1; i++) chain[i].connect(chain[i + 1]);
+    hp.connect(analyser); // el nivel se mide antes de la puerta
+    gain.connect(this.mix);
+    this.mic = { stream, nodes: chain, gate, gain, eq, analyser, buf: new Float32Array(analyser.fftSize) };
+    const track = stream.getAudioTracks()[0];
+    if (track) {
+      track.onended = () => {
+        if (this.mic?.stream === stream) {
+          this.stopMic();
+          this.onMicLost?.();
+        }
+      };
+    }
+    this.ensureControl();
+  }
+
+  stopMic(): void {
+    const m = this.mic;
+    if (!m) return;
+    this.mic = null;
+    for (const t of m.stream.getTracks()) {
+      t.onended = null;
+      t.stop();
+    }
+    for (const n of m.nodes) n.disconnect();
+    m.analyser.disconnect();
+    this.micDb = -100;
+    this.applyDuck(-100);
+    this.idleControlLater();
+  }
+
+  get micActive(): boolean {
+    return this.mic !== null;
+  }
+
+  setMicMuted(muted: boolean): void {
+    this.micMuted = muted;
+    if (this.mic) this.mic.gain.gain.setTargetAtTime(muted ? 0 : this.micGain, this.ctx.currentTime, 0.01);
+  }
+
+  setMicGain(g: number): void {
+    this.micGain = Math.min(2, Math.max(0, g));
+    if (this.mic && !this.micMuted) this.mic.gain.gain.setTargetAtTime(this.micGain, this.ctx.currentTime, 0.01);
+  }
+
+  setMicGateThreshold(db: number): void {
+    this.gateCtl = new GateController(Math.min(-20, Math.max(-90, db)));
+  }
+
+  setDuck(s: DuckSettings): void {
+    this.duckCtl.setSettings(s);
+  }
+
+  setDuckForced(on: boolean): void {
+    this.duckCtl.setForced(on);
+    if (on) this.ensureControl();
+    else this.idleControlLater();
+  }
+
+  setEq(target: "music" | "mic", e: EqSettings): void {
+    const c = clampEq(e);
+    if (target === "mic") this.pendingMicEq = c;
+    const filters = target === "music" ? this.musicEq : this.mic?.eq;
+    filters?.forEach((f, i) => (f.gain.value = c[EQ_BANDS[i].key]));
+  }
+
+  getMicLevelDb(): number {
+    return this.micDb;
+  }
+
+  getDuckGainDb(): number {
+    return this.duckDb;
+  }
+
+  private applyDuck(micDb: number) {
+    const d = this.duckCtl.update({ micDb, micMuted: this.micMuted, nowMs: performance.now() });
+    this.duckGain.gain.setTargetAtTime(d.targetGain, this.ctx.currentTime, Math.max(0.005, d.timeConstantSec));
+    this.duckDb = gainToDb(d.targetGain);
+  }
+
+  private ensureControl() {
+    if (this.controlTimer) return;
+    this.controlTimer = setInterval(() => {
+      let db = -100;
+      if (this.mic) {
+        this.mic.analyser.getFloatTimeDomainData(this.mic.buf);
+        db = rmsToDb(this.mic.buf);
+        const g = this.micMuted ? 0 : this.gateCtl.update(db, performance.now());
+        this.mic.gate.gain.setTargetAtTime(g, this.ctx.currentTime, 0.01);
+      }
+      this.micDb = db;
+      this.applyDuck(db);
+    }, CONTROL_MS);
+  }
+
+  /** Sin micrófono y con la música ya recuperada, el bucle de control se detiene. */
+  private idleControlLater() {
+    const check = setInterval(() => {
+      if (this.mic) {
+        clearInterval(check);
+        return;
+      }
+      if (this.duckDb === 0 && this.controlTimer) {
+        clearInterval(this.controlTimer);
+        this.controlTimer = null;
+        clearInterval(check);
+      } else if (!this.controlTimer) {
+        clearInterval(check);
+      }
+    }, 500);
+  }
+
   getLevels(): Levels {
     this.masterAnalyser.getFloatTimeDomainData(this.masterBuf);
     const a = this.decks.A;
@@ -276,6 +482,9 @@ export class AudioEngine {
   }
 
   dispose(): void {
+    this.stopMic();
+    if (this.controlTimer) clearInterval(this.controlTimer);
+    this.controlTimer = null;
     for (const t of this.fadeTimers) clearTimeout(t);
     this.fadeTimers.clear();
     this.release(this.decks.A);
