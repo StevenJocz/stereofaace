@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Art } from "@/ui/Art";
+import { Mark } from "@/ui/Header";
 import { useRadio, type RadioStatus } from "./RadioProvider";
 import { ScheduleModal } from "./ScheduleModal";
 import { OWN_STATION_SLUG, useNowPlayingProgram } from "./useNowPlayingProgram";
@@ -265,6 +266,27 @@ export function RadioBar() {
                     {s.name}
                     {program.program.hosts ? ` · Con ${program.program.hosts}` : ""}
                   </span>
+                </span>
+              </button>
+            ) : own ? (
+              // Sin programa al aire: la emisora propia se presenta con su logo, sin datos de relleno.
+              <button
+                type="button"
+                className="program-block flex min-w-0 items-center gap-3 text-left"
+                onClick={() => setScheduleOpen(true)}
+                aria-label={`${s.name}, en vivo. Ver programación completa`}
+              >
+                <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-[8px] border border-line bg-black lg:size-14">
+                  <Mark size={44} />
+                </span>
+                <span className="min-w-0">
+                  <span className="mono flex items-center gap-2 whitespace-nowrap text-[0.6rem] text-accent-ink">
+                    <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-accent live-dot" />
+                    Radio en vivo
+                    <span aria-hidden="true" className="hidden opacity-70 lg:inline">›</span>
+                  </span>
+                  <span className="block truncate font-bold leading-tight">{s.name}</span>
+                  <span className="mono block truncate text-[0.66rem] text-muted">Electrónica, indie y underground</span>
                 </span>
               </button>
             ) : (
