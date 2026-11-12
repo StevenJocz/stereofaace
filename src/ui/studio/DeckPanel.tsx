@@ -12,6 +12,7 @@ export type DeckView = {
   playing: boolean;
   levelDb: number;
   volume: number;
+  coverUrl: string | null;
 };
 
 const ACCENT: Record<DeckId, string> = { A: "#c6ff00", B: "#9b6bff" };
@@ -38,7 +39,7 @@ export function DeckPanel({
   return (
     <section className="studio-deck panel" data-active={active} aria-label={`Deck ${id}`}>
       <div className="studio-deck-body">
-        <VinylDisc playing={deck.playing} deck={id} accent={ACCENT[id]} />
+        <VinylDisc playing={deck.playing} deck={id} accent={ACCENT[id]} coverUrl={deck.coverUrl} />
         <div className="studio-deck-info">
           <header className="flex items-center justify-between gap-2">
             <span className="display-up text-[1.15rem]">Deck {id}</span>

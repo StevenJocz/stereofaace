@@ -71,3 +71,17 @@ export function fileHandler(
     return new Response(up.body, { status: up.status, headers });
   });
 }
+
+export function artHandler(db: Db, actor: Actor | null, id: string, fetchImpl?: typeof fetch): Promise<Response> {
+  return guarded(actor, async () => {
+    if (!/^\d{1,9}$/.test(id)) return reply(400, "Identificador de pista no válido.");
+    const client = await loadAzuraClient(db, actor, fetchImpl);
+    const up = await client.art(id);
+    const type = up.headers.get("content-type") ?? "";
+    if (!/^image\/(jpeg|png|webp|gif)/.test(type)) return reply(404, "Sin carátula.");
+    return new Response(up.body, {
+      status: 200,
+      headers: { "content-type": type, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff" },
+    });
+  });
+}

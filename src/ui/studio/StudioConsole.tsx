@@ -10,6 +10,7 @@ import { MicPanel, type MicDevice } from "./MicPanel";
 import { QueuePanel } from "./QueuePanel";
 import { AudioEngine, LoadSupersededError, type DeckId } from "./engine/audio-engine";
 import { makeItems } from "./engine/audio-files";
+import { loadCover, type DeckCover } from "./engine/deck-cover";
 import { FLAT_EQ, type EqSettings } from "./engine/eq";
 import { DEFAULT_DUCK, type DuckSettings } from "./engine/voice";
 import { pickNext, shouldAdvanceOnEnd, shouldStartFade } from "./engine/autoplay";
@@ -19,7 +20,7 @@ import { WEBCAST_MIME, WEBCAST_URL, WebcastSender, type LiveState, type Recorder
 const FADE_SEC = 6;
 const CREDS_KEY = "sf-studio-dj";
 const other = (d: DeckId): DeckId => (d === "A" ? "B" : "A");
-const emptyDeck = (): DeckView => ({ item: null, durationSec: null, currentSec: 0, playing: false, levelDb: -100, volume: 1 });
+const emptyDeck = (): DeckView => ({ item: null, durationSec: null, currentSec: 0, playing: false, levelDb: -100, volume: 1, coverUrl: null });
 
 type Creds = { user: string; password: string };
 
@@ -79,6 +80,8 @@ export function StudioConsole() {
   const handedOffRef = useRef<Record<DeckId, boolean>>({ A: false, B: false });
   const voiceRef = useRef({ duck, eqMusic, eqMic, micMuted, micGain, gateDb });
   const pttRef = useRef(false);
+  const coversRef = useRef<Record<DeckId, DeckCover | null>>({ A: null, B: null });
+  const coverSeqRef = useRef<Record<DeckId, number>>({ A: 0, B: 0 });
   const liveSinceRef = useRef<number | null>(null);
   useEffect(() => {
     queueRef.current = queue;
@@ -86,6 +89,23 @@ export function StudioConsole() {
     autoRef.current = auto;
     voiceRef.current = { duck, eqMusic, eqMic, micMuted, micGain, gateDb };
   }, [queue, active, auto, duck, eqMusic, eqMic, micMuted, micGain, gateDb]);
+
+  /** Busca la carátula de la pista cargada en un deck (sin bloquear la reproducción). */
+  const attachCover = useCallback((id: DeckId, item: QueueItem) => {
+    const seq = ++coverSeqRef.current[id];
+    coversRef.current[id]?.revoke();
+    coversRef.current[id] = null;
+    setDecks((d) => ({ ...d, [id]: { ...d[id], coverUrl: null } }));
+    void loadCover(item).then((cover) => {
+      if (!cover) return;
+      if (coverSeqRef.current[id] !== seq) {
+        cover.revoke(); // llegó tarde: ya hay otra pista en el deck
+        return;
+      }
+      coversRef.current[id] = cover;
+      setDecks((d) => ({ ...d, [id]: { ...d[id], coverUrl: cover.url } }));
+    });
+  }, []);
 
   const getEngine = useCallback((): AudioEngine => {
     if (engineRef.current) return engineRef.current;
@@ -132,6 +152,7 @@ export function StudioConsole() {
           const { durationSec } = await e.loadDeck(to, item);
           dispatch({ type: "remove", id: item.id }); // solo tras cargar bien: si falla, la pista sigue en la cola
           setDecks((d) => ({ ...d, [to]: { ...d[to], item, durationSec, currentSec: 0, playing: false } }));
+          attachCover(to, item);
         } else {
           item = e.deckItem(to) as QueueItem;
         }
@@ -176,7 +197,7 @@ export function StudioConsole() {
     // Solo en desarrollo: permite verificar el audio desde el navegador con un micrófono simulado.
     if (process.env.NODE_ENV !== "production") Object.assign(window, { __studioEngine: e });
     return e;
-  }, []);
+  }, [attachCover]);
 
   // Niveles en vivo.
   useEffect(() => {
@@ -233,6 +254,8 @@ export function StudioConsole() {
       senderRef.current?.stop();
       engineRef.current?.dispose();
       engineRef.current = null;
+      coversRef.current.A?.revoke();
+      coversRef.current.B?.revoke();
     },
     [],
   );
@@ -267,6 +290,7 @@ export function StudioConsole() {
         handedOffRef.current[id] = false;
         dispatch({ type: "remove", id: item.id });
         setDecks((d) => ({ ...d, [id]: { ...d[id], item, durationSec, currentSec: 0, playing: false } }));
+        attachCover(id, item);
         if (!durationSec) setMessage(`No se pudo leer la duración de «${item.title}»: no habrá fundido automático al terminar.`);
         if (!e.isPlaying(other(id))) {
           e.cut(id);
@@ -277,7 +301,7 @@ export function StudioConsole() {
         if (!(err instanceof LoadSupersededError)) setMessage(err instanceof Error ? err.message : "No se pudo cargar la pista.");
       }
     },
-    [getEngine],
+    [getEngine, attachCover],
   );
 
   const play = useCallback(

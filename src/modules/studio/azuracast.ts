@@ -91,6 +91,12 @@ export class AzuraClient {
     return all.filter((m) => m.playlists?.some((p) => p.id === id)).map(toFile);
   }
 
+  /** Carátula de una pista (AzuraCast devuelve una imagen genérica si no tiene). */
+  async art(id: string): Promise<Response> {
+    if (!/^\d+$/.test(id)) throw new DomainError("azuracast_bad_id", "Identificador de pista no válido.");
+    return this.request(`/art/${id}`);
+  }
+
   /** Audio de una pista, tal como lo entrega AzuraCast (respeta `Range`). */
   async fileStream(id: string, range: string | null): Promise<Response> {
     if (!/^\d+$/.test(id)) throw new DomainError("azuracast_bad_id", "Identificador de pista no válido.");

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { DbHandle } from "@/lib/db";
 import type { Actor } from "@/lib/rbac";
 import { users } from "@/db/schema";
-import { fileHandler, libraryHandler, playlistsHandler } from "@/modules/studio/http";
+import { artHandler, fileHandler, libraryHandler, playlistsHandler } from "@/modules/studio/http";
 import { saveStudioConfig } from "@/modules/studio/settings";
 import { makeDb } from "./helpers";
 
@@ -123,5 +123,22 @@ describe("rutas del estudio", () => {
     expect((await fileHandler(h.db, admin, "abc", null, u.impl)).status).toBe(400);
     expect((await fileHandler(h.db, null, "7", null, u.impl)).status).toBe(401);
     expect(u.seen).toHaveLength(0);
+  });
+
+  it("art devuelve la carátula con su tipo y caché privada", async () => {
+    const u = upstream(() => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "content-type": "image/jpeg" } }));
+    const r = await artHandler(h.db, editor, "7", u.impl);
+    expect(u.seen[0].url).toBe("https://radio.example.org/api/station/stereo_face/art/7");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("image/jpeg");
+    expect(r.headers.get("cache-control")).toContain("private");
+    expect(new Uint8Array(await r.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("art: id no numérico 400, sin sesión 401, y no acepta contenido que no sea imagen", async () => {
+    const u = upstream(() => new Response("<html>", { status: 200, headers: { "content-type": "text/html" } }));
+    expect((await artHandler(h.db, admin, "../x", u.impl)).status).toBe(400);
+    expect((await artHandler(h.db, null, "7", u.impl)).status).toBe(401);
+    expect((await artHandler(h.db, admin, "7", u.impl)).status).toBe(404);
   });
 });

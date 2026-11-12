@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const RPM_DEG_PER_SEC = 200; // 33⅓ rpm
 const SPIN_UP = 4; // arranque rápido
 const SPIN_DOWN = 2.2; // frenada con inercia
 
 /** Plato de vinilo que gira mientras el deck suena, con arranque y frenada suaves y un brazo que se posa sobre el disco. */
-export function VinylDisc({ playing, deck, accent, className = "" }: { playing: boolean; deck: string; accent: string; className?: string }) {
+export function VinylDisc({ playing, deck, accent, coverUrl = null, className = "" }: { playing: boolean; deck: string; accent: string; coverUrl?: string | null; className?: string }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const showCover = !!coverUrl && failed !== coverUrl;
   const disc = useRef<HTMLDivElement>(null);
   const playingRef = useRef(playing);
   const angle = useRef(0);
@@ -67,12 +69,30 @@ export function VinylDisc({ playing, deck, accent, className = "" }: { playing: 
           <circle cx="100" cy="100" r="36" fill={accent} />
           <circle cx="100" cy="100" r="36" fill="none" stroke="#000" strokeOpacity="0.35" strokeWidth="1" />
           <circle cx="100" cy="100" r="29" fill="none" stroke="#000" strokeOpacity="0.2" strokeWidth="0.8" strokeDasharray="2 3" />
-          <text x="100" y="112" textAnchor="middle" fontSize="34" fontWeight="900" fill="#07080a" fontFamily="inherit">
-            {deck}
-          </text>
-          <circle cx="100" cy="72" r="2.6" fill="#07080a" />
+          {showCover ? (
+            <>
+              <clipPath id={`cp-${deck}`}>
+                <circle cx="100" cy="100" r="27" />
+              </clipPath>
+              <image href={coverUrl ?? undefined} x="73" y="73" width="54" height="54" preserveAspectRatio="xMidYMid slice" clipPath={`url(#cp-${deck})`} />
+              <circle cx="100" cy="100" r="27" fill="none" stroke="#000" strokeOpacity="0.4" strokeWidth="1" />
+              <text x="100" y="135.2" textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#07080a" fontFamily="inherit">
+                {deck}
+              </text>
+            </>
+          ) : (
+            <text x="100" y="112" textAnchor="middle" fontSize="34" fontWeight="900" fill="#07080a" fontFamily="inherit">
+              {deck}
+            </text>
+          )}
+          <circle cx="100" cy="66" r="2.2" fill="#07080a" />
           <circle cx="100" cy="100" r="3.2" fill="#0a0a0a" stroke="#888" strokeWidth="0.8" />
         </svg>
+        {coverUrl && (
+          // Precarga para detectar una carátula rota y volver a la letra del deck.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={coverUrl} alt="" hidden onError={() => setFailed(coverUrl)} />
+        )}
       </div>
       <div className="studio-vinyl-shine" />
       <svg className="studio-tonearm" viewBox="0 0 200 200" focusable="false" aria-hidden="true">
