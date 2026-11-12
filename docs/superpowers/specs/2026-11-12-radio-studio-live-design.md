@@ -66,7 +66,11 @@ Servidor: tabla `studio_carts` (id, nombre, tipo `jingle|promo|sweeper|effect`, 
 1. **Núcleo de emisión:** motor de audio, deck A/B desde archivos locales, cola con arrastrar y soltar, crossfade, master con limitador, medidores, conexión EN VIVO/desconectar con metadatos y reconexión.
 1b. **Biblioteca de AzuraCast:** ajuste con la clave API (guardada solo en el servidor), proxy de lectura y panel de biblioteca con carpetas y listas de reproducción, con búsqueda y arrastre a la cola.
 2. **Cart Wall:** administración de jingles y promos en `/admin/radio/studio/carts` (subir, ordenar, color, atajo) y panel de botones en la consola; sonido instantáneo con ducking.
-3. **Voz:** micrófono con selección de dispositivo, atajo «hablar», ducking configurable (umbral, reducción, ataque, recuperación) y gate/compresor básico.
+3. **Voz y sonido** (adelantada por pedido del dueño, 2026-11-12, antes del Cart Wall):
+   - **Micrófono:** selección de dispositivo, ganancia, silencio (mute), medidor propio, botón «Hablar» (alternar) y atajo de mantener para hablar. El micrófono nunca se reproduce por los altavoces del DJ (evita el eco); solo sale al aire.
+   - **Ducking automático:** cuando la voz supera un umbral, el volumen de la música de fondo baja a un nivel configurable y recupera suavemente al terminar. Ajustes: activado/desactivado, reducción en dB (por defecto −12), umbral de voz (por defecto −45 dB), ataque (por defecto 150 ms) y recuperación (por defecto 1,2 s). Hay un botón manual «Bajar música» que fuerza el ducking.
+   - **Ecualizador de 3 bandas** (graves 100 Hz, medios 1 kHz, agudos 8 kHz, ±12 dB) por separado para la música y para el micrófono, con presets («Plano», «Voz de radio», «Música brillante»).
+   - **Cadena del micrófono:** filtro pasa-altos a 80 Hz, puerta de ruido (gate) con umbral ajustable, compresor y ecualizador, antes de la mezcla.
 4. **Listas guardadas:** listas de emisión guardables por DJ e historial de lo emitido.
 5. **Pulido:** atajos de teclado, wake lock, aviso al cerrar, temas, accesibilidad de teclado, documentación para los DJs.
 
