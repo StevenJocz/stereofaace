@@ -8,6 +8,7 @@ import type { CartView } from "@/modules/studio/carts";
 import { CartWall } from "./CartWall";
 import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
+import type { RelayTrack } from "@/modules/studio/relay-meta";
 import { RelayPanel } from "./RelayPanel";
 import { LiveBar } from "./LiveBar";
 import { MicPanel, type MicDevice } from "./MicPanel";
@@ -85,6 +86,7 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
   const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay">("carts");
   const [relayState, setRelayState] = useState<RelayState>("idle");
   const [relayVolume, setRelayVolume] = useState(0.8);
+  const [relayTrack, setRelayTrack] = useState<RelayTrack | null>(null);
   const [djInfo, setDjInfo] = useState<DjProgramInfo | null>(null);
   const [programChoice, setProgramChoice] = useState(entry.programChoice);
   const [cartState, setCartState] = useState<"loading" | "ready" | "error">("loading");
@@ -475,6 +477,31 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
     }
   }, [deviceId, getEngine]);
 
+  // Mientras la señal externa está en la mezcla se consulta qué canción suena (cada 15 s).
+  useEffect(() => {
+    if (relayState !== "playing" || !relay.configured) return;
+    let alive = true;
+    const load = () =>
+      fetch("/api/studio/relay/meta")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: { track: RelayTrack | null } | null) => alive && setRelayTrack(d?.track ?? null))
+        .catch(() => undefined);
+    load();
+    const t = setInterval(load, 15_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+      setRelayTrack(null);
+    };
+  }, [relayState, relay.configured]);
+
+  // En directo y sin música sonando en los decks, quien escucha ve la canción de la señal.
+  useEffect(() => {
+    if (!relayTrack || liveRef.current !== "live") return;
+    const deckBusy = (["A", "B"] as const).some((id) => engineRef.current?.isPlaying(id));
+    if (!deckBusy) senderRef.current?.setMetadata({ title: relayTrack.title, artist: relayTrack.artist || relay.name });
+  }, [relayTrack, relay.name]);
+
   const toggleRelay = useCallback(async () => {
     const e = getEngine();
     if (relayState === "playing" || relayState === "connecting") {
@@ -784,6 +811,7 @@ function StudioConsoleInner({ entry, relay }: { entry: DjEntry; relay: RelayInfo
               configured={relay.configured}
               state={relayState}
               volume={relayVolume}
+              track={relayTrack}
               onToggle={() => void toggleRelay()}
               onVolume={(v) => {
                 setRelayVolume(v);

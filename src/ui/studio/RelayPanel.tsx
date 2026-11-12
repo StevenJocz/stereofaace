@@ -1,5 +1,6 @@
 "use client";
 
+import type { RelayTrack } from "@/modules/studio/relay-meta";
 import type { RelayState } from "./engine/audio-engine";
 
 const LABEL: Record<RelayState, string> = {
@@ -14,6 +15,7 @@ export function RelayPanel({
   configured,
   state,
   volume,
+  track,
   onToggle,
   onVolume,
 }: {
@@ -21,6 +23,7 @@ export function RelayPanel({
   configured: boolean;
   state: RelayState;
   volume: number;
+  track: RelayTrack | null;
   onToggle: () => void;
   onVolume: (v: number) => void;
 }) {
@@ -43,6 +46,24 @@ export function RelayPanel({
           <p className="mono text-[0.68rem] text-muted">{LABEL[state]}</p>
         </div>
       </div>
+      {state === "playing" && track && (
+        <div className="np-card mt-3" aria-label="Suena en la señal">
+          <span className="np-cover" aria-hidden="true">
+            {track.img ? (
+              // eslint-disable-next-line @next/next/no-img-element -- carátula pública del servicio de la señal (https)
+              <img src={track.img} alt="" className="absolute inset-0 size-full object-cover" />
+            ) : (
+              <span className="mono text-muted">♪</span>
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="mono text-[0.6rem] text-accent-ink">Suena en la señal</p>
+            <p className="truncate font-bold leading-tight" title={track.title}>{track.title}</p>
+            {track.artist && <p className="mono truncate text-[0.7rem] text-muted">{track.artist}</p>}
+            {track.next && <p className="mono mt-1 truncate text-[0.62rem] text-muted/70">Sigue · {track.next}</p>}
+          </div>
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button type="button" className={on ? "btn" : "btn btn-accent"} onClick={onToggle}>
           {on ? "Quitar de la mezcla" : "Poner en la mezcla"}
