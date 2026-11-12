@@ -60,6 +60,11 @@ describe("carts", () => {
     expect((await readdir(root)).length).toBe(before);
   });
 
+  it("la tecla V está reservada para hablar y no se puede usar como atajo", async () => {
+    await expect(createCart(h.db, editor, root, { name: "v", kind: "jingle", hotkey: "v" }, wav())).rejects.toBeInstanceOf(ZodError);
+    await expect(createCart(h.db, editor, root, { name: "V", kind: "jingle", hotkey: "V" }, wav())).rejects.toBeInstanceOf(ZodError);
+  });
+
   it("un atajo duplicado entre carts activos se rechaza (sin distinguir mayúsculas)", async () => {
     await expect(createCart(h.db, editor, root, { name: "otro", kind: "jingle", hotkey: "1" }, wav())).rejects.toMatchObject({ code: "cart_hotkey_taken" });
     await createCart(h.db, editor, root, { name: "con q", kind: "jingle", hotkey: "q" }, wav());

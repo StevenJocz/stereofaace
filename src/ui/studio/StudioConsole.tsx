@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { DeckPanel, type DeckView } from "./DeckPanel";
 import { LibraryPanel } from "./LibraryPanel";
+import type { CartView } from "@/modules/studio/carts";
+import { CartWall } from "./CartWall";
 import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
 import { LiveBar } from "./LiveBar";
@@ -10,6 +12,7 @@ import { MicPanel, type MicDevice } from "./MicPanel";
 import { QueuePanel } from "./QueuePanel";
 import { AudioEngine, LoadSupersededError, type DeckId } from "./engine/audio-engine";
 import { makeItems } from "./engine/audio-files";
+import { hotkeyMap, isTypingTarget } from "./engine/carts";
 import { loadCover, type DeckCover } from "./engine/deck-cover";
 import { FLAT_EQ, type EqSettings } from "./engine/eq";
 import { DEFAULT_DUCK, type DuckSettings } from "./engine/voice";
@@ -67,6 +70,9 @@ export function StudioConsole() {
   const [duck, setDuck] = useState<DuckSettings>(DEFAULT_DUCK);
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
+  const [carts, setCarts] = useState<CartView[]>([]);
+  const [cartState, setCartState] = useState<"loading" | "ready" | "error">("loading");
+  const [cartsPlaying, setCartsPlaying] = useState<ReadonlySet<string>>(new Set());
 
   const engineRef = useRef<AudioEngine | null>(null);
   const senderRef = useRef<WebcastSender | null>(null);
@@ -118,6 +124,13 @@ export function StudioConsole() {
     e.setMicGain(v.micGain);
     e.setMicMuted(v.micMuted);
     e.setMicGateThreshold(v.gateDb);
+    e.onCartEnded = (id) =>
+      setCartsPlaying((s) => {
+        if (!s.has(id)) return s;
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
     e.onMicLost = () => {
       setMicActive(false);
       setMicError("Se perdió el micrófono (¿se desconectó?). Actívalo de nuevo.");
@@ -381,6 +394,65 @@ export function StudioConsole() {
     };
   }, []);
 
+  // Cart Wall: se cargan los audios y se decodifican de antemano para dispararlos al instante.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/studio/carts")
+      .then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return (await r.json()) as CartView[];
+      })
+      .then((list) => {
+        if (!alive) return;
+        setCarts(list);
+        setCartState("ready");
+        const e = getEngine();
+        for (const c of list) void e.preloadCart(c.id, `/api/studio/cart/${c.id}`).catch(() => undefined);
+      })
+      .catch(() => alive && setCartState("error"));
+    return () => {
+      alive = false;
+    };
+  }, [getEngine]);
+
+  const fireCart = useCallback(
+    async (c: CartView) => {
+      try {
+        const e = getEngine();
+        await e.resume();
+        if (!e.hasCart(c.id)) await e.preloadCart(c.id, `/api/studio/cart/${c.id}`);
+        if (e.playCart(c.id, { gainDb: c.gainDb, duck: c.duck })) setCartsPlaying((s) => new Set(s).add(c.id));
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : "No se pudo reproducir el cart.");
+      }
+    },
+    [getEngine],
+  );
+
+  const stopCarts = useCallback(() => engineRef.current?.stopAllCarts(), []);
+  const readCartRemaining = useCallback((id: string) => engineRef.current?.cartRemaining(id) ?? 0, []);
+
+  // Atajos de los carts (1 tecla) y Esc para detenerlos todos.
+  useEffect(() => {
+    const keys = hotkeyMap(carts);
+    const h = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || isTypingTarget(e.target as HTMLElement | null)) return;
+      if (e.key === "Escape") {
+        engineRef.current?.stopAllCarts();
+        return;
+      }
+      if (e.repeat) return;
+      const id = keys.get(e.key.toLowerCase());
+      const cart = id ? carts.find((c) => c.id === id) : undefined;
+      if (cart) {
+        e.preventDefault();
+        void fireCart(cart);
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [carts, fireCart]);
+
   const readMicLevel = useCallback(() => engineRef.current?.getMicLevelDb() ?? -100, []);
   const readDuckDb = useCallback(() => engineRef.current?.getDuckGainDb() ?? 0, []);
 
@@ -484,6 +556,7 @@ export function StudioConsole() {
             }}
           />
         ))}
+        <CartWall carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
       </div>
       <div className="studio-voice-row">
         <MicPanel

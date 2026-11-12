@@ -33,7 +33,8 @@ const fields = {
   hotkey: z
     .string()
     .trim()
-    .regex(/^[a-zA-Z0-9]$/, "El atajo es una sola letra o número"),
+    .regex(/^[a-zA-Z0-9]$/, "El atajo es una sola letra o número")
+    .refine((k) => k.toLowerCase() !== "v", "La tecla V está reservada para hablar por el micrófono"),
   gainDb: z.number().min(-24).max(6),
   duck: z.boolean(),
   durationSec: z.number().positive().max(3600),

@@ -2,7 +2,7 @@ import { LoadGate } from "./autoplay";
 import { equalPowerGains } from "./crossfade";
 import { EQ_BANDS, FLAT_EQ, clampEq, type EqSettings } from "./eq";
 import { peakToDb, rmsToDb } from "./meter";
-import { DEFAULT_DUCK, DuckController, GateController, gainToDb, type DuckSettings } from "./voice";
+import { DEFAULT_DUCK, DuckController, GateController, dbToGain, gainToDb, type DuckSettings } from "./voice";
 import type { QueueItem } from "./queue";
 
 export type DeckId = "A" | "B";
@@ -69,11 +69,16 @@ export class AudioEngine {
   private duckDb = 0;
   private micDb = -100;
   private controlTimer: ReturnType<typeof setInterval> | null = null;
+  private cartBus: GainNode;
+  private cartBuffers = new Map<string, AudioBuffer>();
+  private cartPlaying = new Map<string, { src: AudioBufferSourceNode; duck: boolean; endsAt: number }>();
+  private manualForce = false;
   private fadeTimers = new Set<ReturnType<typeof setTimeout>>();
 
   onDeckEnded: ((deck: DeckId) => void) | null = null;
   onDeckTime: ((deck: DeckId, current: number, duration: number) => void) | null = null;
   onMicLost: (() => void) | null = null;
+  onCartEnded: ((id: string) => void) | null = null;
 
   constructor() {
     this.ctx = new AudioContext({ sampleRate: 48000 });
@@ -102,6 +107,9 @@ export class AudioEngine {
     }
     prev.connect(this.duckGain);
     this.duckGain.connect(this.mix);
+    // Carts (jingles, promos…): van directo a la mezcla, sin pasar por el ducker de la música.
+    this.cartBus = this.ctx.createGain();
+    this.cartBus.connect(this.mix);
     this.mix.connect(this.limiter);
     this.limiter.connect(this.master);
     this.master.connect(this.masterAnalyser);
@@ -406,9 +414,86 @@ export class AudioEngine {
   }
 
   setDuckForced(on: boolean): void {
-    this.duckCtl.setForced(on);
-    if (on) this.ensureControl();
+    this.manualForce = on;
+    this.applyForce();
+  }
+
+  /** El ducking se fuerza con el botón manual o mientras suene un cart que pide bajar la música. */
+  private applyForce() {
+    const cart = [...this.cartPlaying.values()].some((c) => c.duck);
+    const force = this.manualForce || cart;
+    this.duckCtl.setForced(force);
+    if (force) this.ensureControl();
     else this.idleControlLater();
+  }
+
+  // ───────────── Carts (Cart Wall) ─────────────
+
+  /** Descarga y decodifica el audio de un cart para poder dispararlo al instante. */
+  async preloadCart(id: string, url: string): Promise<void> {
+    if (this.cartBuffers.has(id)) return;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("No se pudo descargar el audio del cart.");
+    const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
+    this.cartBuffers.set(id, buf);
+  }
+
+  hasCart(id: string): boolean {
+    return this.cartBuffers.has(id);
+  }
+
+  /** Dispara un cart. Si ya suena, se reinicia (no se apilan copias). Devuelve false si aún no está precargado. */
+  playCart(id: string, opts: { gainDb: number; duck: boolean }): boolean {
+    const buffer = this.cartBuffers.get(id);
+    if (!buffer) return false;
+    this.stopCart(id);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = this.ctx.createGain();
+    gain.gain.value = dbToGain(Math.min(6, Math.max(-24, opts.gainDb)));
+    src.connect(gain);
+    gain.connect(this.cartBus);
+    const entry = { src, duck: opts.duck, endsAt: this.ctx.currentTime + buffer.duration };
+    this.cartPlaying.set(id, entry);
+    src.onended = () => {
+      if (this.cartPlaying.get(id)?.src !== src) return; // lo reemplazó un reinicio
+      this.cartPlaying.delete(id);
+      gain.disconnect();
+      this.applyForce();
+      this.onCartEnded?.(id);
+    };
+    src.start();
+    this.applyForce();
+    return true;
+  }
+
+  stopCart(id: string): void {
+    const e = this.cartPlaying.get(id);
+    if (!e) return;
+    this.cartPlaying.delete(id); // se quita antes para que onended del anterior no dispare el aviso de fin
+    e.src.onended = null;
+    try {
+      e.src.stop();
+    } catch {
+      /* ya había terminado */
+    }
+    e.src.disconnect();
+    this.applyForce();
+    this.onCartEnded?.(id);
+  }
+
+  stopAllCarts(): void {
+    for (const id of [...this.cartPlaying.keys()]) this.stopCart(id);
+  }
+
+  isCartPlaying(id: string): boolean {
+    return this.cartPlaying.has(id);
+  }
+
+  /** Segundos que le quedan a un cart que suena (0 si no suena). */
+  cartRemaining(id: string): number {
+    const e = this.cartPlaying.get(id);
+    return e ? Math.max(0, e.endsAt - this.ctx.currentTime) : 0;
   }
 
   setEq(target: "music" | "mic", e: EqSettings): void {
@@ -482,6 +567,7 @@ export class AudioEngine {
   }
 
   dispose(): void {
+    this.stopAllCarts();
     this.stopMic();
     if (this.controlTimer) clearInterval(this.controlTimer);
     this.controlTimer = null;
