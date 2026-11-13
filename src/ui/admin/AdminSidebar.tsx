@@ -32,6 +32,7 @@ const ICONS: Record<string, React.ReactNode> = {
   "/admin/usuarios": I("M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.3a3.5 3.5 0 0 1 0 6.4M18 14.3c2.1.7 3.5 2.6 3.5 5.7"),
   "/admin/auditoria": I("M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6zM9 12l2 2 4-4"),
   "/admin/fuentes": I("M5 5a14 14 0 0 1 14 14M5 11a8 8 0 0 1 8 8M5.5 19h.01"),
+  "/admin/ajustes/facebook": I("M14 8h2V4h-3a4 4 0 0 0-4 4v2H7v4h2v6h4v-6h2.5l.5-4h-3V8.5A.5.5 0 0 1 14 8z"),
 };
 
 const STORE = "sf-admin-sidebar-collapsed";

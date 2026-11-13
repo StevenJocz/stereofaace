@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/auth/session";
 import { can } from "@/lib/rbac";
 import { listArtistOptions } from "@/modules/artists/admin";
 import { getArticleAdmin, listRevisions } from "@/modules/content/admin";
+import { getArticleSocial, getFacebookConfig } from "@/modules/social/facebook";
 import { categories } from "@/modules/taxonomy/schema";
 import { ArticleEditor, type EditorArticle } from "@/ui/admin/ArticleEditor";
 
@@ -22,6 +23,9 @@ export default async function ArticleEditorPage({ params }: { params: Promise<{ 
     can(user.role, "artist:read") ? listArtistOptions(db, user) : Promise.resolve([]),
   ]);
   if (!a) notFound();
+  // Estado en Facebook: solo se muestra a quien administra los ajustes y si está activado.
+  const fbOn = can(user.role, "setting:update") && (await getFacebookConfig(db, user)).enabled;
+  const social = fbOn ? await getArticleSocial(db, user, id) : null;
 
   const article: EditorArticle = {
     id: a.id,
@@ -68,6 +72,7 @@ export default async function ArticleEditorPage({ params }: { params: Promise<{ 
         canEdit={a.canEdit && can(user.role, "article:update")}
         canPublish={can(user.role, "article:publish")}
         canDelete={can(user.role, "article:delete")}
+        facebook={fbOn ? { status: social?.status ?? null, error: social?.error ?? null } : null}
       />
     </>
   );

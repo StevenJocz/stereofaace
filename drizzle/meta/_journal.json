@@ -36,6 +36,13 @@
       "when": 1794504516511,
       "tag": "0004_studio_y_programacion",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794528082193,
+      "tag": "0005_redes_sociales",
+      "breakpoints": true
     }
   ]
 }
