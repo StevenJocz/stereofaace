@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { JSONContent } from "@tiptap/react";
 import {
   deleteArticleAction,
+  facebookPostNowAction,
   previewAction,
   restoreRevisionAction,
   saveArticleAction,
@@ -105,6 +106,7 @@ export function ArticleEditor({
   canEdit,
   canPublish,
   canDelete,
+  facebook = null,
 }: {
   article: EditorArticle;
   categories: { id: string; name: string }[];
@@ -114,7 +116,11 @@ export function ArticleEditor({
   canEdit: boolean;
   canPublish: boolean;
   canDelete: boolean;
+  /** Estado en Facebook (null si no está activado o no hay permiso). */
+  facebook?: { status: string | null; error: string | null } | null;
 }) {
+  const [fbMsg, setFbMsg] = useState<{ ok: boolean; message: string } | null>(null);
+  const [fbBusy, setFbBusy] = useState(false);
   const [f, setF] = useState({
     title: article.title,
     slug: article.slug,
@@ -405,6 +411,29 @@ export function ArticleEditor({
               <a href={`/noticias/${f.slug}`} target="_blank" rel="noopener" className="mono text-accent-ink underline">
                 Ver publicado ↗
               </a>
+            )}
+            {facebook && status === "published" && (
+              <div className="grid gap-1.5 border-t border-line pt-3">
+                <p className="mono text-muted">
+                  Facebook:{" "}
+                  {fbMsg ? <span className={fbMsg.ok ? "text-accent-ink" : "text-[#ff8a8a]"}>{fbMsg.message}</span> : facebook.status === "posted" ? <span className="text-accent-ink">publicada</span> : facebook.status === "failed" ? <span className="text-[#ff8a8a]">falló{facebook.error ? `: ${facebook.error}` : ""}</span> : "aún no"}
+                </p>
+                {canPublish && (
+                  <button
+                    type="button"
+                    className="btn !px-3 !py-1 w-fit"
+                    disabled={fbBusy}
+                    onClick={() => {
+                      setFbBusy(true);
+                      void facebookPostNowAction(article.id)
+                        .then(setFbMsg)
+                        .finally(() => setFbBusy(false));
+                    }}
+                  >
+                    {facebook.status === "posted" ? "Publicar de nuevo en Facebook" : "Publicar en Facebook ahora"}
+                  </button>
+                )}
+              </div>
             )}
           </Section>
 

@@ -14,6 +14,7 @@ import { NewsletterForm } from "@/ui/NewsletterForm";
 import { getDb } from "@/lib/db";
 import { DEFAULT_SITE_SETTINGS, getSiteSettings } from "@/modules/settings/site";
 import { MotionReady } from "@/ui/MotionReady";
+import { AdSlot } from "@/ui/ads/AdSlot";
 import { formatAgendaDate, formatDayMonth, formatShortDate, timeAgoEs } from "@/lib/time";
 import { RELEASE_KIND_LABEL } from "@/lib/labels";
 import { getHomeData, type HeroSlide, type StoryCard } from "@/modules/content/service";
@@ -478,6 +479,10 @@ async function HomeContent() {
           </section>
         </>
       )}
+
+      <div className="wrap">
+        <AdSlot name="home" />
+      </div>
 
       {/* LANZAMIENTOS */}
       <div className="mt-28" />

@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
-import { ForbiddenError } from "@/lib/rbac";
+import { assertCan, ForbiddenError } from "@/lib/rbac";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 import { fieldErrors, type FieldErrors } from "@/lib/validation";
 import {
@@ -18,6 +19,18 @@ import {
   updateArticle,
 } from "@/modules/content/admin";
 import type { ArticleState } from "@/modules/content/schema";
+import { publishArticleToFacebook } from "@/modules/social/facebook";
+
+/** Tras publicar, la nota se sube a Facebook en segundo plano: un fallo allí nunca afecta a la publicación. */
+function shareOnFacebook(id: string) {
+  after(async () => {
+    try {
+      await publishArticleToFacebook(await getDb(), id);
+    } catch (error) {
+      console.error("[facebook]", error);
+    }
+  });
+}
 
 export type SaveResult =
   | { ok: true; updatedAt: string; slug: string; message?: string }
@@ -64,7 +77,11 @@ export async function saveArticleAction(id: string, payload: unknown): Promise<S
     const res = await updateArticle(await getDb(), user, id, payload);
     return { updatedAt: res.updatedAt.toISOString(), slug: res.slug };
   });
-  if (r.ok) revalidatePath("/admin/articulos");
+  if (r.ok) {
+    revalidatePath("/admin/articulos");
+    const status = (payload as { status?: string } | null)?.status;
+    if (status === "published" || status === "scheduled") shareOnFacebook(id);
+  }
   return r;
 }
 
@@ -76,7 +93,10 @@ export async function statusAction(id: string, status: ArticleState, scheduledFo
     const row = await getArticleAdmin(db, user, id);
     return { updatedAt: (row?.updatedAt ?? new Date()).toISOString(), slug: row?.slug ?? "" };
   });
-  if (r.ok) revalidatePath("/admin", "layout");
+  if (r.ok) {
+    revalidatePath("/admin", "layout");
+    if (status === "published" || status === "scheduled") shareOnFacebook(id);
+  }
   return r;
 }
 
@@ -106,4 +126,21 @@ export async function deleteArticleAction(id: string): Promise<SaveResult> {
 export async function previewAction(html: string): Promise<string> {
   await requireUser();
   return sanitizeArticleHtml(html.slice(0, 400_000));
+}
+
+/** Botón del editor: publica (o vuelve a publicar) la nota en Facebook ahora y devuelve el resultado. */
+export async function facebookPostNowAction(id: string): Promise<{ ok: boolean; message: string }> {
+  const user = await requireUser();
+  try {
+    assertCan(user, "article:publish");
+    const res = await publishArticleToFacebook(await getDb(), id, { force: true });
+    revalidatePath(`/admin/articulos/${id}`);
+    if (res.status === "posted") return { ok: true, message: "Publicada en Facebook." };
+    if (res.status === "failed") return { ok: false, message: `Facebook no la aceptó: ${res.error}` };
+    return { ok: false, message: "No se publicó: revisa que Facebook esté activado y que la nota sea pública." };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: "No tienes permiso para esta acción." };
+    console.error("[admin/facebook]", e);
+    return { ok: false, message: "No se pudo completar la acción." };
+  }
 }
