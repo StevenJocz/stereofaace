@@ -39,7 +39,7 @@ function iceComplete(pc: RTCPeerConnection, ms: number): Promise<void> {
  * Cámara en cabina. Solo VIDEO: `getUserMedia({ audio: false })`, sin micrófono ni audio del sistema. La cámara se pide
  * únicamente al pulsar «Activar cámara». El video viaja por WebRTC (WHIP) al servidor, que lo reenvía a YouTube.
  */
-export function CabinCamera() {
+export function CabinCamera({ compact = false, onActive }: { compact?: boolean; onActive?: (active: boolean) => void }) {
   const videoEl = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const pc = useRef<RTCPeerConnection | null>(null);
@@ -53,6 +53,11 @@ export function CabinCamera() {
 
   const state = view?.session?.state ?? null;
   const active = state !== null && state !== "ended" && state !== "error";
+
+  // Avisa al estudio si hay video en directo (para marcar la pestaña «Cámara»).
+  useEffect(() => {
+    onActive?.(active);
+  }, [active, onActive]);
 
   const closePeer = useCallback(() => {
     pc.current?.close();
@@ -201,7 +206,7 @@ export function CabinCamera() {
   const label = view?.session?.label ?? "Fuera del aire";
 
   return (
-    <div className="cabin-admin">
+    <div className={compact ? "cabin-admin cabin-admin--compact" : "cabin-admin"}>
       <section className="panel p-4 sm:p-5" aria-label="Previsualización">
         <div className="cabin-preview">
           <video ref={videoEl} autoPlay muted playsInline aria-label="Previsualización de la cámara (sin audio)" />

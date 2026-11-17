@@ -23,6 +23,7 @@ import { FLAT_EQ, type EqSettings } from "./engine/eq";
 import { DEFAULT_DUCK, type DuckSettings } from "./engine/voice";
 import { pickNext, shouldAdvanceOnEnd, shouldStartFade } from "./engine/autoplay";
 import { DjGate, type DjEntry } from "./DjGate";
+import { CabinCamera } from "./CabinCamera";
 import { queueReducer, type QueueItem } from "./engine/queue";
 import { WEBCAST_MIME, WEBCAST_URL, WebcastSender, type LiveState, type RecorderLike, type SocketLike } from "./engine/webcast";
 
@@ -102,7 +103,8 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
-  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay" | "requests" | "chat">("carts");
+  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay" | "requests" | "chat" | "camera">("carts");
+  const [cabinLive, setCabinLive] = useState(false);
   const [searchSeed, setSearchSeed] = useState<{ text: string; n: number } | null>(null);
   const desk = useDeskFeed(visible);
   const [relayState, setRelayState] = useState<RelayState>("idle");
@@ -862,6 +864,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
               ["requests", `Pedidos${desk.feed.requests.length > 0 ? ` (${desk.feed.requests.length})` : ""}`, desk.feed.requests.length > 0],
               ["chat", "Chat", false],
               ["relay", "Señal", relayState === "playing" || relayState === "connecting"],
+              ["camera", "Cámara", cabinLive],
               ["eq", "Ecualizador", false],
             ] as const).map(([k, label, hot]) => (
               <button key={k} type="button" role="tab" id={`tool-tab-${k}`} aria-selected={tool === k} aria-controls={`tool-${k}`} className="studio-tab" data-hot={hot} onClick={() => setTool(k)}>
@@ -929,6 +932,10 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
           </div>
           <div id="tool-chat" role="tabpanel" aria-labelledby="tool-tab-chat" className="studio-tool-body" hidden={tool !== "chat"}>
             <ChatModPanel feed={desk.feed} refresh={desk.refresh} dropMessage={desk.dropMessage} />
+          </div>
+          {/* Siempre montada (solo se oculta): cambiar de pestaña no corta la cámara ni el directo de YouTube. */}
+          <div id="tool-camera" role="tabpanel" aria-labelledby="tool-tab-camera" className="studio-tool-body" hidden={tool !== "camera"}>
+            <CabinCamera compact onActive={setCabinLive} />
           </div>
           <div id="tool-eq" role="tabpanel" aria-labelledby="tool-tab-eq" className="studio-tool-body" hidden={tool !== "eq"}>
             <EqPanel

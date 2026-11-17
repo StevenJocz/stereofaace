@@ -318,7 +318,7 @@ Al terminar, deja por escrito (en el informe al humano y, si procede, en `PROGRE
 3. YouTube: el canal oficial debe tener **transmisión en vivo habilitada** (hasta 24 h tras activarla) y estar verificado.
 4. Definir las variables, `docker compose build web`, `docker compose run --rm migrate` (crea `video_sessions` y `video_tickets`) y `docker compose --profile video up -d mediamtx video-relay web`.
 5. Como superadministrador: **Ajustes → YouTube → Conectar canal**. Privacidad por defecto: *no listado*; solo un superadministrador puede pasarla a público.
-6. Locutor/administrador: **Cámara en cabina** → Activar cámara → Iniciar transmisión. El locutor solo puede dentro de su horario.
+6. Locutor/administrador: en el **Estudio**, pestaña **Cámara** → Activar cámara → Iniciar transmisión (junto al EN VIVO de audio). El locutor solo puede dentro de su horario.
 
 ### Rotación y revocación
 - Rotar `VIDEO_RELAY_TOKEN`: cambiarlo en `.env` y recrear `web` y `video-relay`.

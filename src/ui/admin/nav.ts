@@ -35,7 +35,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/radio", label: "Radio", permission: "station:read" },
       { href: "/admin/radio/studio", label: "Estudio", permission: "studio:update" },
       { href: "/admin/radio/programacion", label: "Programación", permission: "station:update" },
-      { href: "/admin/camara", label: "Cámara en cabina", permission: "studio:update" },
     ],
   },
   {
