@@ -6,6 +6,7 @@ import { Mark } from "@/ui/Header";
 import { useRadio, type RadioStatus } from "./RadioProvider";
 import { ScheduleModal } from "./ScheduleModal";
 import { OWN_STATION_SLUG, useNowPlayingProgram } from "./useNowPlayingProgram";
+import { ChatPanel } from "@/ui/chat/ChatPanel";
 import { TrackList } from "./StationTracks";
 import { useStationTracks } from "./useStationTracks";
 import { Visualizer } from "./Visualizer";
@@ -195,6 +196,7 @@ export function RadioBar() {
   const r = useRadio();
   const bar = useRef<HTMLElement>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   // La programación solo existe para la emisora propia (StereoFace Radio).
   const program = useNowPlayingProgram(r.current?.slug === OWN_STATION_SLUG);
   const tracks = useStationTracks(r.current?.slug === OWN_STATION_SLUG);
@@ -231,6 +233,7 @@ export function RadioBar() {
     <>
       <StationPanel />
       {own && <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />}
+      {own && <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />}
       <section ref={bar} aria-label="StereoFace Frequencies, radio en vivo" className="radio-bar">
         {/* Móvil: fila 1 = emisora + reproducir; fila 2 = estado + volumen y lista.
             Escritorio (lg): tres columnas con transporte y visualizador. */}
@@ -407,6 +410,14 @@ export function RadioBar() {
               style={{ ["--v" as string]: `${(r.muted ? 0 : r.volume) * 100}%` }}
               className="radio-range hidden w-24 lg:block"
             />
+            {own && (
+              <button type="button" className="btn !px-3.5 !py-2" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen} aria-controls="chat-panel">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z" />
+                </svg>
+                <span className="hidden sm:inline">Chat</span>
+              </button>
+            )}
           </div>
         </div>
       </section>

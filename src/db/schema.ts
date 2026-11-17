@@ -12,3 +12,4 @@ export * from "@/modules/radio/schema";
 export * from "@/modules/studio/schema";
 export * from "@/modules/schedule/schema";
 export * from "@/modules/social/schema";
+export * from "@/modules/chat/schema";

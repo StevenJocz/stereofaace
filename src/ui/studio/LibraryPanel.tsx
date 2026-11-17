@@ -90,15 +90,26 @@ function FileRow({
 export function LibraryPanel({
   onAdd,
   queue,
+  searchSeed = null,
 }: {
   onAdd: (items: QueueItem[]) => void;
   queue: QueueItem[];
+  /** Texto que el estudio manda a la búsqueda (p. ej. un pedido de la audiencia); `n` cambia con cada envío. */
+  searchSeed?: { text: string; n: number } | null;
 }) {
   const [tab, setTab] = useState<Tab>("folders");
   const [path, setPath] = useState("");
   const [listId, setListId] = useState<number | null>(null);
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
+
+  useEffect(() => {
+    if (!searchSeed) return;
+    setTab("folders"); // eslint-disable-line react-hooks/set-state-in-effect -- un pedido del estudio abre la búsqueda
+    setListId(null);
+    setPath("");
+    setQInput(searchSeed.text);
+  }, [searchSeed]);
 
   useEffect(() => {
     const t = setTimeout(() => setQ(qInput.trim()), 300);

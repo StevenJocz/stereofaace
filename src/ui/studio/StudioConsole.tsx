@@ -10,6 +10,7 @@ import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
 import type { RelayTrack } from "@/modules/studio/relay-meta";
 import { RelayPanel } from "./RelayPanel";
+import { ChatModPanel, RequestsPanel, useDeskFeed } from "./DeskChat";
 import { liveStore } from "./live-store";
 import { LiveBar } from "./LiveBar";
 import { MicPanel, type MicDevice } from "./MicPanel";
@@ -88,7 +89,9 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
-  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay">("carts");
+  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay" | "requests" | "chat">("carts");
+  const [searchSeed, setSearchSeed] = useState<{ text: string; n: number } | null>(null);
+  const desk = useDeskFeed(visible);
   const [relayState, setRelayState] = useState<RelayState>("idle");
   const [relayVolume, setRelayVolume] = useState(0.8);
   const [relayTrack, setRelayTrack] = useState<RelayTrack | null>(null);
@@ -810,12 +813,14 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
         onClear={() => dispatch({ type: "clear" })}
         onLoad={(item, id) => void loadToDeck(item, id)}
       />
-      <LibraryPanel onAdd={(items) => dispatch({ type: "add", items })} queue={queue} />
+      <LibraryPanel onAdd={(items) => dispatch({ type: "add", items })} queue={queue} searchSeed={searchSeed} />
         <section className="studio-tools panel" aria-label="Herramientas">
           <div role="tablist" aria-label="Herramientas del estudio" className="studio-tabs">
             {([
               ["carts", "Cart Wall", cartsPlaying.size > 0],
               ["voice", "Voz", micActive && !micMuted],
+              ["requests", `Pedidos${desk.feed.requests.length > 0 ? ` (${desk.feed.requests.length})` : ""}`, desk.feed.requests.length > 0],
+              ["chat", "Chat", false],
               ["relay", "Señal", relayState === "playing" || relayState === "connecting"],
               ["eq", "Ecualizador", false],
             ] as const).map(([k, label, hot]) => (
@@ -876,6 +881,12 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
                 engineRef.current?.setRelayVolume(v);
               }}
             />
+          </div>
+          <div id="tool-requests" role="tabpanel" aria-labelledby="tool-tab-requests" className="studio-tool-body" hidden={tool !== "requests"}>
+            <RequestsPanel feed={desk.feed} refresh={desk.refresh} onSearch={(text) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }))} />
+          </div>
+          <div id="tool-chat" role="tabpanel" aria-labelledby="tool-tab-chat" className="studio-tool-body" hidden={tool !== "chat"}>
+            <ChatModPanel feed={desk.feed} refresh={desk.refresh} dropMessage={desk.dropMessage} />
           </div>
           <div id="tool-eq" role="tabpanel" aria-labelledby="tool-tab-eq" className="studio-tool-body" hidden={tool !== "eq"}>
             <EqPanel
