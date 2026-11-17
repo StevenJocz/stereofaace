@@ -4,28 +4,28 @@ import { pk } from "@/lib/db/columns";
 import { users } from "@/modules/users/schema";
 
 /**
- * Directos de «Cámara en cabina». Solo una sesión activa a la vez (índice único parcial).
- * No se guarda ninguna clave RTMP: se pide a YouTube en cada directo y viaja solo servidor → relay.
+ * Directos de Â«CÃ¡mara en cabinaÂ». Solo una sesiÃ³n activa a la vez (Ã­ndice Ãºnico parcial).
+ * No se guarda ninguna clave RTMP: se pide a YouTube en cada directo y viaja solo servidor â†’ relay.
  */
 export const videoSessions = pgTable(
   "video_sessions",
   {
     id: pk(),
     state: text("state").notNull(),
-    /** Verdadero mientras la sesión no ha terminado; el índice único impide dos directos a la vez. */
+    /** Verdadero mientras la sesiÃ³n no ha terminado; el Ã­ndice Ãºnico impide dos directos a la vez. */
     active: boolean("active").notNull().default(true),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     broadcastId: text("broadcast_id"),
     streamId: text("stream_id"),
     privacy: text("privacy").notNull().default("unlisted"),
     title: text("title").notNull(),
-    /** Motivo del fallo, ya en español y sin datos sensibles. */
+    /** Motivo del fallo, ya en espaÃ±ol y sin datos sensibles. */
     error: text("error"),
-    /** Desde cu�ndo est� en el estado actual (para los tiempos de espera). */
+    /** Desde cuándo está en el estado actual (para los tiempos de espera). */
     stateAt: timestamp("state_at", { withTimezone: true }).notNull().defaultNow(),
     liveAt: timestamp("live_at", { withTimezone: true }),
     endedAt: timestamp("ended_at", { withTimezone: true }),
-    /** Última conciliación con YouTube y el relay (para no consultarlos en cada petición). */
+    /** Ãšltima conciliaciÃ³n con YouTube y el relay (para no consultarlos en cada peticiÃ³n). */
     checkedAt: timestamp("checked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
