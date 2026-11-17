@@ -133,5 +133,6 @@ describe("mensajes de error para el locutor", () => {
     expect(apiErrorMessage(401, null)).toMatch(/sesión expiró/);
     expect(apiErrorMessage(502, { error: "YouTube respondió con el error 500." })).toMatch(/YouTube/);
     expect(apiErrorMessage(0, null)).toMatch(/conexión a internet/);
+    expect(apiErrorMessage(504, null)).toMatch(/error 504/); // un 5xx sin JSON ya no se confunde con «sin internet»
   });
 });

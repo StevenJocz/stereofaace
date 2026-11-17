@@ -2802,3 +2802,241 @@ body[data-radio="on"] .adm-shell {
     animation: none;
   }
 }
+
+/* ───────────── Programas · carteles de calle ───────────── */
+.prog-media {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #0a0a0c;
+  isolation: isolate;
+}
+.prog-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.7) contrast(1.18) brightness(0.92);
+  transition: filter 0.5s ease;
+}
+.prog-card:hover .prog-img,
+.prog-poster:hover .prog-img {
+  filter: grayscale(0) contrast(1.08) brightness(1);
+}
+.prog-initial {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-display, inherit);
+  font-weight: 900;
+  font-size: clamp(9rem, 28vw, 17rem);
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2px var(--pc);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--pc) 22%, #0a0a0c), #0a0a0c 70%);
+}
+/* El color del programa tiñe la imagen desde abajo, como una tinta de serigrafía. */
+.prog-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background: linear-gradient(180deg, transparent 35%, color-mix(in srgb, var(--pc) 85%, #000) 135%);
+}
+/* Trama de puntos tipo fotocopia. */
+.prog-dots {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: overlay;
+  background-image: radial-gradient(circle at 1px 1px, #fff 0.9px, transparent 1.2px);
+  background-size: 5px 5px;
+}
+.prog-no {
+  position: absolute;
+  z-index: 3;
+  top: 0.55rem;
+  left: 0.7rem;
+  font-size: 3.1rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--fg) 85%, transparent);
+  pointer-events: none;
+}
+/* Cinta adhesiva con el estado: «Al aire» o la próxima emisión. */
+.prog-tape {
+  position: absolute;
+  z-index: 3;
+  right: -0.4rem;
+  bottom: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 88%;
+  padding: 0.3rem 0.75rem;
+  background: var(--fg);
+  color: #07080a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(-3deg);
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.8);
+}
+.prog-tape[data-live="true"] {
+  background: var(--accent);
+}
+.prog-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #ff3b3b;
+  animation: cabin-pulse 1.6s infinite;
+}
+.prog-name {
+  margin-top: 1.1rem;
+  font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+  line-height: 0.98;
+}
+.prog-name span {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background: linear-gradient(transparent 62%, var(--pc) 62% 94%, transparent 94%);
+  padding-inline: 0.12em;
+  margin-inline: -0.12em;
+}
+.prog-by {
+  margin-top: 0.55rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.prog-desc {
+  margin-top: 0.6rem;
+  max-width: 44ch;
+  color: var(--muted, #9a9aa0);
+  font-size: 0.95rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.prog-when {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.8rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--line);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--muted, #9a9aa0);
+}
+.prog-when b {
+  color: var(--fg);
+}
+
+/* Página de un programa */
+.prog-hero {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .prog-hero {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 3.5rem;
+  }
+  .prog-poster {
+    position: sticky;
+    top: 5.5rem;
+  }
+}
+.prog-poster {
+  position: relative;
+  transform: rotate(-1.2deg);
+}
+.prog-stamp {
+  position: absolute;
+  z-index: 3;
+  top: 1rem;
+  right: -0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.8rem;
+  border: 2px solid var(--fg);
+  background: #07080a;
+  color: var(--fg);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: rotate(4deg);
+}
+.prog-stamp[data-live="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.prog-title {
+  margin-top: 0.4rem;
+  font-size: clamp(2.6rem, 7vw, 5.6rem);
+  line-height: 0.9;
+  overflow-wrap: anywhere;
+}
+.prog-title span {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background: linear-gradient(transparent 64%, var(--pc) 64% 93%, transparent 93%);
+  padding-inline: 0.08em;
+  margin-inline: -0.08em;
+}
+.prog-host {
+  display: inline-block;
+  margin-top: 1.1rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pc);
+  font-size: 1.05rem;
+}
+.prog-lead {
+  margin-top: 1.4rem;
+  max-width: 52ch;
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  line-height: 1.5;
+}
+.prog-sched,
+.prog-next {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  max-width: 28rem;
+}
+.prog-sched li,
+.prog-next li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+}
+.prog-sched b {
+  font-size: 1.05rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .prog-img {
+    transition: none;
+  }
+  .prog-dot {
+    animation: none;
+  }
+}

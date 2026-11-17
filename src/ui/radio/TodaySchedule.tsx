@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { PublicProgram } from "@/modules/schedule/public";
 import { ScheduleModal } from "./ScheduleModal";
@@ -73,7 +74,9 @@ export function TodaySchedule() {
                 <span className="mono shrink-0 pt-0.5 text-accent-ink">{formatRange(it.startsAt, it.endsAt)}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold leading-tight">{it.program.name}</span>
+                    <Link href={`/programas/${it.program.slug}`} className="font-bold leading-tight hover:text-accent-ink">
+                      {it.program.name}
+                    </Link>
                     {on && <span className="badge badge-ok">Al aire</span>}
                   </span>
                   {it.program.hosts && <span className="mono muted block text-[0.72rem]">Con {it.program.hosts}</span>}
@@ -84,9 +87,14 @@ export function TodaySchedule() {
         </ul>
       )}
 
-      <button type="button" className="btn mt-4 w-full" onClick={() => setOpen(true)}>
-        Ver semana y mes
-      </button>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <button type="button" className="btn w-full" onClick={() => setOpen(true)}>
+          Ver semana y mes
+        </button>
+        <Link href="/programas" className="btn w-full text-center">
+          Todos los programas
+        </Link>
+      </div>
       <ScheduleModal open={open} onClose={() => setOpen(false)} />
     </section>
   );

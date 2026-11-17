@@ -61,3 +61,62 @@ export async function getSchedule(db: Db, from: Date, to: Date): Promise<{ progr
     return program ? [{ program, startsAt: o.startsAt.toISOString(), endsAt: o.endsAt.toISOString() }] : [];
   });
 }
+
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // lunes primero
+
+/** Ficha pública de un programa: lo editorial (nombre, quién lo hace, descripción, imagen) y cuándo sale al aire. */
+export type PublicProgramInfo = PublicProgram & {
+  /** Tramos semanales (0 = domingo … 6 = sábado), horas locales de Bogotá. */
+  weekly: { weekday: number; start: string; end: string }[];
+  /** Próximas emisiones (incluye los horarios puntuales), máximo 4. */
+  upcoming: { startsAt: string; endsAt: string }[];
+  onAir: boolean;
+};
+
+async function loadAllPrograms(db: Db, now: Date): Promise<PublicProgramInfo[]> {
+  const [programRows, slotRows] = await Promise.all([
+    db
+      .select({ p: radioPrograms, key: media.storageKey })
+      .from(radioPrograms)
+      .leftJoin(media, eq(media.id, radioPrograms.photoId))
+      .where(and(isNull(radioPrograms.deletedAt), eq(radioPrograms.active, true))),
+    db.select().from(radioSchedule),
+  ]);
+  const ids = new Set(programRows.map((r) => r.p.id));
+  const slots: Slot[] = slotRows
+    .filter((s) => ids.has(s.programId))
+    .map((s) => ({ id: s.id, programId: s.programId, kind: s.kind as "weekly" | "once", weekday: s.weekday, date: s.date, start: s.startTime, end: s.endTime }));
+  const occ = occurrencesBetween(slots, new Date(now.getTime() - 86_400_000), new Date(now.getTime() + 14 * 86_400_000));
+  const nowMs = now.getTime();
+  return programRows.map(({ p, key }) => {
+    const mine = occ.filter((o) => o.programId === p.id);
+    return {
+      slug: p.slug,
+      name: p.name,
+      description: p.description,
+      hosts: p.hosts,
+      imageUrl: key ? `/media/${key}` : null,
+      color: p.color,
+      weekly: slots
+        .filter((s) => s.programId === p.id && s.kind === "weekly" && s.weekday !== null)
+        .map((s) => ({ weekday: s.weekday as number, start: s.start, end: s.end }))
+        .sort((a, b) => WEEK_ORDER.indexOf(a.weekday) - WEEK_ORDER.indexOf(b.weekday) || a.start.localeCompare(b.start)),
+      upcoming: mine
+        .filter((o) => o.endsAt.getTime() > nowMs)
+        .slice(0, 4)
+        .map((o) => ({ startsAt: o.startsAt.toISOString(), endsAt: o.endsAt.toISOString() })),
+      onAir: mine.some((o) => o.startsAt.getTime() <= nowMs && o.endsAt.getTime() > nowMs),
+    };
+  });
+}
+
+/** Programas activos: primero el que está al aire, luego por la próxima emisión; los que no tienen horario, al final. */
+export async function listPublicPrograms(db: Db, now: Date = new Date()): Promise<PublicProgramInfo[]> {
+  const all = await loadAllPrograms(db, now);
+  const next = (p: PublicProgramInfo) => (p.onAir ? -1 : p.upcoming[0] ? Date.parse(p.upcoming[0].startsAt) : Number.POSITIVE_INFINITY);
+  return all.sort((a, b) => next(a) - next(b) || a.name.localeCompare(b.name, "es"));
+}
+
+export async function getPublicProgram(db: Db, slug: string, now: Date = new Date()): Promise<PublicProgramInfo | null> {
+  return (await loadAllPrograms(db, now)).find((p) => p.slug === slug) ?? null;
+}

@@ -20,6 +20,7 @@ export function cameraErrorMessage(e: unknown): string {
 export function apiErrorMessage(status: number, body: { error?: string } | null): string {
   if (status === 401) return "Tu sesión expiró. Vuelve a iniciar sesión para transmitir.";
   if (body?.error) return body.error;
-  if (status === 0 || status >= 500) return "No se pudo conectar con el servidor. Revisa tu conexión a internet.";
+  if (status === 0) return "No se pudo conectar con el servidor. Revisa tu conexión a internet.";
+  if (status >= 500) return `El servidor respondió con el error ${status} sin detalle (puede ser un tiempo de espera). Inténtalo de nuevo y, si se repite, avisa a quien administra el servidor.`;
   return "No se pudo completar la acción.";
 }
