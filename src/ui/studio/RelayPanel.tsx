@@ -16,6 +16,8 @@ export function RelayPanel({
   state,
   volume,
   track,
+  monitor,
+  onMonitor,
   onToggle,
   onVolume,
 }: {
@@ -24,6 +26,8 @@ export function RelayPanel({
   state: RelayState;
   volume: number;
   track: RelayTrack | null;
+  monitor: boolean;
+  onMonitor: (v: boolean) => void;
   onToggle: () => void;
   onVolume: (v: number) => void;
 }) {
@@ -68,6 +72,16 @@ export function RelayPanel({
         <button type="button" className={on ? "btn" : "btn btn-accent"} onClick={onToggle}>
           {on ? "Quitar de la mezcla" : "Poner en la mezcla"}
         </button>
+      </div>
+      <div className="mt-4 rounded-[10px] border border-line p-3">
+        <button type="button" className={monitor ? "btn btn-accent w-full" : "btn w-full"} aria-pressed={monitor} onClick={() => onMonitor(!monitor)}>
+          {monitor ? "🔊 Escuchando la salida en este dispositivo" : "🔇 Salida en silencio en este dispositivo"}
+        </button>
+        <p className="mono muted mt-2 text-[0.66rem]">
+          {monitor
+            ? "Oyes en este equipo lo mismo que sale al aire. Si abres el reproductor del sitio a la vez, se oirá doble: apaga esto."
+            : "La señal sigue entrando a la emisión, pero aquí no suena. Puedes escuchar la radio con el reproductor del sitio, como un oyente."}
+        </p>
       </div>
       <label className="mono muted mt-4 block">
         <span className="flex items-center justify-between">

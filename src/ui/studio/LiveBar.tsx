@@ -81,13 +81,13 @@ export function LiveBar({
         <button type="button" className={on ? "btn" : "btn btn-accent"} onClick={onToggle} disabled={!on && (!user || !password)}>
           {on ? "Terminar" : "EN VIVO"}
         </button>
-        <p className="studio-status" role="status" aria-live="polite">
+        <p className="studio-status" data-live-status role="status" aria-live="polite">
           <span className="studio-dot" data-state={state} aria-hidden="true" />
           {LABEL[state]}
           {state === "live" && <span className="mono muted"> · {formatTime(elapsedSec)}</span>}
           {on && endsAt !== null && <AirClock endsAt={endsAt} className="ml-2 block text-[0.78rem]" />}
         </p>
-        <div className="ml-auto flex min-w-[16rem] flex-1 items-center gap-4 sm:max-w-[34rem]">
+        <div className="ml-auto flex w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:min-w-[16rem] sm:max-w-[34rem] sm:flex-1 sm:flex-nowrap">
           <div className="flex-1">
             <span className="mono muted">Master</span>
             <PollMeter read={readMaster} label="Nivel de salida (master)" className="mt-1" />
@@ -106,9 +106,15 @@ export function LiveBar({
             />
           </label>
           <ShortcutsHelp />
-          <label className="mono muted flex items-center gap-2 whitespace-nowrap">
-            <input type="checkbox" checked={monitor} onChange={(e) => onMonitor(e.target.checked)} /> Escuchar salida
-          </label>
+          <button
+            type="button"
+            className="btn !px-3 !py-1.5 !text-[0.72rem] whitespace-nowrap"
+            aria-pressed={monitor}
+            onClick={() => onMonitor(!monitor)}
+            title="Oír en este dispositivo lo que sale al aire. Apágalo si escuchas la radio con el reproductor del sitio."
+          >
+            {monitor ? "🔊 Escuchando la salida" : "🔇 Salida en silencio"}
+          </button>
         </div>
       </div>
       {message && (

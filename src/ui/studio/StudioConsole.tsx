@@ -77,6 +77,8 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
   const [elapsed, setElapsed] = useState(0);
   const [masterVolume, setMasterVolume] = useState(0.9);
   const [monitor, setMonitor] = useState(true);
+  const monitorRef = useRef(true);
+  const masterRef = useRef(0.9);
   const [message, setMessage] = useState<string | null>(null);
   const [micActive, setMicActive] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
@@ -151,7 +153,8 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
   const getEngine = useCallback((): AudioEngine => {
     if (engineRef.current) return engineRef.current;
     const e = new AudioEngine();
-    e.setMasterVolume(0.9);
+    e.setMasterVolume(masterRef.current);
+    e.setMonitor(monitorRef.current); // lo que el DJ eligió antes de que existiera el motor
     const v = voiceRef.current; // lo que el DJ ya ajustó antes de que existiera el motor
     e.setDuck(v.duck);
     e.setEq("music", v.eqMusic);
@@ -247,6 +250,30 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
     if (process.env.NODE_ENV !== "production") Object.assign(window, { __studioEngine: e });
     return e;
   }, [attachCover, metaFor]);
+
+  // Oír la salida en este equipo: se recuerda; en teléfonos arranca en silencio (así no se oye doble con el reproductor del sitio).
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem("sf-studio-monitor");
+    } catch {
+      /* sin almacenamiento */
+    }
+    const on = saved === null ? window.innerWidth >= 768 : saved === "1";
+    monitorRef.current = on;
+    setMonitor(on); // eslint-disable-line react-hooks/set-state-in-effect -- preferencia guardada solo en el navegador
+    engineRef.current?.setMonitor(on);
+  }, []);
+  const changeMonitor = useCallback((on: boolean) => {
+    monitorRef.current = on;
+    setMonitor(on);
+    engineRef.current?.setMonitor(on);
+    try {
+      localStorage.setItem("sf-studio-monitor", on ? "1" : "0");
+    } catch {
+      /* solo vale para esta visita */
+    }
+  }, []);
 
   // Los medidores consultan el motor por su cuenta (PollMeter): la consola no se re-renderiza por ellos.
   const levelsRef = useRef({ at: 0, value: { master: { rmsDb: -100, peakDb: -100 }, A: -100, B: -100 } });
@@ -769,13 +796,11 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
         masterVolume={masterVolume}
         onMasterVolume={(v) => {
           setMasterVolume(v);
+          masterRef.current = v;
           engineRef.current?.setMasterVolume(v);
         }}
         monitor={monitor}
-        onMonitor={(v) => {
-          setMonitor(v);
-          engineRef.current?.setMonitor(v);
-        }}
+        onMonitor={changeMonitor}
         message={message}
         dj={/^[a-z0-9_.-]{2,50}$/.test(djUser) ? djInfo : null}
         programChoice={programChoice}
@@ -875,6 +900,8 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
               state={relayState}
               volume={relayVolume}
               track={relayTrack}
+              monitor={monitor}
+              onMonitor={changeMonitor}
               onToggle={() => void toggleRelay()}
               onVolume={(v) => {
                 setRelayVolume(v);

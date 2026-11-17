@@ -1476,6 +1476,7 @@ textarea.input {
 /* Consola a pantalla completa: solo la cola y la biblioteca hacen scroll */
 .studio {
   display: grid;
+  grid-template-columns: minmax(0, 1fr); /* en móvil la columna única nunca crece más que la pantalla */
   grid-template-rows: auto auto minmax(16rem, 1fr); /* decks arriba; abajo cola, biblioteca y herramientas con scroll propio */
   gap: 0.7rem;
 }
@@ -1592,7 +1593,7 @@ textarea.input {
   }
   .studio-decks,
   .studio-bottom {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
   }
   .studio-scroll {
@@ -2415,4 +2416,16 @@ body[data-radio="on"] .adm-shell {
   flex: 1 1 auto;
   padding: 0.4rem 0.55rem;
   font-size: 0.68rem;
+}
+
+/* Estudio en móvil: nada se sale de la pantalla y el estado se puede leer completo */
+@media (max-width: 1023px) {
+  .studio > *,
+  .studio-bottom > *,
+  .studio-decks > * {
+    min-width: 0;
+  }
+  .studio-livebar [data-live-status] {
+    white-space: normal;
+  }
 }
