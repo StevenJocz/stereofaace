@@ -11,6 +11,7 @@ import { HeroSlider, type HeroSlideView } from "@/ui/HeroSlider";
 import { splitHeroTitle } from "@/ui/hero-copy";
 import { Rail, type RailItem } from "@/ui/Rail";
 import { TodaySchedule } from "@/ui/radio/TodaySchedule";
+import { HomeSkeleton } from "@/ui/Skeleton";
 import { NewsletterForm } from "@/ui/NewsletterForm";
 import { getDb } from "@/lib/db";
 import { DEFAULT_SITE_SETTINGS, getSiteSettings } from "@/modules/settings/site";
@@ -125,18 +126,6 @@ function heroView(h: HeroSlide | StoryCard): HeroSlideView {
 }
 
 /** Mismo esqueleto que el contenido real (hero a 9 columnas) para no provocar desplazamientos al llegar los datos. */
-function HomeSkeleton() {
-  return (
-    <div className="wrap pt-5 md:pt-6" aria-busy="true" aria-label="Cargando portada">
-      <div className="grid12 gap-y-6">
-        <div className="col-span-12 xl:col-span-9">
-          <div className="hero" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** Título y descripción de la portada: salen de los ajustes del sitio (si no se pueden leer, los textos originales). */
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
