@@ -277,7 +277,7 @@ export function CabinCamera({ compact = false, onActive }: { compact?: boolean; 
         <ul className="mono muted grid gap-1 text-[0.72rem]">
           <li>Solo video: no se usa micrófono. El audio del directo es el de la radio.</li>
           <li>Privacidad de los directos: {view?.privacy === "public" ? "pública" : "no listada"}.</li>
-          <li>No cierres esta pestaña mientras transmites: al salir, la transmisión termina.</li>
+          <li>Puedes usar las demás pestañas del estudio y otras secciones del panel: el video sigue en vivo. Solo se corta si cierras o recargas esta ventana del navegador.</li>
         </ul>
       </section>
     </div>
