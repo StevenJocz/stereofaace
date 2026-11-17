@@ -8,6 +8,8 @@ export const createUserSchema = z.object({
   name: z.string().trim().min(1).max(120),
   role: z.enum(ROLES),
   password: passwordSchema,
+  /** Programa que conducirá un locutor (obligatorio para ese rol). */
+  programId: z.uuid().optional(),
 });
 
 export const updateUserSchema = z.object({

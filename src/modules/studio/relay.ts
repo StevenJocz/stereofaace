@@ -58,14 +58,14 @@ export async function getRelayConfig(db: Db, actor: Actor | null) {
 
 /** Para el estudio: nombre y si hay señal; la dirección nunca sale del servidor. */
 export async function getRelayPublic(db: Db, actor: Actor | null): Promise<{ configured: boolean; name: string }> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const c = await read(db);
   return { configured: c.url !== "", name: c.name };
 }
 
 /** Solo servidor: la dirección para el proxy. */
 export async function loadRelayUrl(db: Db, actor: Actor | null): Promise<string | null> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const c = await read(db);
   return c.url || null;
 }

@@ -29,7 +29,7 @@ const mk = async (role: Actor["role"], n: string): Promise<Actor> => {
 };
 beforeAll(async () => {
   h = await makeDb();
-  editor = await mk("editor", "edi");
+  editor = await mk("locutor", "edi");
   redactor = await mk("redactor", "red");
 });
 afterAll(() => h.close());

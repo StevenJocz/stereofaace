@@ -26,7 +26,7 @@ const mk = async (role: Actor["role"], n: string): Promise<Actor> => {
 beforeAll(async () => {
   h = await makeDb();
   admin = await mk("admin", "adm");
-  editor = await mk("editor", "ed");
+  editor = await mk("locutor", "ed");
   redactor = await mk("redactor", "red");
   root = await mkdtemp(path.join(tmpdir(), "sf-carts-"));
 });

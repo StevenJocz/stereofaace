@@ -44,7 +44,7 @@ beforeAll(async () => {
     return { id: u.id, role: u.role };
   };
   admin = await mk("admin", "adm");
-  editor = await mk("editor", "edi");
+  editor = await mk("locutor", "edi");
 });
 afterAll(() => h.close());
 

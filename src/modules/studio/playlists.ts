@@ -37,7 +37,7 @@ async function load(db: Db, id: string) {
 }
 
 export async function listSaved(db: Db, actor: Actor | null): Promise<{ id: string; name: string; count: number; mine: boolean }[]> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const rows = await db.select().from(studioPlaylists).orderBy(desc(studioPlaylists.updatedAt));
   const manage = can(actor.role, "station:manage");
   return rows
@@ -46,7 +46,7 @@ export async function listSaved(db: Db, actor: Actor | null): Promise<{ id: stri
 }
 
 export async function getSaved(db: Db, actor: Actor | null, id: string): Promise<{ id: string; name: string; items: SavedItem[] }> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const row = await load(db, id);
   assertOwner(actor, row.ownerId);
   return { id: row.id, name: row.name, items: row.items };
@@ -54,7 +54,7 @@ export async function getSaved(db: Db, actor: Actor | null, id: string): Promise
 
 /** Guarda (o actualiza con `id`) una lista. Los ítems sin id de AzuraCast numérico se descartan y se cuentan en `skipped`. */
 export async function saveList(db: Db, actor: Actor | null, raw: SaveListInput): Promise<{ id: string; skipped: number }> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const input = saveSchema.parse(raw);
   const valid = input.items.filter((i) => /^\d{1,9}$/.test(i.azId));
   const skipped = input.items.length - valid.length;
@@ -72,7 +72,7 @@ export async function saveList(db: Db, actor: Actor | null, raw: SaveListInput):
 }
 
 export async function deleteSaved(db: Db, actor: Actor | null, id: string): Promise<void> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const row = await load(db, id);
   assertOwner(actor, row.ownerId);
   await db.delete(studioPlaylists).where(eq(studioPlaylists.id, row.id));

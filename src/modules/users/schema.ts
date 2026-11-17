@@ -2,7 +2,7 @@ import { boolean, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, u
 import { sql } from "drizzle-orm";
 import { pk, timestamps } from "@/lib/db/columns";
 
-export const ROLES = ["superadmin", "admin", "editor", "redactor", "colaborador"] as const;
+export const ROLES = ["superadmin", "admin", "editor", "redactor", "colaborador", "locutor"] as const;
 export type Role = (typeof ROLES)[number];
 export const roleEnum = pgEnum("role", ROLES);
 
@@ -16,9 +16,14 @@ export const users = pgTable(
     passwordHash: text("password_hash"),
     role: roleEnum("role").notNull().default("colaborador"),
     active: boolean("active").notNull().default(true),
+    /** Usuario del DJ en AzuraCast (solo locutores). Lo genera el sistema; la clave se deriva, no se guarda. */
+    djUsername: text("dj_username"),
     ...timestamps,
   },
-  (t) => [uniqueIndex("users_email_lower_idx").on(sql`lower(${t.email})`)],
+  (t) => [
+    uniqueIndex("users_email_lower_idx").on(sql`lower(${t.email})`),
+    uniqueIndex("users_dj_username_idx").on(t.djUsername),
+  ],
 );
 
 export const sessions = pgTable(

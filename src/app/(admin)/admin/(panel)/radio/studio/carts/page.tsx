@@ -7,7 +7,7 @@ import { PageHead } from "@/ui/admin/fields";
 import { CartManager } from "@/ui/studio/CartManager";
 
 export default async function CartsAdminPage() {
-  const user = await requirePermission("station:update");
+  const user = await requirePermission("studio:update");
   const carts = await listCarts(await getDb(), user);
   return (
     <>

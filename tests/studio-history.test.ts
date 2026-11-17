@@ -18,7 +18,7 @@ const at = (s: number) => new Date(t0.getTime() + s * 1000);
 
 beforeAll(async () => {
   h = await makeDb();
-  dj = await mk("editor", "dj");
+  dj = await mk("locutor", "dj");
   redactor = await mk("redactor", "red");
 });
 afterAll(async () => {

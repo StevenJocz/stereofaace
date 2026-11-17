@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { can } from "@/lib/rbac";
 import { getDb } from "@/lib/db";
 import { getRelayPublic } from "@/modules/studio/relay";
+import { djUsernameOf } from "@/modules/studio/dj-accounts";
 import { AdminSidebar } from "@/ui/admin/AdminSidebar";
 import { OnAirBar } from "@/ui/studio/OnAirBar";
 import { PersistentStudio } from "@/ui/studio/PersistentStudio";
@@ -22,15 +23,25 @@ async function Shell({ children }: { children: React.ReactNode }) {
     group: g.group,
     items: g.items.filter((i) => can(user.role, i.permission)).map(({ href, label }) => ({ href, label })),
   })).filter((g) => g.items.length > 0);
-  const relay = can(user.role, "station:update") ? await getRelayPublic(await getDb(), user) : null;
+  const db = await getDb();
+  const relay = can(user.role, "studio:update") ? await getRelayPublic(db, user) : null;
+  const locutor = user.role === "locutor" ? await djUsernameOf(db, user) : null;
   return (
     <div className="adm-shell">
       <AdminSidebar groups={groups} email={user.email} role={user.role} logout={logoutAction} />
       <main className="adm-main">
         <OnAirBar />
         <div className="wrap py-6 sm:py-8">
-          {children}
-          {relay && <PersistentStudio relay={relay} />}
+          {user.role === "locutor" && !locutor ? (
+            <p role="alert" className="panel mono p-5 text-[#ffb020]">
+              Tu cuenta aún no tiene usuario de DJ. Pide a quien administra que la sincronice con AzuraCast.
+            </p>
+          ) : (
+            <>
+              {children}
+              {relay && <PersistentStudio relay={relay} locutor={locutor ?? undefined} />}
+            </>
+          )}
         </div>
       </main>
     </div>

@@ -35,6 +35,7 @@ export function LiveBar({
   dj,
   programChoice,
   onProgramChoice,
+  locked = false,
 }: {
   state: LiveState;
   user: string;
@@ -53,6 +54,8 @@ export function LiveBar({
   dj: DjProgramInfo | null;
   programChoice: string;
   onProgramChoice: (id: string) => void;
+  /** Locutor: sin usuario ni clave que escribir y solo su programa; el servidor decide si es su horario. */
+  locked?: boolean;
 }) {
   const on = state === "live" || state === "connecting" || state === "reconnecting";
   return (
@@ -62,6 +65,8 @@ export function LiveBar({
           <p className="mono text-accent-ink">StereoFace Radio</p>
           <h1 className="display-up text-[1.5rem] leading-none">Estudio en vivo</h1>
         </div>
+        {!locked && (
+        <>
         <label className="block">
           <span className="mono muted block">Usuario DJ</span>
           <input className="input !py-1.5" value={user} onChange={(e) => onUser(e.target.value)} autoComplete="username" disabled={on} />
@@ -77,13 +82,15 @@ export function LiveBar({
             disabled={on}
           />
         </label>
-        {dj && <ProgramPicker dj={dj} programChoice={programChoice} onProgramChoice={onProgramChoice} />}
-        <button type="button" className={on ? "btn" : "btn btn-accent"} onClick={onToggle} disabled={!on && (!user || !password)}>
+        </>
+        )}
+        {dj && <ProgramPicker dj={dj} programChoice={programChoice} onProgramChoice={onProgramChoice} locked={locked} />}
+        <button type="button" className={on ? "btn" : "btn btn-accent"} onClick={onToggle} disabled={!on && (!user || (!locked && !password))}>
           {on ? "Terminar" : "EN VIVO"}
         </button>
         <p className="studio-status" data-live-status role="status" aria-live="polite">
           <span className="studio-dot" data-state={state} aria-hidden="true" />
-          {LABEL[state]}
+          {locked && state === "auth-error" ? "AzuraCast no te dejó entrar: revisa que sea tu horario" : LABEL[state]}
           {state === "live" && <span className="mono muted"> · {formatTime(elapsedSec)}</span>}
           {on && endsAt !== null && <AirClock endsAt={endsAt} className="ml-2 block text-[0.78rem]" />}
         </p>

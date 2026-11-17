@@ -5,7 +5,7 @@ import type { DjProgramInfo, StudioProgram } from "@/modules/schedule/dj";
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota", hour12: false });
 
 /** Programa que le toca al DJ (o el próximo) y selector «Emitir como». Se usa en la entrada al estudio y en la barra de emisión. */
-export function ProgramPicker({ dj, programChoice, onProgramChoice }: { dj: DjProgramInfo; programChoice: string; onProgramChoice: (id: string) => void }) {
+export function ProgramPicker({ dj, programChoice, onProgramChoice, locked = false }: { dj: DjProgramInfo; programChoice: string; onProgramChoice: (id: string) => void; locked?: boolean }) {
   const choices: StudioProgram[] = [...(dj.scheduled ? [dj.scheduled.program] : []), ...dj.others];
   const chosen = programChoice ? choices.find((p) => p.id === programChoice) : dj.scheduled?.program;
   if (!chosen && !dj.next && choices.length === 0) return null;
@@ -34,7 +34,7 @@ export function ProgramPicker({ dj, programChoice, onProgramChoice }: { dj: DjPr
             Tu próximo programa: <span className="text-fg">{dj.next.program.name}</span> a las {hhmm(dj.next.startsAt)}
           </span>
         ) : null}
-        {choices.length > 0 && (
+        {!locked && choices.length > 0 && (
           <label className="block">
             <span className="sr-only">Emitir como</span>
             <select className="input !py-1 !text-[0.8rem]" value={programChoice} onChange={(e) => onProgramChoice(e.target.value)} aria-label="Emitir como">

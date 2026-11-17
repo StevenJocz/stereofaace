@@ -1,8 +1,10 @@
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { DomainError } from "@/lib/errors";
 import { ForbiddenError, assertCan, canAssignRole, type Actor } from "@/lib/rbac";
+import { radioPrograms } from "@/modules/schedule/schema";
+import { syncDjAccount, uniqueDjUsername, type DjSync } from "@/modules/studio/dj-accounts";
 import { auditLogs, sessions, users, type Role } from "./schema";
 import { createUser } from "./auth";
 import { recordAudit } from "./audit";
@@ -16,6 +18,7 @@ export type UserRow = {
   name: string;
   role: Role;
   active: boolean;
+  djUsername: string | null;
   createdAt: Date;
 };
 
@@ -29,6 +32,7 @@ export async function listUsers(db: Db, actor: Actor | null): Promise<UserRow[]>
       name: users.name,
       role: users.role,
       active: users.active,
+      djUsername: users.djUsername,
       createdAt: users.createdAt,
     })
     .from(users)
@@ -41,20 +45,60 @@ async function getTarget(db: Db, id: string) {
   return target;
 }
 
-export async function createUserAdmin(db: Db, actor: Actor | null, raw: unknown): Promise<{ id: string }> {
+/**
+ * Alta de usuario. Un locutor nace con su programa y su cuenta de DJ en AzuraCast (usuario y clave los pone el sistema,
+ * con el horario del programa); si AzuraCast no responde el usuario se crea igual y se devuelve un aviso para reintentar.
+ */
+export async function createUserAdmin(db: Db, actor: Actor | null, raw: unknown): Promise<{ id: string; dj?: DjSync }> {
   assertCan(actor, "user:create");
   const input = createUserSchema.parse(raw);
   if (!canAssignRole(actor, input.role)) throw new ForbiddenError("user:assign-role");
-  const created = await createUser(db, input);
+  const locutor = input.role === "locutor";
+  if (locutor) {
+    if (!input.programId) throw new DomainError("program_required", "Elige el programa que conducirá el locutor.");
+    const [p] = await db.select({ id: radioPrograms.id }).from(radioPrograms).where(and(eq(radioPrograms.id, input.programId), isNull(radioPrograms.deletedAt)));
+    if (!p) throw new DomainError("program_not_found", "Ese programa ya no existe.");
+  }
+  const created = await createUser(db, { ...input, djUsername: locutor ? await uniqueDjUsername(db, input.name) : undefined });
   await recordAudit(db, { userId: actor.id, action: "user.create", entity: "user", entityId: created.id, diff: { role: input.role } });
-  return created;
+  if (!locutor) return created;
+  await assignPrograms(db, actor, created.id, [input.programId!]);
+  return { ...created, dj: await syncDjAccount(db, created.id) };
+}
+
+/** Programas que conduce un locutor: los marcados quedan a su nombre; los que tenía y ya no están, quedan sin locutor. */
+export async function assignPrograms(db: Db, actor: Actor | null, userId: string, programIds: string[]): Promise<DjSync> {
+  assertCan(actor, "user:update");
+  const target = await getTarget(db, userId);
+  if (target.role !== "locutor" || !target.djUsername) throw new DomainError("not_locutor", "Solo un locutor conduce programas.");
+  if (userId !== actor.id && !canAssignRole(actor, target.role)) throw new ForbiddenError("user:manage-target");
+  const ids = [...new Set(programIds)];
+  const live = await db.select({ id: radioPrograms.id, dj: radioPrograms.djUsername }).from(radioPrograms).where(isNull(radioPrograms.deletedAt));
+  const known = new Set(live.map((p) => p.id));
+  if (ids.some((id) => !known.has(id))) throw new DomainError("program_not_found", "Alguno de los programas ya no existe.");
+  const mine = target.djUsername.toLowerCase();
+  for (const p of live) {
+    const has = p.dj?.toLowerCase() === mine;
+    if (ids.includes(p.id) && !has) await db.update(radioPrograms).set({ djUsername: target.djUsername }).where(eq(radioPrograms.id, p.id));
+    if (!ids.includes(p.id) && has) await db.update(radioPrograms).set({ djUsername: null }).where(eq(radioPrograms.id, p.id));
+  }
+  await recordAudit(db, { userId: actor.id, action: "user.programs", entity: "user", entityId: userId, diff: { programs: ids.length } });
+  return syncDjAccount(db, userId);
+}
+
+/** Vuelve a enviar a AzuraCast la cuenta y el horario de un locutor (para reintentar tras un fallo). */
+export async function resyncDj(db: Db, actor: Actor | null, userId: string): Promise<DjSync> {
+  assertCan(actor, "user:update");
+  const target = await getTarget(db, userId);
+  if (userId !== actor.id && !canAssignRole(actor, target.role)) throw new ForbiddenError("user:manage-target");
+  return syncDjAccount(db, userId);
 }
 
 /**
  * Cambia nombre, rol o estado. Reglas: nadie deja al sistema sin superadmin activo; nadie cambia su propio rol
  * ni se desactiva; solo se gestiona a quien tenga un rol inferior (el superadmin, a cualquiera).
  */
-export async function updateUserAdmin(db: Db, actor: Actor | null, id: string, raw: unknown): Promise<void> {
+export async function updateUserAdmin(db: Db, actor: Actor | null, id: string, raw: unknown): Promise<{ dj?: DjSync }> {
   assertCan(actor, "user:update");
   const input = updateUserSchema.parse(raw);
   const target = await getTarget(db, id);
@@ -78,12 +122,14 @@ export async function updateUserAdmin(db: Db, actor: Actor | null, id: string, r
   }
   if (input.role && input.role !== target.role && !canAssignRole(actor, input.role)) throw new ForbiddenError("user:assign-role");
 
+  const becomesLocutor = input.role === "locutor" && !target.djUsername;
   await db
     .update(users)
     .set({
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.role !== undefined ? { role: input.role } : {}),
       ...(input.active !== undefined ? { active: input.active } : {}),
+      ...(becomesLocutor ? { djUsername: await uniqueDjUsername(db, input.name ?? target.name) } : {}),
     })
     .where(eq(users.id, id));
   if (input.active === false) await db.delete(sessions).where(eq(sessions.userId, id));
@@ -94,6 +140,9 @@ export async function updateUserAdmin(db: Db, actor: Actor | null, id: string, r
     entityId: id,
     diff: { name: input.name !== undefined, role: input.role, active: input.active },
   });
+  // Quien es o fue locutor: su cuenta de DJ se activa, se desactiva o se actualiza según su nuevo estado.
+  const touchesDj = becomesLocutor || Boolean(target.djUsername);
+  return touchesDj ? { dj: await syncDjAccount(db, id) } : {};
 }
 
 /** Fija una contraseña nueva y cierra todas las sesiones de esa persona. */

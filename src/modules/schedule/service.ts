@@ -6,6 +6,7 @@ import { DomainError } from "@/lib/errors";
 import { assertCan, type Actor } from "@/lib/rbac";
 import { slugify } from "@/lib/slug";
 import { media } from "@/modules/media/schema";
+import { syncAllDjAccounts } from "@/modules/studio/dj-accounts";
 import { recordAudit } from "@/modules/users/audit";
 import { radioPrograms, radioSchedule } from "./schema";
 
@@ -108,6 +109,7 @@ export async function saveProgram(db: Db, actor: Actor | null, raw: ProgramInput
     const [row] = await db.update(radioPrograms).set(values).where(and(eq(radioPrograms.id, input.id), live)).returning({ id: radioPrograms.id, slug: radioPrograms.slug });
     if (!row) throw new DomainError("program_not_found", "Ese programa ya no existe.");
     await recordAudit(db, { userId: actor.id, action: "schedule.program.update", entity: "radio_program", entityId: row.id, diff: { fields: Object.keys(values) } });
+    await syncAllDjAccounts(db);
     return row;
   }
   const slug = await uniqueSlug(db, radioPrograms, slugify(input.name), "programa");
@@ -122,6 +124,7 @@ export async function deleteProgram(db: Db, actor: Actor | null, id: string): Pr
   const [row] = await db.update(radioPrograms).set({ deletedAt: new Date() }).where(and(eq(radioPrograms.id, id), live)).returning({ id: radioPrograms.id });
   if (!row) throw new DomainError("program_not_found", "Ese programa ya no existe.");
   await recordAudit(db, { userId: actor.id, action: "schedule.program.delete", entity: "radio_program", entityId: id });
+  await syncAllDjAccounts(db);
 }
 
 export type SlotAdminView = { id: string; programId: string; kind: "weekly" | "once"; weekday: number | null; date: string | null; start: string; end: string };
@@ -147,6 +150,7 @@ export async function addSlot(db: Db, actor: Actor | null, raw: SlotInput): Prom
     .values({ programId: input.programId, kind: input.kind, weekday: input.weekday ?? null, date: input.date ?? null, startTime: input.start, endTime: input.end })
     .returning({ id: radioSchedule.id });
   await recordAudit(db, { userId: actor.id, action: "schedule.slot.create", entity: "radio_schedule", entityId: row.id, diff: { programId: input.programId, kind: input.kind } });
+  await syncAllDjAccounts(db);
   return row;
 }
 
@@ -155,4 +159,5 @@ export async function removeSlot(db: Db, actor: Actor | null, id: string): Promi
   const [row] = await db.delete(radioSchedule).where(eq(radioSchedule.id, id)).returning({ id: radioSchedule.id });
   if (!row) throw new DomainError("slot_not_found", "Ese tramo ya no existe.");
   await recordAudit(db, { userId: actor.id, action: "schedule.slot.delete", entity: "radio_schedule", entityId: id });
+  await syncAllDjAccounts(db);
 }

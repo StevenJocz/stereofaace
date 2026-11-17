@@ -55,7 +55,12 @@ export async function saveStudioConfig(db: Db, actor: Actor | null, raw: StudioC
 
 /** Cliente listo para usar en rutas del servidor. Exige permiso de uso del estudio. */
 export async function loadAzuraClient(db: Db, actor: Actor | null, fetchImpl?: typeof fetch): Promise<AzuraClient> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
+  return systemAzuraClient(db, fetchImpl);
+}
+
+/** Cliente para tareas del sistema (alta de DJs); quien llama ya verificó sus propios permisos. */
+export async function systemAzuraClient(db: Db, fetchImpl?: typeof fetch): Promise<AzuraClient> {
   const s = await readStored(db);
   if (!s.apiKey) throw new DomainError("studio_no_key", "Configura la clave de AzuraCast en los ajustes del estudio.");
   return new AzuraClient({ baseUrl: s.baseUrl, stationId: s.stationId, apiKey: s.apiKey }, fetchImpl);

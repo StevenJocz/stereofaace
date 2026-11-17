@@ -18,8 +18,8 @@ const items = [{ azId: "11", title: "Tema uno", artist: "Banda", durationSec: 14
 
 beforeAll(async () => {
   h = await makeDb();
-  dj = await mk("editor", "dj");
-  other = await mk("editor", "otro");
+  dj = await mk("locutor", "dj");
+  other = await mk("locutor", "otro");
   redactor = await mk("redactor", "red");
 });
 afterAll(async () => {
@@ -56,7 +56,7 @@ describe("listas guardadas por HTTP", () => {
 
   it("get con check sin clave de AzuraCast no falla: devuelve todo y missing null", async () => {
     const h2 = await makeDb();
-    const [u] = await h2.db.insert(users).values({ email: "d@example.com", name: "d", role: "editor" }).returning();
+    const [u] = await h2.db.insert(users).values({ email: "d@example.com", name: "d", role: "locutor" }).returning();
     const a = { id: u.id, role: u.role };
     const { id } = await (await savedSaveHandler(h2.db, a, { name: "Sin clave", items })).json();
     const body = await (await savedGetHandler(h2.db, a, id, { check: true })).json();

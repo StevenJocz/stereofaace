@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/rbac";
 import { getDashboardStats } from "@/modules/dashboard/service";
@@ -21,6 +22,7 @@ export default async function AdminHome({
 }) {
   const user = await requireUser();
   const sp = await searchParams;
+  if (user.role === "locutor") redirect("/admin/radio/studio"); // su único espacio es el estudio
   // Algunos roles (colaborador) no ven cifras: solo el saludo y su navegación.
   const stats = can(user.role, "dashboard:read")
     ? await getDashboardStats(await getDb(), user)

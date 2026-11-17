@@ -16,7 +16,7 @@ beforeAll(async () => {
     const [u] = await h.db.insert(users).values({ email: `${n}@example.com`, name: n, role }).returning();
     return { id: u.id, role: u.role };
   };
-  editor = await mk("editor", "edi");
+  editor = await mk("locutor", "edi");
   redactor = await mk("redactor", "red");
   await saveChatConfig(h.db, editor, { enabled: true, requestsEnabled: true });
 });

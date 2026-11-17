@@ -70,7 +70,7 @@ describe("usuarios (administración)", () => {
     const second = await mkUser("superadmin", "root2");
     await expect(updateUserAdmin(h.db, root, root.id, { role: "admin" })).rejects.toMatchObject({ code: "self" });
     await updateUserAdmin(h.db, root, second.id, { role: "admin" }); // con dos superadmins sí se puede
-    await expect(updateUserAdmin(h.db, root, second.id, { role: "admin" })).resolves.toBeUndefined();
+    await expect(updateUserAdmin(h.db, root, second.id, { role: "admin" })).resolves.toEqual({});
   });
 
   it("un admin no toca a otro admin ni a un superadmin", async () => {

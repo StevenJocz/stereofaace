@@ -19,8 +19,8 @@ const mk = async (role: Actor["role"], n: string): Promise<Actor> => {
 
 beforeAll(async () => {
   h = await makeDb();
-  dj1 = await mk("editor", "dj1");
-  dj2 = await mk("editor", "dj2");
+  dj1 = await mk("locutor", "dj1");
+  dj2 = await mk("locutor", "dj2");
   admin = await mk("admin", "adm");
   redactor = await mk("redactor", "red");
 });

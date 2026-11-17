@@ -76,7 +76,7 @@ const view = (r: Row): CartView => ({
 const active = isNull(studioCarts.deletedAt);
 
 export async function listCarts(db: Db, actor: Actor | null): Promise<CartView[]> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const rows = await db.select().from(studioCarts).where(active).orderBy(asc(studioCarts.position), asc(studioCarts.createdAt));
   return rows.map(view);
 }
@@ -93,7 +93,7 @@ async function assertHotkeyFree(db: Db, hotkey: string | null | undefined, excep
 }
 
 export async function createCart(db: Db, actor: Actor | null, root: string, raw: CartInput, file: File): Promise<CartView> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const input = createSchema.parse(raw);
   await assertHotkeyFree(db, input.hotkey);
   const audio = await validateAudioUpload(file);
@@ -128,7 +128,7 @@ export async function createCart(db: Db, actor: Actor | null, root: string, raw:
 }
 
 export async function updateCart(db: Db, actor: Actor | null, id: string, raw: CartPatch): Promise<CartView> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const patch = patchSchema.parse(raw);
   if (patch.hotkey) await assertHotkeyFree(db, patch.hotkey, id);
   const set: Partial<typeof studioCarts.$inferInsert> = {};
@@ -153,7 +153,7 @@ export async function deleteCart(db: Db, actor: Actor | null, id: string): Promi
 }
 
 export async function moveCart(db: Db, actor: Actor | null, id: string, direction: "up" | "down"): Promise<void> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const rows = await db.select().from(studioCarts).where(active).orderBy(asc(studioCarts.position), asc(studioCarts.createdAt));
   const i = rows.findIndex((r) => r.id === id);
   const j = direction === "up" ? i - 1 : i + 1;
@@ -167,7 +167,7 @@ export async function moveCart(db: Db, actor: Actor | null, id: string, directio
 }
 
 export async function readCartAudio(db: Db, actor: Actor | null, root: string, id: string): Promise<{ bytes: Buffer; mime: string } | null> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   if (!UUID.test(id)) return null;
   const [row] = await db.select().from(studioCarts).where(and(eq(studioCarts.id, id), active));
   if (!row) return null;

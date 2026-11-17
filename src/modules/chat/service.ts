@@ -60,7 +60,7 @@ export async function getChatConfig(db: Db): Promise<ChatConfig> {
 }
 
 export async function saveChatConfig(db: Db, actor: Actor | null, cfg: ChatConfig): Promise<void> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const value = { enabled: Boolean(cfg.enabled), requestsEnabled: Boolean(cfg.requestsEnabled) };
   await db
     .insert(siteSettings)
@@ -132,7 +132,7 @@ export async function listMessages(db: Db, q: ListQ): Promise<{ messages: Public
 
 /** Lectura del equipo: incluye el identificador para poder silenciar. */
 export async function listMessagesAdmin(db: Db, actor: Actor | null, q: ListQ): Promise<{ messages: AdminMessage[]; last: number }> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const rows = await loadMessages(db, q);
   return {
     messages: rows.map((r) => ({ ...toPublic(r, false), clientId: r.clientId })),
@@ -141,13 +141,13 @@ export async function listMessagesAdmin(db: Db, actor: Actor | null, q: ListQ): 
 }
 
 export async function deleteMessage(db: Db, actor: Actor | null, seq: number): Promise<void> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   await db.update(chatMessages).set({ deletedAt: new Date() }).where(eq(chatMessages.seq, seq));
 }
 
 /** Silencia a un navegador por `minutes` minutos; 0 levanta el silencio. */
 export async function muteClient(db: Db, actor: Actor | null, clientId: string, minutes: number, now: Date = new Date()): Promise<void> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   if (!clientId || clientId.length > 80) throw new DomainError("bad_client", "Identificador no válido.");
   if (minutes <= 0) {
     await db.delete(chatMutes).where(eq(chatMutes.clientId, clientId));
@@ -205,7 +205,7 @@ export async function listRequestsPublic(db: Db, q: { clientId?: string }): Prom
 
 /** Para el DJ: del pedido más viejo al más nuevo. */
 export async function listRequestsAdmin(db: Db, actor: Actor | null, q: { status?: RequestStatus } = {}): Promise<AdminRequest[]> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const rows = await db
     .select()
     .from(songRequests)
@@ -216,6 +216,6 @@ export async function listRequestsAdmin(db: Db, actor: Actor | null, q: { status
 }
 
 export async function setRequestStatus(db: Db, actor: Actor | null, id: string, status: RequestStatus): Promise<void> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   await db.update(songRequests).set({ status, handledBy: actor.id, handledAt: new Date() }).where(eq(songRequests.id, id));
 }

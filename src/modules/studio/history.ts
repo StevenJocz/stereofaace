@@ -20,7 +20,7 @@ export type HistoryRow = { id: string; playedAt: string; title: string; artist: 
 
 /** Anota una pista que pasó al aire. Una entrada idéntica a la anterior en menos de 30 s (pausa y reanudación) no se repite. */
 export async function logPlayed(db: Db, actor: Actor | null, raw: HistoryEntry, now: Date = new Date()): Promise<void> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const e = entrySchema.parse(raw);
   const [prev] = await db
     .select()
@@ -33,7 +33,7 @@ export async function logPlayed(db: Db, actor: Actor | null, raw: HistoryEntry, 
 }
 
 export async function listHistory(db: Db, actor: Actor | null, opts: { limit?: number; before?: Date } = {}): Promise<HistoryRow[]> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const limit = Math.min(MAX_LIMIT, Math.max(1, Math.floor(opts.limit ?? DEFAULT_LIMIT)));
   const rows = await db
     .select()

@@ -22,7 +22,7 @@ export type DjProgramInfo = {
  * ocurrencia, y los demás programas activos por si emite fuera de horario.
  */
 export async function getProgramForDj(db: Db, actor: Actor | null, djUsername: string, now: Date = new Date()): Promise<DjProgramInfo> {
-  assertCan(actor, "station:update");
+  assertCan(actor, "studio:update");
   const dj = djUsername.trim().toLowerCase();
   if (!/^[a-z0-9_.-]{2,50}$/.test(dj)) throw new DomainError("bad_dj", "Usuario de DJ no válido.");
 

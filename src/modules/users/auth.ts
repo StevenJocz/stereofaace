@@ -13,7 +13,7 @@ export type SessionUser = Actor & { email: string; name: string };
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 /** Crea un usuario. La contraseña se guarda solo como hash. */
-export async function createUser(db: Db, input: { email: string; name: string; role: Role; password: string }) {
+export async function createUser(db: Db, input: { email: string; name: string; role: Role; password: string; djUsername?: string }) {
   const email = input.email.trim().toLowerCase();
   const existing = await db
     .select({ id: users.id })
@@ -23,7 +23,7 @@ export async function createUser(db: Db, input: { email: string; name: string; r
   if (existing.length) throw new DomainError("email_taken", "Ya existe un usuario con ese correo");
   const [u] = await db
     .insert(users)
-    .values({ email, name: input.name.trim(), role: input.role, passwordHash: await hashPassword(input.password) })
+    .values({ email, name: input.name.trim(), role: input.role, djUsername: input.djUsername, passwordHash: await hashPassword(input.password) })
     .returning({ id: users.id });
   return u;
 }

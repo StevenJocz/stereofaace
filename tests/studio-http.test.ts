@@ -31,7 +31,7 @@ const json = (v: unknown) => new Response(JSON.stringify(v), { status: 200, head
 beforeAll(async () => {
   h = await makeDb();
   admin = await mk(h.db, "admin", "adm");
-  editor = await mk(h.db, "editor", "ed");
+  editor = await mk(h.db, "locutor", "ed");
   redactor = await mk(h.db, "redactor", "red");
   await saveStudioConfig(h.db, admin, { baseUrl: "https://radio.example.org", stationId: "stereo_face", apiKey: "ID:SECRET" });
   bare = await makeDb();

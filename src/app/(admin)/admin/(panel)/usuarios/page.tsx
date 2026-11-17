@@ -40,6 +40,7 @@ export default async function UsersAdminPage() {
                 <td className="py-3 pr-4">
                   <Link href={`/admin/usuarios/${u.id}`} className="display-up hover:text-accent-ink">{u.name}</Link>
                   <p className="mono break-all text-muted">{u.email}</p>
+                  {u.djUsername && u.role === "locutor" && <p className="mono text-muted">DJ: {u.djUsername}</p>}
                 </td>
                 <td className="mono py-3 pr-4">{ROLE_LABEL[u.role] ?? u.role}</td>
                 <td className="py-3 pr-4">{u.active ? <span className="badge badge-ok">Activo</span> : <span className="badge badge-idle">Inactivo</span>}</td>

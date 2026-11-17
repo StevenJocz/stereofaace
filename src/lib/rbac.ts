@@ -19,6 +19,7 @@ export type Resource =
   | "setting"
   | "subscriber"
   | "station"
+  | "studio"
   | "audit"
   | "dashboard";
 
@@ -42,6 +43,7 @@ const ALL_RESOURCES: Resource[] = [
   "audit",
   "dashboard",
   "station",
+  "studio",
 ];
 const ALL_ACTIONS: Action[] = ["read", "create", "update", "delete", "publish", "review", "manage"];
 
@@ -104,6 +106,8 @@ const MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "media:read",
     "media:create",
   ]),
+  // Locutor: solo el estudio (consola, cart wall, pedidos y chat). Nada de contenido ni de ajustes.
+  locutor: new Set<Permission>(["studio:read", "studio:update"]),
 };
 
 export class ForbiddenError extends Error {
@@ -136,7 +140,7 @@ export function canSetArticleStatus(actor: Actor, next: string): boolean {
   return can(actor.role, "article:update");
 }
 
-const RANK: Record<Role, number> = { superadmin: 5, admin: 4, editor: 3, redactor: 2, colaborador: 1 };
+const RANK: Record<Role, number> = { superadmin: 5, admin: 4, editor: 3, redactor: 2, colaborador: 1, locutor: 1 };
 
 /** Nadie asigna un rol igual o superior al propio, salvo el superadministrador. */
 export function canAssignRole(actor: Actor, target: Role): boolean {

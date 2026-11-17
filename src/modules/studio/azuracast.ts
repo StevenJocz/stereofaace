@@ -3,6 +3,18 @@ import { DomainError } from "@/lib/errors";
 export type AzFile = { id: string; path: string; title: string; artist: string; durationSec: number | null };
 export type AzFolder = { path: string; name: string };
 export type AzPlaylist = { id: number; name: string; trackCount: number };
+/** Tramo del horario de un DJ en AzuraCast. Horas como HHMM en la zona de la estación; días ISO (1 = lunes … 7 = domingo). */
+export type AzScheduleItem = { start_time: number; end_time: number; start_date: string | null; end_date: string | null; days: number[]; loop_once: boolean };
+export type AzStreamer = { id: number; streamer_username: string; is_active?: boolean };
+export type AzStreamerBody = {
+  streamer_username: string;
+  streamer_password: string;
+  display_name: string;
+  comments?: string;
+  is_active: boolean;
+  enforce_schedule: boolean;
+  schedule_items: AzScheduleItem[];
+};
 export type AzuraConfig = { baseUrl: string; stationId: string; apiKey: string };
 
 type RawMedia = {
@@ -113,6 +125,34 @@ export class AzuraClient {
 
   async updatePlaylist(id: number, body: Record<string, unknown>): Promise<void> {
     await this.request(`/playlist/${Math.trunc(id)}`, { "Content-Type": "application/json" }, [], { method: "PUT", body: JSON.stringify(body) });
+  }
+
+  /** DJs (streamers) de la estación. */
+  async listStreamers(): Promise<AzStreamer[]> {
+    return this.json<AzStreamer[]>("/streamers");
+  }
+
+  async createStreamer(body: AzStreamerBody): Promise<void> {
+    await this.request("/streamers", { "Content-Type": "application/json" }, [], { method: "POST", body: JSON.stringify(body) });
+  }
+
+  async updateStreamer(id: number, body: Partial<AzStreamerBody>): Promise<void> {
+    await this.request(`/streamer/${Math.trunc(id)}`, { "Content-Type": "application/json" }, [], { method: "PUT", body: JSON.stringify(body) });
+  }
+
+  /** Zona horaria de la estación (requiere clave con permiso de administración; null si no se puede leer). */
+  async timezone(): Promise<string | null> {
+    try {
+      const res = await this.fetchImpl(`${this.cfg.baseUrl.replace(/\/+$/, "")}/api/admin/station/${this.cfg.stationId}`, {
+        headers: { "X-API-Key": this.cfg.apiKey },
+        redirect: "error",
+      });
+      if (!res.ok) return null;
+      const j = (await res.json()) as { timezone?: unknown };
+      return typeof j.timezone === "string" ? j.timezone : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Últimas reproducciones de la estación (respuesta cruda; requiere clave con permiso de lectura de la estación). */

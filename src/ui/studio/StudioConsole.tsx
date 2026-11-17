@@ -54,13 +54,24 @@ const noopSubscribe = () => () => {};
 /** Primero la entrada del DJ (usuario, contraseña y programa); después, la consola. */
 export type RelayInfo = { configured: boolean; name: string };
 
-export function StudioConsole({ relay, visible = true }: { relay: RelayInfo; visible?: boolean }) {
-  const [entry, setEntry] = useState<DjEntry | null>(null);
-  if (!entry) return <DjGate onEnter={setEntry} />;
-  return <StudioConsoleInner entry={entry} relay={relay} visible={visible} />;
+export function StudioConsole({ relay, visible = true, locutor }: { relay: RelayInfo; visible?: boolean; locutor?: string }) {
+  const [picked, setPicked] = useState<DjEntry | null>(null);
+  // Un locutor ya inició sesión en el panel: no hay segunda entrada, su acceso a AzuraCast lo da el servidor en su horario.
+  const own = useMemo<DjEntry | null>(() => (locutor ? { user: locutor, password: "", programChoice: "" } : null), [locutor]);
+  const entry = own ?? picked;
+  if (!entry) return <DjGate onEnter={setPicked} />;
+  return <StudioConsoleInner entry={entry} relay={relay} visible={visible} locked={Boolean(locutor)} />;
 }
 
-function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: RelayInfo; visible: boolean }) {
+/** Acceso a AzuraCast de un locutor: el servidor solo lo entrega dentro de su horario. */
+async function fetchDjCredentials(): Promise<Creds> {
+  const res = await fetch("/api/studio/dj-credentials", { cache: "no-store" });
+  const body = (await res.json().catch(() => ({}))) as { error?: string; user?: string; password?: string };
+  if (!res.ok || !body.user || !body.password) throw new Error(body.error ?? "No se pudo obtener tu acceso al estudio.");
+  return { user: body.user, password: body.password };
+}
+
+function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry; relay: RelayInfo; visible: boolean; locked: boolean }) {
   const visibleRef = useRef(visible);
   useEffect(() => {
     visibleRef.current = visible; // los atajos del teclado solo valen con la consola a la vista
@@ -691,16 +702,19 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
     setLiveEndsAt(scheduledEndsAt);
     try {
       setMessage(null);
+      const liveCreds = locked ? await fetchDjCredentials() : creds;
       const e = getEngine();
       await e.resume();
-      try {
-        sessionStorage.setItem(CREDS_KEY, JSON.stringify(creds));
-      } catch {
-        /* sin almacenamiento */
+      if (!locked) {
+        try {
+          sessionStorage.setItem(CREDS_KEY, JSON.stringify(creds));
+        } catch {
+          /* sin almacenamiento */
+        }
       }
       const sender = new WebcastSender({
         url: WEBCAST_URL,
-        creds,
+        creds: liveCreds,
         mime: WEBCAST_MIME,
         stream: e.stream,
         createSocket: (u, p) => new WebSocket(u, p) as unknown as SocketLike,
@@ -723,7 +737,7 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
     } finally {
       startingRef.current = false;
     }
-  }, [live, creds, getEngine, metaFor, scheduledEndsAt]);
+  }, [live, creds, locked, getEngine, metaFor, scheduledEndsAt]);
 
   const toggleRef = useRef(toggleLive);
   useEffect(() => {
@@ -805,6 +819,7 @@ function StudioConsoleInner({ entry, relay, visible }: { entry: DjEntry; relay: 
         dj={/^[a-z0-9_.-]{2,50}$/.test(djUser) ? djInfo : null}
         programChoice={programChoice}
         onProgramChoice={setProgramChoice}
+        locked={locked}
       />
       <div className="studio-decks">
         {(["A", "B"] as const).map((id) => (

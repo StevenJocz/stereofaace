@@ -29,6 +29,7 @@ export const ROLE_LABEL: Record<string, string> = {
   editor: "Editor",
   redactor: "Redactor",
   colaborador: "Colaborador",
+  locutor: "Locutor (solo estudio)",
 };
 
 export const KIND_LABEL: Record<string, string> = { rss: "RSS", atom: "Atom", api: "API", ical: "iCal", manual: "Manual" };
