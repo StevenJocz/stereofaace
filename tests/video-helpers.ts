@@ -1,14 +1,21 @@
+import { DomainError } from "@/lib/errors";
+import type { EgressState } from "@/modules/video/gateway";
 import type { BroadcastLife, StreamHealth } from "@/modules/video/youtube";
 import type { VideoDeps } from "@/modules/video/service";
 
 export const INGEST = "rtmp://a.rtmp.youtube.com/live2/SECRET-STREAM-KEY-123";
-export const OFFER = "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=sendonly\r\n";
-export const ANSWER = "v=0\r\ns=answer\r\n";
 
-/** YouTube, relay y MediaMTX simulados: ningún directo real durante las pruebas. */
+/** YouTube y LiveKit simulados: ningún directo real durante las pruebas. */
 export function fakeDeps(now: () => Date = () => new Date()) {
   const log: string[] = [];
-  const st = { health: "inactive" as StreamHealth, life: "ready" as BroadcastLife, relayRunning: false, relayError: undefined as string | undefined, relayUrl: "" , failWhip: false };
+  const st = {
+    health: "inactive" as StreamHealth,
+    life: "ready" as BroadcastLife,
+    publisher: false,
+    egress: "active" as EgressState,
+    egressUrl: "",
+    failRoom: false,
+  };
   const deps: VideoDeps = {
     youtube: {
       ensureStream: async () => ({ id: "S1", ingestUrl: INGEST }),
@@ -24,21 +31,24 @@ export function fakeDeps(now: () => Date = () => new Date()) {
         st.life = to === "testing" ? "testing" : to === "live" ? "live" : "complete";
       },
     },
-    relay: {
-      start: async (u) => {
-        log.push("relay:start");
-        st.relayUrl = u;
-        st.relayRunning = true;
+    media: {
+      mintPublishToken: async () => ({ url: "wss://demo.livekit.cloud", token: "JWT-DE-PRUEBA" }),
+      ensureRoom: async () => {
+        if (st.failRoom) throw new DomainError("media_unavailable", "El servicio de video (LiveKit) no responde. Avisa a quien administra el servidor.");
+        log.push("room");
       },
+      publisherLive: async () => st.publisher,
+      startEgress: async (url) => {
+        log.push("egress:start");
+        st.egressUrl = url;
+        st.egress = "active";
+        return "EG_1";
+      },
+      egressState: async () => st.egress,
       stop: async () => {
-        log.push("relay:stop");
-        st.relayRunning = false;
+        log.push("media:stop");
+        st.egress = "ended";
       },
-      status: async () => ({ running: st.relayRunning, ...(st.relayError ? { error: st.relayError } : {}) }),
-    },
-    whip: async () => {
-      if (st.failWhip) throw new Error("x");
-      return ANSWER;
     },
     now,
   };

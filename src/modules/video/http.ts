@@ -2,7 +2,7 @@ import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { ForbiddenError, type Actor } from "@/lib/rbac";
 import { rateLimit } from "@/lib/rate-limit";
-import { beginYouTubeConnect, defaultDeps, finishYouTubeConnect, getVideoAdmin, pollVideo, prepareBroadcast, publicVideo, publishOffer, stopBroadcast, type VideoDeps } from "./service";
+import { beginYouTubeConnect, defaultDeps, finishYouTubeConnect, getVideoAdmin, pollVideo, issuePublishToken, prepareBroadcast, publicVideo, stopBroadcast, type VideoDeps } from "./service";
 
 const NO_STORE = { "cache-control": "no-store" } as const;
 const reply = (status: number, error: string) => Response.json({ error }, { status, headers: NO_STORE });
@@ -14,11 +14,9 @@ const STATUS_BY_CODE: Record<string, number> = {
   video_ticket: 403,
   video_busy: 409,
   video_state: 409,
-  whip_rejected: 409,
-  video_offer: 400,
+  media_unavailable: 502,
   video_not_configured: 503,
   youtube_not_connected: 503,
-  relay_unavailable: 502,
   youtube_auth: 502,
   youtube_error: 502,
   youtube_forbidden: 502,
@@ -68,20 +66,15 @@ export function videoStartHandler(db: Db, actor: Actor | null, request: Request,
   });
 }
 
-/** Señalización WHIP: oferta SDP del navegador + credencial de un solo uso en `Authorization: Bearer`. */
-export function videoWhipHandler(db: Db, actor: Actor | null, request: Request, deps?: VideoDeps): Promise<Response> {
+/** Canjea la credencial de un solo uso (`Authorization: Bearer`) por un token de LiveKit para publicar la cámara. */
+export function videoTokenHandler(db: Db, actor: Actor | null, request: Request, deps?: VideoDeps): Promise<Response> {
   return guarded(actor, async () => {
     const blocked = mutating(request);
     if (blocked) return blocked;
-    if (!rateLimit(`video:whip:${actor!.id}`, 10, 60_000).ok) return reply(429, "Demasiados intentos. Espera un minuto.");
-    if (!(request.headers.get("content-type") ?? "").startsWith("application/sdp")) return reply(415, "Se esperaba application/sdp.");
-    const declared = Number(request.headers.get("content-length") ?? "NaN");
-    if (!Number.isFinite(declared)) return reply(411, "Falta el tamaño del contenido.");
-    if (declared > 40_000) return reply(413, "La oferta es demasiado grande.");
+    if (!rateLimit(`video:token:${actor!.id}`, 10, 60_000).ok) return reply(429, "Demasiados intentos. Espera un minuto.");
     const ticket = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
     if (!ticket) return reply(401, "Falta la credencial de transmisión.");
-    const answer = await publishOffer(db, actor, ticket, await request.text(), deps ?? (await defaultDeps(db)));
-    return new Response(answer, { status: 201, headers: { "content-type": "application/sdp", ...NO_STORE } });
+    return Response.json(await issuePublishToken(db, actor, ticket, deps ?? (await defaultDeps(db))), { headers: NO_STORE });
   });
 }
 

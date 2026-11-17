@@ -300,7 +300,7 @@ Al terminar, deja por escrito (en el informe al humano y, si procede, en `PROGRE
 
 ## 17. Cámara en cabina (video del locutor → YouTube Live)
 
-**Flujo:** navegador del locutor (solo video, sin micrófono) ──WHIP, vía `web`, con credencial de un solo uso──► `mediamtx` ──RTSP interno──► `video-relay` (FFmpeg: video + AAC silenciosa) ──RTMP──► YouTube Live. El sitio muestra el embed oficial de YouTube (`youtube-nocookie`), siempre mudo; el único audio es la radio. Los servicios están en el perfil `video` de `docker-compose.yml` (no arrancan con un `up` normal). **No verificado en un servidor real: es la primera vez que se ejecuta.**
+**Flujo:** el navegador del locutor publica **solo video** (sin micrófono) en **LiveKit Cloud** con un token de 2 minutos que solo permite la cámara; el servidor pide a LiveKit un *egreso RTMP* y LiveKit entrega el video al directo de YouTube. El sitio muestra el embed oficial de YouTube (`youtube-nocookie`), siempre mudo; el único audio es la radio. **El servidor solo hace llamadas HTTPS de salida: no necesita IP pública, ni puertos abiertos, ni contenedores nuevos** (sirve detrás de CGNAT y Cloudflare Tunnel). Aún no se ha probado con una cámara real.
 
 ### Variables (en `.env`, permisos 600, nunca en git)
 | Variable | Descripción |
@@ -308,31 +308,39 @@ Al terminar, deja por escrito (en el informe al humano y, si procede, en `PROGRE
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Credenciales OAuth de Google Cloud (tipo «Aplicación web»). |
 | `GOOGLE_REDIRECT_URI` | Opcional. Por defecto `NEXT_PUBLIC_SITE_URL` + `/api/youtube/oauth/callback`; debe coincidir exactamente con la consola de Google. |
 | `VIDEO_SECRET_KEY` | 32 bytes que cifran el refresh token en la base: `openssl rand -base64 32`. |
-| `VIDEO_RELAY_TOKEN` | Token web↔relay (≥ 24 caracteres): `openssl rand -hex 32`. |
-| `VIDEO_PUBLIC_HOST` | Dominio o IP pública con la que el navegador alcanza el puerto de medios. |
-| `VIDEO_RELAY_URL`, `VIDEO_WHIP_URL` | Ya tienen valor por defecto en Compose. |
+| `LIVEKIT_URL` | `wss://TU-PROYECTO.livekit.cloud` (proyecto propio de StereoFace). |
+| `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | Claves del proyecto de LiveKit (Settings → Keys). |
+
+`docker-compose.yml` ya pasa estas variables al servicio `web` (vacías = el módulo avisa qué falta).
 
 ### Instalación
-1. Firewall/router: abrir **8189/udp y 8189/tcp** hacia el servidor (solo medios WebRTC). No abras 8889, 8554 ni 8080.
-2. Google Cloud: crear proyecto → habilitar **YouTube Data API v3** → pantalla de consentimiento → credenciales OAuth «Aplicación web» con la redirección `https://DOMINIO/api/youtube/oauth/callback`. Añadir la cuenta oficial como usuario de prueba (o publicar la app).
-3. YouTube: el canal oficial debe tener **transmisión en vivo habilitada** (hasta 24 h tras activarla) y estar verificado.
-4. Definir las variables, `docker compose build web`, `docker compose run --rm migrate` (crea `video_sessions` y `video_tickets`) y `docker compose --profile video up -d mediamtx video-relay web`.
+1. **LiveKit Cloud:** crea un proyecto en https://cloud.livekit.io y copia la URL y una clave API. Comprueba que el plan permite **Egress** (envío RTMP) y sus minutos.
+2. **Google Cloud:** proyecto → habilitar **YouTube Data API v3** → pantalla de consentimiento (usuario de prueba = cuenta del canal) → credenciales OAuth «Aplicación web» con la redirección `https://DOMINIO/api/youtube/oauth/callback`. En «Prueba» el acceso caduca a los 7 días: tras verificar que funciona, pulsa **Publicar app**.
+3. **YouTube:** el canal oficial debe tener la transmisión en vivo habilitada (hasta 24 h) y estar verificado.
+4. Define las variables en `.env`, aplica la migración (`docker compose run --rm migrate`: añade `video_sessions` y `video_tickets`) y recrea `web` (`docker compose up -d web`).
 5. Como superadministrador: **Ajustes → YouTube → Conectar canal**. Privacidad por defecto: *no listado*; solo un superadministrador puede pasarla a público.
-6. Locutor/administrador: en el **Estudio**, pestaña **Cámara** → Activar cámara → Iniciar transmisión (junto al EN VIVO de audio). El locutor solo puede dentro de su horario.
+6. En el **Estudio**, pestaña **Cámara** → Activar cámara → Iniciar transmisión (junto al EN VIVO de audio). El locutor solo puede dentro de su horario.
+
+### Seguridad y privacidad
+- La clave RTMP de YouTube se pide a la API en cada directo; **no se guarda** y viaja solo servidor → LiveKit Cloud (un tercero que ejecuta el envío). Nunca llega al navegador, a la base de datos ni a los registros.
+- El token de LiveKit del navegador es de un solo uso (canje de una credencial propia), dura 2 minutos y solo permite publicar la cámara.
+- El video se envía con `videoOnly`: sin audio. YouTube puede mostrar un aviso de «sin audio» en el panel del directo; es esperado.
 
 ### Rotación y revocación
-- Rotar `VIDEO_RELAY_TOKEN`: cambiarlo en `.env` y recrear `web` y `video-relay`.
+- Rotar claves de LiveKit: crear una nueva en el proyecto, actualizar `.env`, `docker compose up -d web`, y borrar la anterior.
 - Rotar `VIDEO_SECRET_KEY`: invalida el token guardado; reconectar YouTube después.
 - Rotar `GOOGLE_CLIENT_SECRET`: crear uno nuevo en Google Cloud, actualizar `.env`, recrear `web`.
 - **Revocar la conexión:** Ajustes → YouTube → *Desconectar y revocar* (revoca en Google y borra el token). También en https://myaccount.google.com/permissions.
-- **Detener con seguridad:** finalizar desde la consola (o `POST /api/studio/video/stop`) y luego `docker compose --profile video stop video-relay mediamtx`.
+- **Detener con seguridad:** finalizar desde la pestaña Cámara (cierra el envío y la sala de LiveKit). Para cortar del todo, vaciar `LIVEKIT_API_SECRET` y recrear `web`.
 
 ### Solución de problemas
 | Síntoma | Qué mirar |
 |---|---|
-| «Faltan variables» en la consola | Falta alguna de la tabla; el aviso lista solo nombres. |
+| «Faltan variables» en la pestaña | Falta alguna de la tabla; el aviso lista solo nombres. |
 | «El canal no tiene habilitada la transmisión en vivo» | Activarla en YouTube Studio y esperar hasta 24 h. |
-| Se queda en «Preparada» y falla por tiempo | El navegador no llega al puerto 8189 (UDP/TCP) o `VIDEO_PUBLIC_HOST` es incorrecto. |
-| «El servicio de video no responde» | `docker compose --profile video ps` y `logs video-relay mediamtx`; token del relay distinto. |
-| Directo se cierra solo | La señal de cámara se cortó (pestaña cerrada o red). |
+| «El servicio de video (LiveKit) no responde» | URL/clave de LiveKit incorrectas o proyecto suspendido. |
+| «LiveKit no pudo iniciar el envío a YouTube» | El plan de LiveKit no incluye Egress o se acabaron los minutos. |
+| «No llegó video de la cámara a tiempo» | El navegador no pudo conectar con LiveKit (red/firewall del locutor). |
+| «YouTube no recibió señal a tiempo» | Revisar el panel del directo en YouTube Studio y el estado del egreso en LiveKit. |
+| Directo se cierra solo | La cámara se desconectó (pestaña cerrada o red). |
 | Cuota de YouTube | Límite diario de la API: esperar al día siguiente. |

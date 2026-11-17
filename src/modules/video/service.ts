@@ -9,7 +9,8 @@ import { djUsernameOf } from "@/modules/studio/dj-accounts";
 import { recordAudit } from "@/modules/users/audit";
 import { readVideoEnv, missingVideoEnv } from "./config";
 import { decryptSecret, encryptSecret } from "./crypto";
-import { RelayClient, forwardWhip, validateOffer } from "./gateway";
+import type { MediaGateway } from "./gateway";
+import { LiveKitGateway } from "./livekit";
 import { VIDEO_STATE_LABEL, assertTransition, isActiveState, type VideoState } from "./state";
 import { YouTubeClient, authUrl, channelOf, exchangeCode, revokeToken, type Privacy, type StreamHealth, type BroadcastLife } from "./youtube";
 import { videoSessions, videoTickets } from "./schema";
@@ -22,7 +23,7 @@ const CHECK_EVERY_MS = 3000;
 const READY_TIMEOUT_MS = 120_000;
 const STARTING_TIMEOUT_MS = 90_000;
 
-/** Lo que el servicio necesita del exterior; se inyecta para que las pruebas nunca hablen con YouTube ni con el relay. */
+/** Lo que el servicio necesita del exterior; se inyecta para que las pruebas nunca hablen con YouTube ni con LiveKit. */
 export type VideoDeps = {
   youtube: {
     ensureStream(): Promise<{ id: string; ingestUrl: string }>;
@@ -32,8 +33,7 @@ export type VideoDeps = {
     broadcastLife(broadcastId: string): Promise<BroadcastLife | null>;
     transition(broadcastId: string, to: "testing" | "live" | "complete"): Promise<void>;
   };
-  relay: { start(ingestUrl: string): Promise<void>; stop(): Promise<void>; status(): Promise<{ running: boolean; error?: string }> };
-  whip: (offerSdp: string) => Promise<string>;
+  media: MediaGateway;
   now: () => Date;
 };
 
@@ -50,15 +50,14 @@ async function writeSetting(db: Db, key: string, value: unknown, by: string | nu
   await db.insert(siteSettings).values({ key, value, updatedBy: by }).onConflictDoUpdate({ target: siteSettings.key, set: { value, updatedBy: by } });
 }
 
-/** Dependencias reales (YouTube + relay + MediaMTX) a partir del entorno y de la conexión guardada. */
+/** Dependencias reales (YouTube + LiveKit) a partir del entorno y de la conexión guardada. */
 export async function defaultDeps(db: Db): Promise<VideoDeps> {
   const env = readVideoEnv();
   if (!env) throw new DomainError("video_not_configured", `Falta configurar el servidor de video (${missingVideoEnv().join(", ")}).`);
   const stored = await readSetting<StoredYt>(db, KEY_YT);
   if (!stored) throw new DomainError("youtube_not_connected", "El canal de YouTube aún no está conectado. Un superadministrador debe conectarlo en Ajustes → YouTube.");
   const yt = new YouTubeClient({ clientId: env.googleClientId, clientSecret: env.googleClientSecret, refreshToken: decryptSecret(stored.refreshToken, env.secretKey) });
-  const relay = new RelayClient(env.relayUrl, env.relayToken);
-  return { youtube: yt, relay, whip: (sdp) => forwardWhip(env.whipUrl, sdp), now: () => new Date() };
+  return { youtube: yt, media: new LiveKitGateway({ url: env.livekitUrl, apiKey: env.livekitKey, apiSecret: env.livekitSecret }), now: () => new Date() };
 }
 
 /* ───────────────────────── vistas ───────────────────────── */
@@ -210,7 +209,7 @@ async function setState(db: Db, id: string, from: VideoState, to: VideoState, ex
 
 async function fail(db: Db, s: Row, message: string, deps?: VideoDeps): Promise<void> {
   if (deps) {
-    await deps.relay.stop().catch(() => undefined);
+    await deps.media.stop(s.egressId).catch(() => undefined);
     if (s.broadcastId) await deps.youtube.transition(s.broadcastId, "complete").catch(() => undefined);
   }
   await db.update(videoSessions).set({ state: "error", active: false, error: message, endedAt: new Date() }).where(eq(videoSessions.id, s.id));
@@ -255,10 +254,12 @@ export async function prepareBroadcast(db: Db, actor: Actor | null, deps: VideoD
   return { ticket: await issueTicket(db, row.id, actor.id, now), session: toView(row, actor), expiresInSec: TICKET_TTL_MS / 1000 };
 }
 
-/** Canjea la credencial (una sola vez), entrega la oferta WebRTC a MediaMTX y arranca el relay hacia YouTube. Devuelve la respuesta SDP. */
-export async function publishOffer(db: Db, actor: Actor | null, ticket: string, offer: unknown, deps: VideoDeps): Promise<string> {
+/**
+ * Canjea la credencial de un solo uso y entrega al navegador un token de LiveKit (2 minutos, solo cámara) para publicar.
+ * El envío a YouTube lo arranca la conciliación cuando LiveKit ya recibe el video.
+ */
+export async function issuePublishToken(db: Db, actor: Actor | null, ticket: string, deps: VideoDeps): Promise<{ url: string; token: string }> {
   assertCan(actor, "studio:update");
-  const sdp = validateOffer(offer);
   const now = deps.now();
   // Atómico: solo el primer uso, de la persona correcta y sin vencer.
   const [t] = await db
@@ -269,18 +270,14 @@ export async function publishOffer(db: Db, actor: Actor | null, ticket: string, 
   if (!t) throw new DomainError("video_ticket", "La credencial de transmisión no es válida, venció o ya se usó. Pulsa «Iniciar transmisión» otra vez.");
   const [s] = await db.select().from(videoSessions).where(eq(videoSessions.id, t.sessionId));
   if (!s || !s.active || s.state !== "ready") throw new DomainError("video_ticket", "Esa transmisión ya no está preparada.");
-  let answer: string;
   try {
-    answer = await deps.whip(sdp);
-    const stream = await deps.youtube.ensureStream();
-    await deps.relay.start(stream.ingestUrl);
+    await deps.media.ensureRoom();
+    return await deps.media.mintPublishToken(`cabina-${s.id.slice(0, 8)}`, "Cabina StereoFace");
   } catch (e) {
-    const msg = e instanceof DomainError ? e.message : "No se pudo conectar la cámara con el servicio de video.";
+    const msg = e instanceof DomainError ? e.message : "No se pudo preparar la conexión de video.";
     await fail(db, s, msg, deps);
-    throw e instanceof DomainError ? e : new DomainError("relay_unavailable", msg);
+    throw e instanceof DomainError ? e : new DomainError("media_unavailable", msg);
   }
-  await db.update(videoSessions).set({ checkedAt: null }).where(eq(videoSessions.id, s.id));
-  return answer;
 }
 
 export async function stopBroadcast(db: Db, actor: Actor | null, deps: VideoDeps): Promise<void> {
@@ -295,7 +292,7 @@ export async function stopBroadcast(db: Db, actor: Actor | null, deps: VideoDeps
 async function finish(db: Db, s: Row, deps: VideoDeps, note: string | null = null): Promise<void> {
   const from = s.state as VideoState;
   if (from !== "ending") await setState(db, s.id, from, "ending");
-  await deps.relay.stop().catch(() => undefined);
+  await deps.media.stop(s.egressId).catch(() => undefined);
   if (s.broadcastId) await deps.youtube.transition(s.broadcastId, "complete").catch(() => undefined);
   await setState(db, s.id, "ending", "ended", note ? { error: note } : {});
 }
@@ -318,12 +315,21 @@ export async function reconcile(db: Db, deps: VideoDeps): Promise<Row | null> {
   const age = now.getTime() - s.stateAt.getTime();
   try {
     if (s.state === "ready") {
-      const relay = await deps.relay.status();
-      if (relay.running && s.streamId && (await deps.youtube.streamHealth(s.streamId)) === "active") {
-        await deps.youtube.transition(s.broadcastId!, "testing").catch(() => undefined); // sin monitor de prueba, YouTube puede no necesitarlo
-        await setState(db, s.id, "ready", "previewing");
-      } else if (relay.error) await fail(db, s, "El servicio de video no pudo leer la cámara. Inténtalo de nuevo.", deps);
-      else if (age > READY_TIMEOUT_MS) await fail(db, s, "YouTube no recibió señal a tiempo. Revisa la conexión y vuelve a intentarlo.", deps);
+      if (!s.egressId) {
+        // La cámara ya publica en LiveKit: se le pide que empuje ese video a YouTube.
+        if (await deps.media.publisherLive()) {
+          const stream = await deps.youtube.ensureStream();
+          const egressId = await deps.media.startEgress(stream.ingestUrl);
+          await db.update(videoSessions).set({ egressId, checkedAt: null }).where(eq(videoSessions.id, s.id));
+        } else if (age > READY_TIMEOUT_MS) await fail(db, s, "No llegó video de la cámara a tiempo. Revisa la conexión y vuelve a intentarlo.", deps);
+      } else {
+        const eg = await deps.media.egressState(s.egressId);
+        if (eg === "failed" || eg === "ending" || eg === "ended") await fail(db, s, "El servicio de video no pudo enviar la señal a YouTube. Inténtalo de nuevo.", deps);
+        else if (eg === "active" && s.streamId && (await deps.youtube.streamHealth(s.streamId)) === "active") {
+          await deps.youtube.transition(s.broadcastId!, "testing").catch(() => undefined); // sin monitor de prueba, YouTube puede no necesitarlo
+          await setState(db, s.id, "ready", "previewing");
+        } else if (age > READY_TIMEOUT_MS) await fail(db, s, "YouTube no recibió señal a tiempo. Revisa la conexión y vuelve a intentarlo.", deps);
+      }
     } else if (s.state === "previewing") {
       const life = await deps.youtube.broadcastLife(s.broadcastId!);
       if (life === "testing" || age > 8000) {
@@ -334,7 +340,8 @@ export async function reconcile(db: Db, deps: VideoDeps): Promise<Row | null> {
       if ((await deps.youtube.broadcastLife(s.broadcastId!)) === "live") await setState(db, s.id, "starting", "live", { liveAt: now });
       else if (age > STARTING_TIMEOUT_MS) await fail(db, s, "YouTube tardó demasiado en iniciar el directo.", deps);
     } else if (s.state === "live") {
-      if (!(await deps.relay.status()).running) await finish(db, s, deps, "La señal de la cámara se cortó y el directo se cerró.");
+      const eg = s.egressId ? await deps.media.egressState(s.egressId) : "ended";
+      if (eg !== "active" && eg !== "starting") await finish(db, s, deps, "La señal de la cámara se cortó y el directo se cerró.");
     } else if (s.state === "ending") {
       await finish(db, s, deps);
     }

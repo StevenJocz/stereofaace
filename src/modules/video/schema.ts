@@ -17,6 +17,8 @@ export const videoSessions = pgTable(
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     broadcastId: text("broadcast_id"),
     streamId: text("stream_id"),
+    /** Envío de LiveKit hacia YouTube (se inicia cuando la cámara ya publica). */
+    egressId: text("egress_id"),
     privacy: text("privacy").notNull().default("unlisted"),
     title: text("title").notNull(),
     /** Motivo del fallo, ya en espaÃ±ol y sin datos sensibles. */

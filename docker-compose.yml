@@ -65,9 +65,9 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       VIDEO_SECRET_KEY: ${VIDEO_SECRET_KEY:-}
-      VIDEO_RELAY_URL: ${VIDEO_RELAY_URL:-http://video-relay:8080}
-      VIDEO_RELAY_TOKEN: ${VIDEO_RELAY_TOKEN:-}
-      VIDEO_WHIP_URL: ${VIDEO_WHIP_URL:-http://mediamtx:8889}
+      LIVEKIT_URL: ${LIVEKIT_URL:-}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
     volumes:
       # Fotografías editoriales: no se pierden al recrear o actualizar el contenedor web.
       - stereoface_media:/data/media
@@ -123,38 +123,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    logging: *logging
-
-  # ── Cámara en cabina (perfil «video»: no arranca con un `up` normal) ─────────────────────────────────────────
-  # Navegador del locutor ──WHIP (vía web, con credencial de un solo uso)──► mediamtx ──RTSP interno──► video-relay
-  # (FFmpeg, video + AAC silenciosa) ──RTMP──► YouTube Live. El sitio muestra el embed oficial de YouTube, siempre mudo.
-  mediamtx:
-    image: bluenviron/mediamtx:1
-    profiles: ["video"]
-    restart: unless-stopped
-    environment:
-      # Dirección con la que el navegador alcanza el puerto de medios (dominio o IP pública). OBLIGATORIA con el perfil video
-      # (no se exige con `:?` porque Compose interpola todo el archivo aunque el perfil esté apagado).
-      MTX_WEBRTCADDITIONALHOSTS: ${VIDEO_PUBLIC_HOST:-}
-    volumes:
-      - ./infra/mediamtx/mediamtx.yml:/mediamtx.yml:ro
-    # Solo el puerto de medios WebRTC es público (UDP preferido, TCP de respaldo). La señalización (8889) y el RTSP (8554)
-    # quedan dentro de la red de Compose.
-    ports:
-      - "8189:8189/udp"
-      - "8189:8189/tcp"
-    logging: *logging
-
-  video-relay:
-    build: ./services/video-relay
-    profiles: ["video"]
-    restart: unless-stopped
-    environment:
-      RELAY_TOKEN: ${VIDEO_RELAY_TOKEN:-}
-    depends_on:
-      - mediamtx
-    expose:
-      - "8080"
     logging: *logging
 
 volumes:

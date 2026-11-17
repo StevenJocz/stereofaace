@@ -3,7 +3,8 @@ import { randomBytes } from "node:crypto";
 import { decryptSecret, encryptSecret, parseKey, redactSecrets } from "@/modules/video/crypto";
 import { assertTransition, canTransition, isActiveState } from "@/modules/video/state";
 import { missingVideoEnv, readVideoEnv } from "@/modules/video/config";
-import { validateOffer } from "@/modules/video/gateway";
+import { validateIngestUrl } from "@/modules/video/gateway";
+import { LiveKitGateway, apiUrlOf } from "@/modules/video/livekit";
 import { cabinEmbedSrc } from "@/ui/cabin/youtube-embed";
 import { apiErrorMessage, cameraErrorMessage } from "@/ui/studio/cabin-errors";
 
@@ -58,31 +59,50 @@ describe("configuración por entorno", () => {
     GOOGLE_CLIENT_ID: "id",
     GOOGLE_CLIENT_SECRET: "sec",
     VIDEO_SECRET_KEY: key.toString("base64"),
-    VIDEO_RELAY_URL: "http://video-relay:8080/",
-    VIDEO_RELAY_TOKEN: "t".repeat(32),
-    VIDEO_WHIP_URL: "http://mediamtx:8889",
+    LIVEKIT_URL: "wss://demo.livekit.cloud/",
+    LIVEKIT_API_KEY: "APIkey",
+    LIVEKIT_API_SECRET: "s".repeat(40),
   };
   it("sin variables, avisa cuáles faltan (solo los nombres)", () => {
     expect(missingVideoEnv({})).toContain("GOOGLE_CLIENT_SECRET");
     expect(missingVideoEnv({ ...full, VIDEO_SECRET_KEY: "mala" })).toEqual(["VIDEO_SECRET_KEY"]);
+    expect(missingVideoEnv({ ...full, LIVEKIT_URL: "https://no-es-ws" })).toEqual(["LIVEKIT_URL"]);
     expect(readVideoEnv({}, "https://x.test")).toBeNull();
   });
   it("completo: redirección por defecto del sitio y direcciones sin barra final", () => {
     const e = readVideoEnv(full, "https://stereoface.online/")!;
     expect(e.redirectUri).toBe("https://stereoface.online/api/youtube/oauth/callback");
-    expect(e.relayUrl).toBe("http://video-relay:8080");
+    expect(e.livekitUrl).toBe("wss://demo.livekit.cloud");
   });
 });
 
-describe("oferta WebRTC del navegador", () => {
-  const video = "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=sendonly\r\n";
-  it("acepta solo video", () => expect(validateOffer(video)).toBe(video));
-  it("rechaza audio, ausencia de video, basura y tamaños excesivos", () => {
-    expect(() => validateOffer(video + "m=audio 9 UDP/TLS/RTP/SAVPF 111\r\n")).toThrow(/solo envía video/);
-    expect(() => validateOffer("v=0\r\ns=-\r\nt=0 0\r\nm=application 9 x\r\n")).toThrow(/no incluye video/);
-    expect(() => validateOffer(42)).toThrow();
-    expect(() => validateOffer("hola")).toThrow();
-    expect(() => validateOffer(video + "a=x:" + "a".repeat(31_000))).toThrow();
+describe("LiveKit", () => {
+  const gw = new LiveKitGateway({ url: "wss://demo.livekit.cloud", apiKey: "APIkey", apiSecret: "s".repeat(40) });
+  const claims = (jwt: string) => JSON.parse(Buffer.from(jwt.split(".")[1], "base64url").toString()) as { video: Record<string, unknown>; exp: number; nbf?: number; iat?: number; sub: string };
+
+  it("la API HTTPS está en el mismo host que el WebSocket", () => {
+    expect(apiUrlOf("wss://demo.livekit.cloud/")).toBe("https://demo.livekit.cloud");
+    expect(apiUrlOf("ws://localhost:7880")).toBe("http://localhost:7880");
+  });
+
+  it("el token permite publicar SOLO la cámara: sin micrófono, sin suscribirse, sin datos ni administración, y dura 2 minutos", async () => {
+    const { url, token } = await gw.mintPublishToken("cabina-abc", "Cabina StereoFace");
+    expect(url).toBe("wss://demo.livekit.cloud");
+    const c = claims(token);
+    expect(c.video).toMatchObject({ room: "cabina", roomJoin: true, canPublish: true, canSubscribe: false, canPublishData: false, canPublishSources: ["camera"] });
+    for (const k of ["roomAdmin", "roomCreate", "roomList", "roomRecord"]) expect(c.video[k] ?? false).toBe(false);
+    expect(c.sub).toBe("cabina-abc");
+    expect(c.exp - (c.nbf ?? c.iat ?? 0)).toBeLessThanOrEqual(120);
+  });
+});
+
+describe("dirección de entrada de YouTube", () => {
+  it("solo RTMP(S) de youtube.com con clave", () => {
+    expect(validateIngestUrl("rtmp://a.rtmp.youtube.com/live2/abcd-efgh-ijkl")).toContain("youtube.com");
+    expect(validateIngestUrl("rtmps://a.rtmps.youtube.com:443/live2/clave-larga")).toContain("rtmps");
+  });
+  it.each(["rtmp://evil.example.com/live2/clave", "http://a.rtmp.youtube.com/live2/k", "rtmp://a.rtmp.youtube.com/solo", "rtmp://user:p@a.rtmp.youtube.com/live2/k", "rtmp://youtube.com.evil.io/live2/k", "no es url", 5])("rechaza %s", (u) => {
+    expect(() => validateIngestUrl(u)).toThrow();
   });
 });
 

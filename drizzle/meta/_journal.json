@@ -71,6 +71,13 @@
       "when": 1794943105549,
       "tag": "0009_camara_cabina",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794949486655,
+      "tag": "0010_egreso_livekit",
+      "breakpoints": true
     }
   ]
 }

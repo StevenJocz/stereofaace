@@ -6,18 +6,18 @@ export type VideoEnv = {
   googleClientSecret: string;
   redirectUri: string;
   secretKey: Buffer;
-  relayUrl: string;
-  relayToken: string;
-  whipUrl: string;
+  livekitUrl: string;
+  livekitKey: string;
+  livekitSecret: string;
 };
 
 export const VIDEO_ENV_VARS = [
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "VIDEO_SECRET_KEY",
-  "VIDEO_RELAY_URL",
-  "VIDEO_RELAY_TOKEN",
-  "VIDEO_WHIP_URL",
+  "LIVEKIT_URL",
+  "LIVEKIT_API_KEY",
+  "LIVEKIT_API_SECRET",
 ] as const;
 
 /** Nombres de las variables que faltan (para avisar al superadministrador sin mostrar valores). */
@@ -30,6 +30,8 @@ export function missingVideoEnv(env: Record<string, string | undefined> = proces
       if (!missing.includes("VIDEO_SECRET_KEY")) missing.push("VIDEO_SECRET_KEY");
     }
   }
+  const lk = env.LIVEKIT_URL?.trim();
+  if (lk && !/^wss?:\/\//.test(lk) && !missing.includes("LIVEKIT_URL")) missing.push("LIVEKIT_URL");
   return missing;
 }
 
@@ -40,8 +42,8 @@ export function readVideoEnv(env: Record<string, string | undefined> = process.e
     googleClientSecret: env.GOOGLE_CLIENT_SECRET!.trim(),
     redirectUri: (env.GOOGLE_REDIRECT_URI?.trim() || `${siteUrl.replace(/\/$/, "")}/api/youtube/oauth/callback`),
     secretKey: parseKey(env.VIDEO_SECRET_KEY),
-    relayUrl: env.VIDEO_RELAY_URL!.trim().replace(/\/$/, ""),
-    relayToken: env.VIDEO_RELAY_TOKEN!.trim(),
-    whipUrl: env.VIDEO_WHIP_URL!.trim().replace(/\/$/, ""),
+    livekitUrl: env.LIVEKIT_URL!.trim().replace(/\/$/, ""),
+    livekitKey: env.LIVEKIT_API_KEY!.trim(),
+    livekitSecret: env.LIVEKIT_API_SECRET!.trim(),
   };
 }

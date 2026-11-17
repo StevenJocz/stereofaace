@@ -1,68 +1,37 @@
 import { DomainError } from "@/lib/errors";
 
-/** Servicio de relay (FFmpeg) dentro de la red privada de Compose. Habla solo con el servidor, con un token compartido. */
-export class RelayClient {
-  constructor(
-    private readonly baseUrl: string,
-    private readonly token: string,
-    private readonly fetchImpl: typeof fetch = fetch,
-  ) {}
+/** Sala única de LiveKit donde publica la cámara de la cabina. */
+export const ROOM = "cabina";
 
-  private async call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
-    let res: Response;
-    try {
-      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
-        method,
-        headers: { authorization: `Bearer ${this.token}`, ...(body ? { "content-type": "application/json" } : {}) },
-        body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(8000),
-      });
-    } catch {
-      throw new DomainError("relay_unavailable", "El servicio de video no responde. Avisa a quien administra el servidor.");
-    }
-    if (!res.ok) throw new DomainError("relay_unavailable", `El servicio de video respondió con el error ${res.status}.`);
-    return (await res.json()) as T;
-  }
+export type EgressState = "starting" | "active" | "ending" | "ended" | "failed";
 
-  /** `ingestUrl` lleva la clave de YouTube: solo viaja servidor → relay, nunca al navegador ni a un registro. */
-  async start(ingestUrl: string): Promise<void> {
-    await this.call("POST", "/start", { ingestUrl });
-  }
-  async stop(): Promise<void> {
-    await this.call("POST", "/stop", {});
-  }
-  async status(): Promise<{ running: boolean; error?: string }> {
-    return this.call("GET", "/status");
-  }
+/**
+ * Plano de medios (LiveKit Cloud): el navegador publica allí el video y LiveKit lo empuja a YouTube por RTMP.
+ * Nuestro servidor solo hace llamadas HTTPS de SALIDA: no hace falta IP pública ni puertos abiertos.
+ */
+export interface MediaGateway {
+  /** Token de un solo uso y vida corta para publicar SOLO la cámara (sin micrófono ni datos). */
+  mintPublishToken(identity: string, name: string): Promise<{ url: string; token: string }>;
+  ensureRoom(): Promise<void>;
+  /** ¿Hay alguien publicando video en la sala? */
+  publisherLive(): Promise<boolean>;
+  /** Empuja el video de la sala a YouTube. `ingestUrl` lleva la clave: solo viaja servidor → LiveKit. Devuelve el id del egreso. */
+  startEgress(ingestUrl: string): Promise<string>;
+  egressState(egressId: string): Promise<EgressState>;
+  /** Detiene el egreso (si hay) y cierra la sala, lo que desconecta a quien publicaba. Nunca lanza. */
+  stop(egressId: string | null): Promise<void>;
 }
 
-/** Entrega la oferta WebRTC del navegador a MediaMTX (WHIP) y devuelve solo la respuesta SDP. */
-export async function forwardWhip(whipBase: string, offerSdp: string, fetchImpl: typeof fetch = fetch): Promise<string> {
-  let res: Response;
+/** Solo se acepta RTMP(S) hacia servidores de YouTube: el egreso no es un reenviador genérico. */
+export function validateIngestUrl(raw: unknown): string {
+  if (typeof raw !== "string" || raw.length > 400) throw new DomainError("youtube_error", "La dirección de entrada de YouTube no es válida.");
+  let u: URL;
   try {
-    res = await fetchImpl(`${whipBase}/cabina/whip`, {
-      method: "POST",
-      headers: { "content-type": "application/sdp" },
-      body: offerSdp,
-      signal: AbortSignal.timeout(10_000),
-    });
+    u = new URL(raw);
   } catch {
-    throw new DomainError("relay_unavailable", "El servicio de video no responde. Avisa a quien administra el servidor.");
+    throw new DomainError("youtube_error", "La dirección de entrada de YouTube no es válida.");
   }
-  if (res.status === 409 || res.status === 400 || res.status === 404) {
-    // 4xx: otra señal ya publica en la cabina, o la oferta no es válida.
-    throw new DomainError("whip_rejected", "La cabina ya está recibiendo otra señal o la conexión no fue válida. Finaliza e inténtalo de nuevo.");
-  }
-  if (!res.ok) throw new DomainError("relay_unavailable", `El servicio de video respondió con el error ${res.status}.`);
-  const answer = await res.text();
-  if (!answer.startsWith("v=0")) throw new DomainError("whip_rejected", "El servicio de video devolvió una respuesta no válida.");
-  return answer;
-}
-
-/** La oferta del navegador: solo video, tamaño razonable. Rechaza cualquier pista de audio. */
-export function validateOffer(sdp: unknown): string {
-  if (typeof sdp !== "string" || sdp.length < 20 || sdp.length > 30_000 || !sdp.startsWith("v=0")) throw new DomainError("video_offer", "La oferta de conexión no es válida.");
-  if (!/^m=video /m.test(sdp)) throw new DomainError("video_offer", "La conexión no incluye video.");
-  if (/^m=audio /m.test(sdp)) throw new DomainError("video_offer", "La cámara en cabina solo envía video: el audio es siempre el de la radio.");
-  return sdp;
+  const ok = (u.protocol === "rtmp:" || u.protocol === "rtmps:") && /(^|\.)youtube\.com$/i.test(u.hostname) && !u.username && !u.password && u.pathname.split("/").filter(Boolean).length >= 2;
+  if (!ok) throw new DomainError("youtube_error", "La dirección de entrada de YouTube no es válida.");
+  return raw;
 }

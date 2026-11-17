@@ -14,13 +14,13 @@ import {
   getVideoAdmin,
   pollVideo,
   prepareBroadcast,
-  publishOffer,
+  issuePublishToken,
   reconcile,
   setVideoPrivacy,
   stopBroadcast,
 } from "@/modules/video/service";
 import { makeDb } from "./helpers";
-import { ANSWER, INGEST, OFFER, fakeDeps } from "./video-helpers";
+import { INGEST, fakeDeps } from "./video-helpers";
 
 let h: DbHandle;
 let root: Actor;
@@ -63,9 +63,9 @@ beforeAll(async () => {
   vi.stubEnv("GOOGLE_CLIENT_ID", "cid");
   vi.stubEnv("GOOGLE_CLIENT_SECRET", "csecret");
   vi.stubEnv("VIDEO_SECRET_KEY", randomBytes(32).toString("base64"));
-  vi.stubEnv("VIDEO_RELAY_TOKEN", "t".repeat(32));
-  vi.stubEnv("VIDEO_RELAY_URL", "http://video-relay:8080");
-  vi.stubEnv("VIDEO_WHIP_URL", "http://mediamtx:8889");
+  vi.stubEnv("LIVEKIT_URL", "wss://demo.livekit.cloud");
+  vi.stubEnv("LIVEKIT_API_KEY", "APIkey");
+  vi.stubEnv("LIVEKIT_API_SECRET", "s".repeat(40));
   h = await makeDb();
   root = await mk("superadmin", "root");
   admin = await mk("admin", "adm");
@@ -91,7 +91,7 @@ describe("autorización", () => {
       await expect(prepareBroadcast(h.db, a, deps)).rejects.toBeInstanceOf(ForbiddenError);
       await expect(pollVideo(h.db, a, deps)).rejects.toBeInstanceOf(ForbiddenError);
       await expect(stopBroadcast(h.db, a, deps)).rejects.toBeInstanceOf(ForbiddenError);
-      await expect(publishOffer(h.db, a, "x", OFFER, deps)).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(issuePublishToken(h.db, a, "x", deps)).rejects.toBeInstanceOf(ForbiddenError);
     }
     await expect(prepareBroadcast(h.db, null, deps)).rejects.toBeInstanceOf(ForbiddenError);
   });
@@ -131,36 +131,35 @@ describe("preparar el directo", () => {
   });
 });
 
-describe("credencial WebRTC", () => {
-  it("se canjea una sola vez, entrega la oferta a MediaMTX y arranca el relay con la dirección de YouTube", async () => {
-    const { deps, log, st } = fakeDeps();
+describe("credencial de publicación", () => {
+  it("se canjea una sola vez por un token de LiveKit; no hay claves de YouTube en la respuesta", async () => {
+    const { deps, log } = fakeDeps();
     const { ticket } = await prepareBroadcast(h.db, admin, deps);
-    expect(await publishOffer(h.db, admin, ticket, OFFER, deps)).toBe(ANSWER);
-    expect(log).toContain("relay:start");
-    expect(st.relayUrl).toBe(INGEST); // la clave solo viaja servidor → relay
-    await expect(publishOffer(h.db, admin, ticket, OFFER, deps)).rejects.toMatchObject({ code: "video_ticket" });
+    const r = await issuePublishToken(h.db, admin, ticket, deps);
+    expect(r).toEqual({ url: "wss://demo.livekit.cloud", token: "JWT-DE-PRUEBA" });
+    expect(log).toContain("room");
+    expect(JSON.stringify(r)).not.toContain("SECRET-STREAM-KEY");
+    await expect(issuePublishToken(h.db, admin, ticket, deps)).rejects.toMatchObject({ code: "video_ticket" });
   });
 
-  it("no sirve para otra persona, ni vencida, ni con una oferta que lleve audio (y esa no la consume)", async () => {
+  it("no sirve para otra persona, ni inventada, ni vencida", async () => {
     let clock = new Date();
     const { deps } = fakeDeps(() => clock);
     const { ticket } = await prepareBroadcast(h.db, admin, deps);
-    await expect(publishOffer(h.db, root, ticket, OFFER, deps)).rejects.toMatchObject({ code: "video_ticket" });
-    await expect(publishOffer(h.db, admin, ticket, OFFER + "m=audio 9 UDP/TLS/RTP/SAVPF 111\r\n", deps)).rejects.toMatchObject({ code: "video_offer" });
-    await expect(publishOffer(h.db, admin, "inventada", OFFER, deps)).rejects.toMatchObject({ code: "video_ticket" });
+    await expect(issuePublishToken(h.db, root, ticket, deps)).rejects.toMatchObject({ code: "video_ticket" });
+    await expect(issuePublishToken(h.db, admin, "inventada", deps)).rejects.toMatchObject({ code: "video_ticket" });
     clock = new Date(Date.now() + 3 * 60_000);
-    await expect(publishOffer(h.db, admin, ticket, OFFER, deps)).rejects.toMatchObject({ code: "video_ticket" });
+    await expect(issuePublishToken(h.db, admin, ticket, deps)).rejects.toMatchObject({ code: "video_ticket" });
   });
 
-  it("si el relay o MediaMTX fallan, la sesión pasa a error, se libera la cabina y no queda el relay encendido", async () => {
+  it("si LiveKit falla, la sesión pasa a error y la cabina queda libre", async () => {
     const { deps, st, log } = fakeDeps();
-    st.failWhip = true;
+    st.failRoom = true;
     const { ticket } = await prepareBroadcast(h.db, admin, deps);
-    await expect(publishOffer(h.db, admin, ticket, OFFER, deps)).rejects.toThrow();
-    const s = await latest();
-    expect(s).toMatchObject({ state: "error", active: false });
-    expect(log).toContain("relay:stop");
-    expect((await prepareBroadcast(h.db, admin, fakeDeps().deps)).session.state).toBe("ready"); // la cabina quedó libre
+    await expect(issuePublishToken(h.db, admin, ticket, deps)).rejects.toMatchObject({ code: "media_unavailable" });
+    expect(await latest()).toMatchObject({ state: "error", active: false });
+    expect(log).toContain("media:stop");
+    expect((await prepareBroadcast(h.db, admin, fakeDeps().deps)).session.state).toBe("ready");
   });
 });
 
@@ -168,17 +167,24 @@ describe("estados del directo", () => {
   async function toLive(now: () => Date) {
     const f = fakeDeps(now);
     const { ticket } = await prepareBroadcast(h.db, admin, f.deps);
-    await publishOffer(h.db, admin, ticket, OFFER, f.deps);
+    await issuePublishToken(h.db, admin, ticket, f.deps);
     return f;
   }
 
-  it("preparada → previsualizando → iniciando → en vivo, un paso por comprobación", async () => {
+  it("preparada → (la cámara publica: se inicia el envío a YouTube) → previsualizando → iniciando → en vivo", async () => {
     let clock = new Date();
     const f = await toLive(() => clock);
     const step = async () => {
       clock = new Date(clock.getTime() + 4000);
       return (await reconcile(h.db, f.deps))?.state;
     };
+    expect(await step()).toBe("ready"); // aún no llega video de la cámara
+    expect(f.log).not.toContain("egress:start");
+    f.st.publisher = true;
+    expect(await step()).toBe("ready"); // inicia el envío de LiveKit a YouTube
+    expect(f.log).toContain("egress:start");
+    expect(f.st.egressUrl).toBe(INGEST); // la clave solo viaja servidor → LiveKit
+    expect((await latest()).egressId).toBe("EG_1");
     expect(await step()).toBe("ready"); // YouTube aún no recibe señal
     f.st.health = "active";
     expect(await step()).toBe("previewing");
@@ -193,43 +199,60 @@ describe("estados del directo", () => {
     expect(await getPublicVideo(h.db)).toEqual({ live: false });
   });
 
-  it("dos comprobaciones seguidas no repiten las llamadas a YouTube", async () => {
+  it("dos comprobaciones seguidas no repiten las llamadas", async () => {
     const f = await toLive(() => new Date());
-    f.st.health = "active";
+    f.st.publisher = true;
     await reconcile(h.db, f.deps);
     const before = f.log.length;
     await reconcile(h.db, f.deps); // dentro de los 3 s: se salta
     expect(f.log.length).toBe(before);
   });
 
-  it("si YouTube no recibe señal a tiempo, termina en error con un motivo claro y libera la cabina", async () => {
+  it("si la cámara nunca publica, termina en error con un motivo claro y libera la cabina", async () => {
     const f = await toLive(() => new Date(Date.now() + 5 * 60_000));
-    const s = await reconcile(h.db, f.deps);
-    expect(s).toBeNull();
+    expect(await reconcile(h.db, f.deps)).toBeNull();
+    const row = await latest();
+    expect(row).toMatchObject({ state: "error", active: false });
+    expect(row.error).toMatch(/No llegó video/);
+    expect(f.log).toContain("media:stop");
+  });
+
+  it("si YouTube no recibe señal a tiempo, termina en error", async () => {
+    let clock = new Date();
+    const f = await toLive(() => clock);
+    f.st.publisher = true;
+    clock = new Date(clock.getTime() + 4000);
+    await reconcile(h.db, f.deps); // inicia el envío
+    clock = new Date(Date.now() + 5 * 60_000);
+    await reconcile(h.db, f.deps);
     const row = await latest();
     expect(row).toMatchObject({ state: "error", active: false });
     expect(row.error).toMatch(/no recibió señal/);
-    expect(f.log).toContain("relay:stop");
   });
 
-  it("si el relay avisa de un error al leer la cámara, falla sin esperar", async () => {
-    const f = await toLive(() => new Date());
-    f.st.relayRunning = false;
-    f.st.relayError = "No se pudo leer la cámara.";
-    await reconcile(h.db, f.deps);
-    expect((await latest()).state).toBe("error");
-  });
-
-  it("en vivo, si la señal se corta, el directo se cierra solo y se completa en YouTube", async () => {
+  it("si LiveKit reporta que el envío falló, falla sin esperar", async () => {
     let clock = new Date();
     const f = await toLive(() => clock);
+    f.st.publisher = true;
+    clock = new Date(clock.getTime() + 4000);
+    await reconcile(h.db, f.deps);
+    f.st.egress = "failed";
+    clock = new Date(clock.getTime() + 4000);
+    await reconcile(h.db, f.deps);
+    expect(await latest()).toMatchObject({ state: "error", active: false });
+  });
+
+  it("en vivo, si el envío se corta (la cámara se desconectó), el directo se cierra solo y se completa en YouTube", async () => {
+    let clock = new Date();
+    const f = await toLive(() => clock);
+    f.st.publisher = true;
     f.st.health = "active";
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       clock = new Date(clock.getTime() + 4000);
       await reconcile(h.db, f.deps);
     }
     expect((await latest()).state).toBe("live");
-    f.st.relayRunning = false;
+    f.st.egress = "ended";
     clock = new Date(clock.getTime() + 4000);
     await reconcile(h.db, f.deps);
     const row = await latest();
@@ -239,15 +262,18 @@ describe("estados del directo", () => {
   });
 
   it("si falla YouTube a mitad, termina en error sin filtrar detalles", async () => {
-    const f = await toLive(() => new Date());
+    let clock = new Date();
+    const f = await toLive(() => clock);
+    f.st.publisher = true;
     f.st.health = "active";
     f.deps.youtube.transition = async () => {
       throw new Error("detalle interno: " + INGEST);
     };
     f.deps.youtube.broadcastLife = async () => "testing";
-    await reconcile(h.db, f.deps); // → previewing (el intento de «testing» se tolera)
-    await h.db.update(videoSessions).set({ checkedAt: null });
-    await reconcile(h.db, f.deps);
+    for (let i = 0; i < 4; i++) {
+      clock = new Date(clock.getTime() + 4000);
+      await reconcile(h.db, f.deps); // inicia el envío → previsualizando (el intento de «testing» se tolera) → falla al pasar a vivo
+    }
     const row = await latest();
     expect(row.state).toBe("error");
     expect(row.error).not.toContain("SECRET-STREAM-KEY");
@@ -255,12 +281,12 @@ describe("estados del directo", () => {
 });
 
 describe("finalizar", () => {
-  it("quien inició, o un administrador, finaliza: relay detenido y directo completado", async () => {
+  it("quien inició, o un administrador, finaliza: envío detenido y directo completado", async () => {
     const f = fakeDeps(() => WED_2030);
     await prepareBroadcast(h.db, locutor, f.deps);
     await stopBroadcast(h.db, locutor, f.deps);
     expect((await latest())).toMatchObject({ state: "ended", active: false });
-    expect(f.log).toEqual(expect.arrayContaining(["relay:stop", "transition:complete"]));
+    expect(f.log).toEqual(expect.arrayContaining(["media:stop", "transition:complete"]));
     await endActive();
     const g = fakeDeps(() => WED_2030);
     await prepareBroadcast(h.db, locutor, g.deps);

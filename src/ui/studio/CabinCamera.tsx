@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { LocalVideoTrack, Room } from "livekit-client";
 import type { VideoAdminView } from "@/modules/video/service";
 import { apiErrorMessage, cameraErrorMessage } from "./cabin-errors";
 
 type Cam = { deviceId: string; label: string };
 type Cached = VideoAdminView | null;
-
-const ICE = [{ urls: "stun:stun.l.google.com:19302" }];
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -20,29 +19,16 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** Espera a que el navegador termine de reunir candidatos ICE (la señalización WHIP va en una sola oferta). */
-function iceComplete(pc: RTCPeerConnection, ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    if (pc.iceGatheringState === "complete") return resolve();
-    const done = () => {
-      pc.removeEventListener("icegatheringstatechange", check);
-      clearTimeout(t);
-      resolve();
-    };
-    const check = () => pc.iceGatheringState === "complete" && done();
-    const t = setTimeout(done, ms);
-    pc.addEventListener("icegatheringstatechange", check);
-  });
-}
-
 /**
  * Cámara en cabina. Solo VIDEO: `getUserMedia({ audio: false })`, sin micrófono ni audio del sistema. La cámara se pide
- * únicamente al pulsar «Activar cámara». El video viaja por WebRTC (WHIP) al servidor, que lo reenvía a YouTube.
+ * únicamente al pulsar «Activar cámara». El video se publica en LiveKit Cloud (sin puertos abiertos en nuestro servidor),
+ * que lo entrega a YouTube. El token de LiveKit solo permite publicar la cámara.
  */
 export function CabinCamera({ compact = false, onActive }: { compact?: boolean; onActive?: (active: boolean) => void }) {
   const videoEl = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
-  const pc = useRef<RTCPeerConnection | null>(null);
+  const room = useRef<Room | null>(null);
+  const published = useRef<LocalVideoTrack | null>(null);
   const [cams, setCams] = useState<Cam[]>([]);
   const [deviceId, setDeviceId] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
@@ -60,8 +46,10 @@ export function CabinCamera({ compact = false, onActive }: { compact?: boolean; 
   }, [active, onActive]);
 
   const closePeer = useCallback(() => {
-    pc.current?.close();
-    pc.current = null;
+    const r = room.current;
+    room.current = null;
+    published.current = null;
+    void r?.disconnect(false); // false: la previsualización local sigue encendida
     setSending(false);
   }, []);
 
@@ -90,7 +78,7 @@ export function CabinCamera({ compact = false, onActive }: { compact?: boolean; 
 
   // Si el servidor da por terminado el directo (error o fin), se cierra la conexión del navegador.
   useEffect(() => {
-    if ((state === "ended" || state === "error") && pc.current) closePeer();
+    if ((state === "ended" || state === "error") && room.current) closePeer();
   }, [state, closePeer]);
 
   const stopCamera = useCallback(() => {
@@ -109,8 +97,7 @@ export function CabinCamera({ compact = false, onActive }: { compact?: boolean; 
       });
       const track = s.getVideoTracks()[0];
       // Con una transmisión en curso se cambia la fuente sin cortar el directo.
-      const sender = pc.current?.getSenders().find((x) => x.track?.kind === "video");
-      if (sender) await sender.replaceTrack(track);
+      if (published.current) await published.current.replaceTrack(track);
       stream.current?.getTracks().forEach((t) => t.stop());
       stream.current = s;
       if (videoEl.current) videoEl.current.srcObject = s;
@@ -131,36 +118,23 @@ export function CabinCamera({ compact = false, onActive }: { compact?: boolean; 
     setError(null);
     try {
       const { ticket } = await api<{ ticket: string }>("/api/studio/video/start", { method: "POST" });
-      const peer = new RTCPeerConnection({ iceServers: ICE });
-      pc.current = peer;
-      peer.onconnectionstatechange = () => {
-        if (peer.connectionState === "failed" || peer.connectionState === "disconnected") {
+      const { url, token } = await api<{ url: string; token: string }>("/api/studio/video/token", { method: "POST", headers: { authorization: `Bearer ${ticket}` } });
+      const { Room, LocalVideoTrack, RoomEvent, Track } = await import("livekit-client");
+      const r = new Room({ adaptiveStream: false, dynacast: false });
+      r.on(RoomEvent.Disconnected, () => {
+        if (room.current === r) {
+          room.current = null;
+          published.current = null;
+          setSending(false);
           setError("Se perdió la conexión de la cámara con el servidor. Finaliza y vuelve a iniciar.");
         }
-      };
-      peer.addTransceiver(track, { direction: "sendonly", streams: [stream.current!] }); // solo video
-      await peer.setLocalDescription(await peer.createOffer());
-      await iceComplete(peer, 4000);
-      const res = await fetch("/api/studio/video/whip", {
-        method: "POST",
-        headers: { "content-type": "application/sdp", authorization: `Bearer ${ticket}` },
-        body: peer.localDescription!.sdp,
-      }).catch(() => {
-        throw new Error(apiErrorMessage(0, null));
       });
-      if (!res.ok) throw new Error(apiErrorMessage(res.status, (await res.json().catch(() => null)) as { error?: string } | null));
-      await peer.setRemoteDescription({ type: "answer", sdp: await res.text() });
+      room.current = r;
+      await r.connect(url, token);
+      const local = new LocalVideoTrack(track);
+      await r.localParticipant.publishTrack(local, { source: Track.Source.Camera, simulcast: false, videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 } }); // solo video
+      published.current = local;
       setSending(true);
-      try {
-        const sender = peer.getSenders()[0];
-        const p = sender.getParameters();
-        if (p.encodings?.[0]) {
-          p.encodings[0].maxBitrate = 2_500_000;
-          await sender.setParameters(p);
-        }
-      } catch {
-        /* el navegador decide el bitrate */
-      }
       await refresh();
     } catch (e) {
       closePeer();
@@ -186,10 +160,10 @@ export function CabinCamera({ compact = false, onActive }: { compact?: boolean; 
   // Al salir de la página, o cerrar la pestaña, la transmisión termina (la cámara no puede seguir sin esta pestaña).
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
-      if (pc.current) e.preventDefault();
+      if (room.current) e.preventDefault();
     };
     const end = () => {
-      if (pc.current) void fetch("/api/studio/video/stop", { method: "POST", keepalive: true }).catch(() => undefined);
+      if (room.current) void fetch("/api/studio/video/stop", { method: "POST", keepalive: true }).catch(() => undefined);
     };
     window.addEventListener("beforeunload", warn);
     window.addEventListener("pagehide", end);
@@ -197,7 +171,7 @@ export function CabinCamera({ compact = false, onActive }: { compact?: boolean; 
       window.removeEventListener("beforeunload", warn);
       window.removeEventListener("pagehide", end);
       end();
-      pc.current?.close();
+      void room.current?.disconnect(false);
       stream.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);

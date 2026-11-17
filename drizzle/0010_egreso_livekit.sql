@@ -1,0 +1,1 @@
+ALTER TABLE "video_sessions" ADD COLUMN "egress_id" text;
