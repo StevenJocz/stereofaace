@@ -45,6 +45,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/auditoria", label: "Auditoría", permission: "audit:read" },
       { href: "/admin/fuentes", label: "Fuentes", permission: "source:read" },
       { href: "/admin/ajustes/facebook", label: "Facebook", permission: "setting:update" },
+      { href: "/admin/ajustes/publicidad", label: "Publicidad", permission: "setting:update" },
     ],
   },
 ];

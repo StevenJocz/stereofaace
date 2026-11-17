@@ -5,7 +5,10 @@
  */
 import type { Db } from "@/lib/db";
 import { categories, genres } from "@/modules/taxonomy/schema";
+import { pages } from "@/modules/content/schema";
 import { siteSettings } from "@/modules/settings/schema";
+import { sanitizeArticleHtml } from "@/lib/sanitize";
+import { LEGAL_PAGES } from "./legal-pages";
 import { seedRadioDefaults } from "./seed-radio";
 
 export const CATEGORIES = [
@@ -48,5 +51,19 @@ export async function seedBase(db: Db): Promise<void> {
   await db
     .insert(siteSettings)
     .values({ key: "site", value: { name: "StereoFace", tagline: "Electrónica, indie y cultura underground" } })
+    .onConflictDoNothing();
+  // Páginas legales base: solo se crean si no existen (no se pisa lo que se edite en el panel).
+  await db
+    .insert(pages)
+    .values(
+      LEGAL_PAGES.map((p) => ({
+        slug: p.slug,
+        locale: "es",
+        title: p.title,
+        bodyHtml: sanitizeArticleHtml(p.html.trim()),
+        status: "published" as const,
+        seo: { title: p.title, description: p.description },
+      })),
+    )
     .onConflictDoNothing();
 }

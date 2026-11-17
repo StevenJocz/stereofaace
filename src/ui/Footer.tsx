@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Barcode } from "./Barcode";
 import { Mark } from "./Header";
+import { CookiePrefsLink } from "./ads/AdsBridge";
 import { getDb } from "@/lib/db";
 import { EDITION_NO } from "@/lib/site";
 import { DEFAULT_SITE_SETTINGS, getSiteSettings, type SiteSettings } from "@/modules/settings/site";
@@ -76,9 +77,19 @@ function FooterView({ settings }: { settings: SiteSettings }) {
             <Link href="/#cultura">Cultura</Link>
           </nav>
 
+          <nav aria-label="Información legal" className="mono col-span-6 flex flex-col gap-2 md:col-span-4 lg:col-span-2">
+            <span className="muted">Legal</span>
+            <Link href="/pagina/sobre-nosotros">Sobre nosotros</Link>
+            <Link href="/pagina/contacto">Contacto</Link>
+            <Link href="/pagina/privacidad">Privacidad</Link>
+            <Link href="/pagina/cookies">Cookies</Link>
+            <Link href="/pagina/terminos">Términos</Link>
+            <CookiePrefsLink />
+          </nav>
+
           <div className="mono col-span-6 flex flex-col gap-2 md:col-span-4 lg:col-span-2">
             <span className="muted">Estado</span>
-            <span>Contenido demo</span>
+            <span>En línea</span>
             <Barcode value={EDITION_NO} className="h-8 w-28" />
             <span className="muted">N.º {EDITION_NO}</span>
           </div>

@@ -10,6 +10,7 @@ import { getArticleArtists } from "@/modules/artists/profile";
 import { getArticleBySlug, getRelatedArticles } from "@/modules/content/service";
 import { ArticleCover } from "@/ui/ArticleCover";
 import { StoryHero } from "@/ui/StoryHero";
+import { AdSlot } from "@/ui/ads/AdSlot";
 import { ShareButtons } from "@/ui/ShareButtons";
 
 type Params = { slug: string };
@@ -129,6 +130,8 @@ async function ArticleView({ params }: { params: Promise<Params> }) {
           ) : (
             <p className="text-muted">Este artículo aún no tiene contenido.</p>
           )}
+
+          <AdSlot name="article" />
 
           {artistsTagged.length > 0 && (
             <section aria-labelledby="artistas-nota" className="mt-10">
