@@ -351,7 +351,7 @@ export async function pollVideo(db: Db, actor: Actor | null, deps?: VideoDeps): 
     try {
       await reconcile(db, deps ?? (await defaultDeps(db)));
     } catch (e) {
-      if (!(e instanceof DomainError)) console.error("[video] conciliación", e instanceof Error ? e.message : "error");
+      if (!(e instanceof DomainError)) console.error("[video] conciliación", e instanceof Error ? e.name : "error");
     }
   }
   return getVideoAdmin(db, actor);
