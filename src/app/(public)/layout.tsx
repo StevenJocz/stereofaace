@@ -7,6 +7,7 @@ import { Header } from "@/ui/Header";
 import { Footer } from "@/ui/Footer";
 import { MotionRoot } from "@/ui/MotionRoot";
 import { Intro } from "@/ui/Intro";
+import { CabinLive } from "@/ui/cabin/CabinLive";
 
 /** Lee la configuración de publicidad en cada petición; si falla, no hay anuncios. */
 async function AdsLoader() {
@@ -30,6 +31,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <Header />
       <main id="contenido">{children}</main>
       <Footer />
+      <CabinLive />
       <MotionRoot />
       <Suspense fallback={null}>
         <AdsLoader />

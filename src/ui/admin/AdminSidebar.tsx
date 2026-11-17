@@ -33,6 +33,8 @@ const ICONS: Record<string, React.ReactNode> = {
   "/admin/auditoria": I("M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6zM9 12l2 2 4-4"),
   "/admin/fuentes": I("M5 5a14 14 0 0 1 14 14M5 11a8 8 0 0 1 8 8M5.5 19h.01"),
   "/admin/ajustes/publicidad": I("M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"),
+  "/admin/camara": I("M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM15 10.5l6-3.5v10l-6-3.5"),
+  "/admin/ajustes/youtube": I("M3 7.5a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3zM10 9v6l5-3z"),
   "/admin/ajustes/facebook": I("M14 8h2V4h-3a4 4 0 0 0-4 4v2H7v4h2v6h4v-6h2.5l.5-4h-3V8.5A.5.5 0 0 1 14 8z"),
 };
 

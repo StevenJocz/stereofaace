@@ -295,3 +295,44 @@ Al terminar, deja por escrito (en el informe al humano y, si procede, en `PROGRE
 3. ¿Qué correo y contraseña uso para el primer administrador y qué correo para Let's Encrypt?
 4. ¿Dónde guardo las copias de seguridad fuera del servidor?
 5. ¿Debe el sitio responder también en `www.DOMINIO`? (Hoy solo cubre el dominio exacto; añadirlo exige ampliar `server_name` y el certificado.)
+
+---
+
+## 17. Cámara en cabina (video del locutor → YouTube Live)
+
+**Flujo:** navegador del locutor (solo video, sin micrófono) ──WHIP, vía `web`, con credencial de un solo uso──► `mediamtx` ──RTSP interno──► `video-relay` (FFmpeg: video + AAC silenciosa) ──RTMP──► YouTube Live. El sitio muestra el embed oficial de YouTube (`youtube-nocookie`), siempre mudo; el único audio es la radio. Los servicios están en el perfil `video` de `docker-compose.yml` (no arrancan con un `up` normal). **No verificado en un servidor real: es la primera vez que se ejecuta.**
+
+### Variables (en `.env`, permisos 600, nunca en git)
+| Variable | Descripción |
+|---|---|
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Credenciales OAuth de Google Cloud (tipo «Aplicación web»). |
+| `GOOGLE_REDIRECT_URI` | Opcional. Por defecto `NEXT_PUBLIC_SITE_URL` + `/api/youtube/oauth/callback`; debe coincidir exactamente con la consola de Google. |
+| `VIDEO_SECRET_KEY` | 32 bytes que cifran el refresh token en la base: `openssl rand -base64 32`. |
+| `VIDEO_RELAY_TOKEN` | Token web↔relay (≥ 24 caracteres): `openssl rand -hex 32`. |
+| `VIDEO_PUBLIC_HOST` | Dominio o IP pública con la que el navegador alcanza el puerto de medios. |
+| `VIDEO_RELAY_URL`, `VIDEO_WHIP_URL` | Ya tienen valor por defecto en Compose. |
+
+### Instalación
+1. Firewall/router: abrir **8189/udp y 8189/tcp** hacia el servidor (solo medios WebRTC). No abras 8889, 8554 ni 8080.
+2. Google Cloud: crear proyecto → habilitar **YouTube Data API v3** → pantalla de consentimiento → credenciales OAuth «Aplicación web» con la redirección `https://DOMINIO/api/youtube/oauth/callback`. Añadir la cuenta oficial como usuario de prueba (o publicar la app).
+3. YouTube: el canal oficial debe tener **transmisión en vivo habilitada** (hasta 24 h tras activarla) y estar verificado.
+4. Definir las variables, `docker compose build web`, `docker compose run --rm migrate` (crea `video_sessions` y `video_tickets`) y `docker compose --profile video up -d mediamtx video-relay web`.
+5. Como superadministrador: **Ajustes → YouTube → Conectar canal**. Privacidad por defecto: *no listado*; solo un superadministrador puede pasarla a público.
+6. Locutor/administrador: **Cámara en cabina** → Activar cámara → Iniciar transmisión. El locutor solo puede dentro de su horario.
+
+### Rotación y revocación
+- Rotar `VIDEO_RELAY_TOKEN`: cambiarlo en `.env` y recrear `web` y `video-relay`.
+- Rotar `VIDEO_SECRET_KEY`: invalida el token guardado; reconectar YouTube después.
+- Rotar `GOOGLE_CLIENT_SECRET`: crear uno nuevo en Google Cloud, actualizar `.env`, recrear `web`.
+- **Revocar la conexión:** Ajustes → YouTube → *Desconectar y revocar* (revoca en Google y borra el token). También en https://myaccount.google.com/permissions.
+- **Detener con seguridad:** finalizar desde la consola (o `POST /api/studio/video/stop`) y luego `docker compose --profile video stop video-relay mediamtx`.
+
+### Solución de problemas
+| Síntoma | Qué mirar |
+|---|---|
+| «Faltan variables» en la consola | Falta alguna de la tabla; el aviso lista solo nombres. |
+| «El canal no tiene habilitada la transmisión en vivo» | Activarla en YouTube Studio y esperar hasta 24 h. |
+| Se queda en «Preparada» y falla por tiempo | El navegador no llega al puerto 8189 (UDP/TCP) o `VIDEO_PUBLIC_HOST` es incorrecto. |
+| «El servicio de video no responde» | `docker compose --profile video ps` y `logs video-relay mediamtx`; token del relay distinto. |
+| Directo se cierra solo | La señal de cámara se cortó (pestaña cerrada o red). |
+| Cuota de YouTube | Límite diario de la API: esperar al día siguiente. |

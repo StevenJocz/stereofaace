@@ -64,6 +64,13 @@
       "when": 1794942154711,
       "tag": "0008_roles_locutor",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794943105549,
+      "tag": "0009_camara_cabina",
+      "breakpoints": true
     }
   ]
 }

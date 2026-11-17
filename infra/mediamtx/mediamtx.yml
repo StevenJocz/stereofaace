@@ -1,0 +1,39 @@
+# MediaMTX como puerta WebRTC (WHIP) de la cabina. SOLO lo alcanza el servicio web por la red interna de Compose;
+# lo único publicado al exterior es el puerto de medios WebRTC (8189 UDP/TCP). Sin claves aquí: la autorización es
+# la credencial de un solo uso que valida la aplicación antes de reenviar la oferta.
+logLevel: warn
+
+rtsp: yes
+rtspAddress: :8554          # lectura interna (relay); no se publica
+rtmp: no
+hls: no
+srt: no
+api: no
+metrics: no
+playback: no
+
+webrtc: yes
+webrtcAddress: :8889        # señalización WHIP interna; no se publica
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+# La dirección pública con la que el navegador alcanza el puerto de medios (se define con MTX_WEBRTCADDITIONALHOSTS).
+webrtcAdditionalHosts: []
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+        path: cabina
+      - action: read
+        path: cabina
+
+# Un único camino permitido; una señal nueva sustituye a la anterior (una cámara que se cayó no bloquea la cabina).
+paths:
+  cabina:
+    source: publisher
+    overridePublisher: yes

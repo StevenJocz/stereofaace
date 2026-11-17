@@ -35,6 +35,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/radio", label: "Radio", permission: "station:read" },
       { href: "/admin/radio/studio", label: "Estudio", permission: "studio:update" },
       { href: "/admin/radio/programacion", label: "Programación", permission: "station:update" },
+      { href: "/admin/camara", label: "Cámara en cabina", permission: "studio:update" },
     ],
   },
   {
@@ -46,6 +47,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/fuentes", label: "Fuentes", permission: "source:read" },
       { href: "/admin/ajustes/facebook", label: "Facebook", permission: "setting:update" },
       { href: "/admin/ajustes/publicidad", label: "Publicidad", permission: "setting:update" },
+      { href: "/admin/ajustes/youtube", label: "YouTube", permission: "audit:manage" }, // solo superadministrador
     ],
   },
 ];
