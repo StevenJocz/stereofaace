@@ -10,6 +10,7 @@ import { Ticker } from "@/ui/Ticker";
 import { HeroSlider, type HeroSlideView } from "@/ui/HeroSlider";
 import { splitHeroTitle } from "@/ui/hero-copy";
 import { Rail, type RailItem } from "@/ui/Rail";
+import { TodaySchedule } from "@/ui/radio/TodaySchedule";
 import { NewsletterForm } from "@/ui/NewsletterForm";
 import { getDb } from "@/lib/db";
 import { DEFAULT_SITE_SETTINGS, getSiteSettings } from "@/modules/settings/site";
@@ -348,6 +349,7 @@ async function HomeContent() {
                     El archivo completo llega con la ruta /noticias
                   </li>
                 </ul>
+                <TodaySchedule />
               </div>
             </div>
           </section>
