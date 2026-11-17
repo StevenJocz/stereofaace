@@ -2678,3 +2678,127 @@ body[data-radio="on"] .adm-shell {
     animation: none;
   }
 }
+
+/* ───────────── 404 · Señal perdida ───────────── */
+.nf {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  min-height: min(78dvh, 46rem);
+  padding-block: clamp(2.5rem, 8vw, 6rem);
+  overflow: hidden;
+}
+/* Ruido de pantalla: rejilla de líneas + puntos, apagado con «reducir movimiento». */
+.nf-noise {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 2px, color-mix(in srgb, var(--fg) 5%, transparent) 2px 3px),
+    radial-gradient(60% 70% at 85% 10%, color-mix(in srgb, var(--violet) 26%, transparent), transparent 70%),
+    radial-gradient(40% 50% at 5% 100%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
+  animation: nf-scan 9s linear infinite;
+}
+@keyframes nf-scan {
+  to {
+    background-position:
+      0 24px,
+      0 0,
+      0 0;
+  }
+}
+/* 404 con el canal estéreo partido: verde a la izquierda, violeta a la derecha. */
+.nf-code {
+  position: relative;
+  margin: 0.3rem 0 0;
+  font-size: clamp(6rem, 24vw, 17rem);
+  line-height: 0.82;
+  letter-spacing: -0.04em;
+  color: var(--fg);
+}
+.nf-code span {
+  position: relative;
+  display: inline-block;
+}
+.nf-code span::before,
+.nf-code span::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.nf-code span::before {
+  color: var(--accent);
+  transform: translateX(-0.035em);
+  clip-path: inset(0 0 55% 0);
+  animation: nf-glitch-l 4.2s steps(1, end) infinite;
+}
+.nf-code span::after {
+  color: var(--violet);
+  transform: translateX(0.035em);
+  clip-path: inset(48% 0 0 0);
+  animation: nf-glitch-r 3.6s steps(1, end) infinite;
+}
+@keyframes nf-glitch-l {
+  0%,
+  86%,
+  100% {
+    transform: translateX(-0.035em);
+    clip-path: inset(0 0 55% 0);
+  }
+  88% {
+    transform: translateX(-0.09em);
+    clip-path: inset(12% 0 40% 0);
+  }
+  92% {
+    transform: translateX(0.04em);
+    clip-path: inset(60% 0 6% 0);
+  }
+}
+@keyframes nf-glitch-r {
+  0%,
+  80%,
+  100% {
+    transform: translateX(0.035em);
+    clip-path: inset(48% 0 0 0);
+  }
+  83% {
+    transform: translateX(0.1em);
+    clip-path: inset(8% 0 62% 0);
+  }
+  90% {
+    transform: translateX(-0.05em);
+    clip-path: inset(30% 0 30% 0);
+  }
+}
+.nf-title {
+  margin-top: 1rem;
+  font-size: clamp(1.6rem, 4.4vw, 3rem);
+  line-height: 1;
+}
+.nf-wave {
+  width: min(100%, 38rem);
+  height: 3.2rem;
+  margin-top: 1.6rem;
+  color: var(--accent);
+  opacity: 0.85;
+}
+.nf-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-noise,
+  .nf-code span::before,
+  .nf-code span::after {
+    animation: none;
+  }
+}
