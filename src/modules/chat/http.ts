@@ -89,7 +89,7 @@ export function publicRequestPost(db: Db, body: unknown, ip: string): Promise<Re
     if (!byClient.ok) return tooFast(byClient.retryAfterMs, "Espera unos segundos antes de pedir otra canción.");
     const byIp = rateLimit(`req:ip:${ip}`, 6, 60_000);
     if (!byIp.ok) return tooFast(byIp.retryAfterMs, "Demasiados pedidos desde tu conexión. Espera un momento.");
-    const r = await createRequest(db, { ...id, title: str(b.title), artist: str(b.artist) || undefined });
+    const r = await createRequest(db, { ...id, title: str(b.title), artist: str(b.artist) || undefined, note: str(b.note) || undefined });
     return json(r, r.duplicate ? 200 : 201);
   });
 }

@@ -12,6 +12,11 @@ export const chatMessages = pgTable(
     clientId: text("client_id").notNull(),
     nickname: text("nickname").notNull(),
     body: text("body"),
+    /** message = mensaje normal; request = tarjeta de pedido de canción (body = título, artist = artista). */
+    kind: text("kind").notNull().default("message"),
+    artist: text("artist"),
+    /** Comentario corto del pedido (solo en las tarjetas de pedido). */
+    note: text("note"),
     /** Clave de un GIF de la bandeja predefinida. */
     gif: text("gif"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -37,6 +42,8 @@ export const songRequests = pgTable(
     nickname: text("nickname").notNull(),
     title: text("title").notNull(),
     artist: text("artist"),
+    /** Comentario corto de quien pide («para mi novia», «dedicada a…»). */
+    note: text("note"),
     /** pending = esperando al DJ; played = ya sonó; rejected = descartado. */
     status: text("status").notNull().default("pending"),
     handledBy: uuid("handled_by").references(() => users.id, { onDelete: "set null" }),

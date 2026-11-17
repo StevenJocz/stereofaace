@@ -50,6 +50,13 @@
       "when": 1794931413706,
       "tag": "0006_chat_radio",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794935865614,
+      "tag": "0007_pedido_en_chat",
+      "breakpoints": true
     }
   ]
 }

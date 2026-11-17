@@ -70,6 +70,14 @@ describe("pedidos públicos", () => {
     expect(list.requests[0]).toMatchObject({ title: "Strobe", mine: true });
     expect(list.config.requestsEnabled).toBe(true);
   });
+  it("el comentario corto llega al pedido y a la tarjeta del chat", async () => {
+    const r = await publicRequestPost(h.db, body({ clientId: "cliente-nota-1", title: "Innerbloom", artist: "RÜFÜS DU SOL", note: "para mi novia" }), "8.8.8.8");
+    expect(r.status).toBe(201);
+    const j = await (await publicChatGet(h.db, { after: null, clientId: "cliente-nota-1" })).json();
+    expect(j.messages.at(-1)).toMatchObject({ kind: "request", body: "Innerbloom", note: "para mi novia", mine: true });
+    const bad = await publicRequestPost(h.db, body({ clientId: "cliente-nota-2", title: "Otra", note: "x".repeat(101) }), "8.8.8.8");
+    expect(bad.status).toBe(400);
+  });
   it("un pedido cada 20 segundos por persona", async () => {
     await publicRequestPost(h.db, body({ title: "Uno" }), "6.6.6.6");
     expect((await publicRequestPost(h.db, body({ title: "Dos" }), "6.6.6.6")).status).toBe(429);

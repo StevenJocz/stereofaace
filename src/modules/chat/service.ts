@@ -42,9 +42,11 @@ const requestSchema = z
     nickname,
     title: z.string().transform(clean).pipe(z.string().min(1, "Escribe el título").max(100, "Máximo 100 caracteres")),
     artist: z.string().optional().transform((v) => clean(v ?? "")).pipe(z.string().max(100, "Máximo 100 caracteres")),
+    note: z.string().optional().transform((v) => clean(v ?? "")).pipe(z.string().max(100, "El comentario puede tener hasta 100 caracteres")),
   })
   .superRefine((v, ctx) => {
     if (LINK.test(v.title) || LINK.test(v.artist)) ctx.addIssue({ code: "custom", path: ["title"], message: "No se permiten enlaces" });
+    if (LINK.test(v.note)) ctx.addIssue({ code: "custom", path: ["note"], message: "No se permiten enlaces en el comentario" });
   });
 
 /* ───────────── Configuración (interruptores del equipo) ───────────── */
@@ -73,7 +75,7 @@ async function assertNotMuted(db: Db, clientId: string, now: Date) {
 
 /* ───────────── Mensajes ───────────── */
 
-export type PublicMessage = { id: number; nickname: string; body: string | null; gif: string | null; at: string; mine: boolean };
+export type PublicMessage = { id: number; kind: "message" | "request"; nickname: string; body: string | null; artist: string | null; note: string | null; gif: string | null; at: string; mine: boolean };
 export type AdminMessage = PublicMessage & { clientId: string };
 
 export async function postMessage(
@@ -90,8 +92,21 @@ export async function postMessage(
     .values({ clientId: input.clientId, nickname: v.nickname, body: v.body, gif: v.gif, createdAt: now })
     .returning();
   if (row.seq % 100 === 0) await db.delete(chatMessages).where(lt(chatMessages.createdAt, new Date(now.getTime() - KEEP_DAYS * 86_400_000)));
-  return { id: row.seq, nickname: row.nickname, body: row.body, gif: row.gif, at: row.createdAt.toISOString(), mine: true };
+  return toPublic(row, true);
 }
+
+type MessageRow = typeof chatMessages.$inferSelect;
+const toPublic = (r: MessageRow, mine: boolean): PublicMessage => ({
+  id: r.seq,
+  kind: r.kind === "request" ? "request" : "message",
+  nickname: r.nickname,
+  body: r.body,
+  artist: r.artist,
+  note: r.note,
+  gif: r.gif,
+  at: r.createdAt.toISOString(),
+  mine,
+});
 
 type ListQ = { after?: number; clientId?: string; limit?: number };
 
@@ -110,7 +125,7 @@ async function loadMessages(db: Db, q: ListQ) {
 export async function listMessages(db: Db, q: ListQ): Promise<{ messages: PublicMessage[]; last: number }> {
   const rows = await loadMessages(db, q);
   return {
-    messages: rows.map((r) => ({ id: r.seq, nickname: r.nickname, body: r.body, gif: r.gif, at: r.createdAt.toISOString(), mine: q.clientId !== undefined && r.clientId === q.clientId })),
+    messages: rows.map((r) => toPublic(r, q.clientId !== undefined && r.clientId === q.clientId)),
     last: rows.at(-1)?.seq ?? q.after ?? 0,
   };
 }
@@ -120,7 +135,7 @@ export async function listMessagesAdmin(db: Db, actor: Actor | null, q: ListQ): 
   assertCan(actor, "station:update");
   const rows = await loadMessages(db, q);
   return {
-    messages: rows.map((r) => ({ id: r.seq, nickname: r.nickname, body: r.body, gif: r.gif, at: r.createdAt.toISOString(), mine: false, clientId: r.clientId })),
+    messages: rows.map((r) => ({ ...toPublic(r, false), clientId: r.clientId })),
     last: rows.at(-1)?.seq ?? q.after ?? 0,
   };
 }
@@ -148,12 +163,12 @@ export async function muteClient(db: Db, actor: Actor | null, clientId: string, 
 /* ───────────── Pedidos de canciones ───────────── */
 
 export type RequestStatus = "pending" | "played" | "rejected";
-export type PublicRequest = { id: string; nickname: string; title: string; artist: string | null; status: RequestStatus; at: string; mine: boolean };
+export type PublicRequest = { id: string; nickname: string; title: string; artist: string | null; note: string | null; status: RequestStatus; at: string; mine: boolean };
 export type AdminRequest = Omit<PublicRequest, "mine"> & { createdAt: string };
 
 export async function createRequest(
   db: Db,
-  input: { clientId: string; nickname: string; title: string; artist?: string },
+  input: { clientId: string; nickname: string; title: string; artist?: string; note?: string },
   now: Date = new Date(),
 ): Promise<{ id: string; duplicate: boolean }> {
   const cfg = await getChatConfig(db);
@@ -168,8 +183,12 @@ export async function createRequest(
 
   const [row] = await db
     .insert(songRequests)
-    .values({ clientId: input.clientId, nickname: v.nickname, title: v.title, artist: v.artist || null, createdAt: now })
+    .values({ clientId: input.clientId, nickname: v.nickname, title: v.title, artist: v.artist || null, note: v.note || null, createdAt: now })
     .returning({ id: songRequests.id });
+  // Tarjeta en el chat: «Fulano pidió Título — Artista» (solo si el chat está abierto).
+  if (cfg.enabled) {
+    await db.insert(chatMessages).values({ clientId: input.clientId, nickname: v.nickname, kind: "request", body: v.title, artist: v.artist || null, note: v.note || null, createdAt: now });
+  }
   return { id: row.id, duplicate: false };
 }
 
@@ -181,7 +200,7 @@ export async function listRequestsPublic(db: Db, q: { clientId?: string }): Prom
     .where(inArray(songRequests.status, ["pending", "played"]))
     .orderBy(desc(songRequests.createdAt))
     .limit(20);
-  return rows.map((r) => ({ id: r.id, nickname: r.nickname, title: r.title, artist: r.artist, status: r.status as RequestStatus, at: r.createdAt.toISOString(), mine: q.clientId !== undefined && r.clientId === q.clientId }));
+  return rows.map((r) => ({ id: r.id, nickname: r.nickname, title: r.title, artist: r.artist, note: r.note, status: r.status as RequestStatus, at: r.createdAt.toISOString(), mine: q.clientId !== undefined && r.clientId === q.clientId }));
 }
 
 /** Para el DJ: del pedido más viejo al más nuevo. */
@@ -193,7 +212,7 @@ export async function listRequestsAdmin(db: Db, actor: Actor | null, q: { status
     .where(q.status ? eq(songRequests.status, q.status) : undefined)
     .orderBy(asc(songRequests.createdAt))
     .limit(100);
-  return rows.map((r) => ({ id: r.id, nickname: r.nickname, title: r.title, artist: r.artist, status: r.status as RequestStatus, at: r.createdAt.toISOString(), createdAt: r.createdAt.toISOString() }));
+  return rows.map((r) => ({ id: r.id, nickname: r.nickname, title: r.title, artist: r.artist, note: r.note, status: r.status as RequestStatus, at: r.createdAt.toISOString(), createdAt: r.createdAt.toISOString() }));
 }
 
 export async function setRequestStatus(db: Db, actor: Actor | null, id: string, status: RequestStatus): Promise<void> {

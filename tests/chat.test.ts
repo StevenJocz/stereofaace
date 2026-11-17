@@ -117,6 +117,55 @@ describe("mensajes", () => {
   });
 });
 
+describe("los pedidos aparecen en el chat como tarjeta", () => {
+  it("un pedido nuevo publica un mensaje de tipo pedido con título y artista", async () => {
+    await createRequest(h.db, { clientId: "t1", nickname: "Steven", title: "Strobe", artist: "deadmau5" });
+    const list = await listMessages(h.db, {});
+    const card = list.messages.at(-1)!;
+    expect(card).toMatchObject({ kind: "request", nickname: "Steven", body: "Strobe", artist: "deadmau5", gif: null });
+  });
+
+  it("sin artista la tarjeta lleva solo el título", async () => {
+    await createRequest(h.db, { clientId: "t2", nickname: "Ana", title: "Opus" });
+    expect((await listMessages(h.db, {})).messages.at(-1)).toMatchObject({ kind: "request", body: "Opus", artist: null });
+  });
+
+  it("un pedido repetido no vuelve a publicarse", async () => {
+    const before = (await listMessages(h.db, {})).messages.length;
+    await createRequest(h.db, { clientId: "t1", nickname: "Steven", title: " strobe ", artist: "DEADMAU5" });
+    expect((await listMessages(h.db, {})).messages.length).toBe(before);
+  });
+
+  it("con el chat apagado el pedido se registra pero no se publica en el chat", async () => {
+    await saveChatConfig(h.db, editor, { enabled: false, requestsEnabled: true });
+    const before = (await listMessagesAdmin(h.db, editor, {})).messages.length;
+    await createRequest(h.db, { clientId: "t3", nickname: "Eli", title: "Silencio" });
+    expect((await listMessagesAdmin(h.db, editor, {})).messages.length).toBe(before);
+    expect((await listRequestsPublic(h.db, {})).some((r) => r.title === "Silencio")).toBe(true);
+    await saveChatConfig(h.db, editor, { enabled: true, requestsEnabled: true });
+  });
+
+  it("el pedido puede llevar un comentario corto que sale en la tarjeta, en la lista pública y en la del DJ", async () => {
+    await createRequest(h.db, { clientId: "t5", nickname: "Gus", title: "Innerbloom", artist: "RÜFÜS DU SOL", note: "para mi novia, es nuestro aniversario" });
+    const card = (await listMessages(h.db, {})).messages.at(-1)!;
+    expect(card).toMatchObject({ kind: "request", body: "Innerbloom", artist: "RÜFÜS DU SOL", note: "para mi novia, es nuestro aniversario" });
+    expect((await listRequestsPublic(h.db, {})).find((r) => r.title === "Innerbloom")?.note).toBe("para mi novia, es nuestro aniversario");
+    expect((await listRequestsAdmin(h.db, editor, { status: "pending" })).find((r) => r.title === "Innerbloom")?.note).toBe("para mi novia, es nuestro aniversario");
+  });
+
+  it("el comentario es opcional, de hasta 100 caracteres y sin enlaces", async () => {
+    await createRequest(h.db, { clientId: "t6", nickname: "Hana", title: "Sin nota" });
+    expect((await listMessages(h.db, {})).messages.at(-1)).toMatchObject({ note: null });
+    await expect(createRequest(h.db, { clientId: "t6", nickname: "Hana", title: "Otra", note: "x".repeat(101) })).rejects.toBeInstanceOf(ZodError);
+    await expect(createRequest(h.db, { clientId: "t6", nickname: "Hana", title: "Otra", note: "escucha https://spam.example" })).rejects.toBeInstanceOf(ZodError);
+  });
+
+  it("los mensajes normales siguen siendo de tipo mensaje", async () => {
+    await postMessage(h.db, { clientId: "t4", nickname: "Caro", text: "hola" });
+    expect((await listMessages(h.db, {})).messages.at(-1)).toMatchObject({ kind: "message", artist: null });
+  });
+});
+
 describe("pedidos de canciones", () => {
   it("se crean pendientes, el público ve los recientes y marca los propios", async () => {
     await createRequest(h.db, { clientId: "p1", nickname: "Gus", title: "Strobe", artist: "deadmau5" });

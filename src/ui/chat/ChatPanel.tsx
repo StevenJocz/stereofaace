@@ -162,7 +162,27 @@ function ChatTab({ config, messages, onSent }: { config: ChatConfig | null; mess
         aria-live="polite"
       >
         {messages.length === 0 && <p className="mono muted p-3 text-[0.74rem]">Aún no hay mensajes. ¡Escribe el primero!</p>}
-        {messages.map((m) => (
+        {messages.map((m) =>
+          m.kind === "request" ? (
+            <div key={m.id} className="chat-request-card" data-mine={m.mine}>
+              <span className="chat-request-disc" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                  <path d="M9 17V5l10-2v12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="6.5" cy="17.5" r="2.5" />
+                  <circle cx="16.5" cy="15.5" r="2.5" />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="mono text-[0.6rem] text-accent-ink">
+                  <strong className="text-fg">{m.nickname}</strong> pidió una canción
+                </p>
+                <p className="chat-request-title">{m.body}</p>
+                {m.artist && <p className="chat-request-artist">{m.artist}</p>}
+                {m.note && <p className="chat-request-note">“{m.note}”</p>}
+              </div>
+              <time className="mono muted self-start text-[0.58rem]">{hhmm(m.at)}</time>
+            </div>
+          ) : (
           <div key={m.id} className="chat-msg" data-mine={m.mine}>
             <span className="chat-nick">{m.nickname}</span>
             <time className="mono muted text-[0.6rem]">{hhmm(m.at)}</time>
@@ -172,7 +192,8 @@ function ChatTab({ config, messages, onSent }: { config: ChatConfig | null; mess
               <img src={gifByKey(m.gif)!.src} alt={gifByKey(m.gif)!.label} className="chat-gif" width={96} height={96} loading="lazy" />
             )}
           </div>
-        ))}
+          ),
+        )}
       </div>
 
       {picker === "emoji" && (
@@ -257,6 +278,7 @@ function RequestsTab({ config, requests, onCreated }: { config: ChatConfig | nul
   const [nick, setNick] = useState("");
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
+  const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -273,12 +295,13 @@ function RequestsTab({ config, requests, onCreated }: { config: ChatConfig | nul
     if (nick.trim().length < 2) return setMsg({ ok: false, text: "Escribe un apodo de al menos 2 letras." });
     saveNick(nick.trim());
     setBusy(true);
-    const r = await postJson<{ duplicate: boolean }>("/api/chat/requests", { clientId: getClientId(), nickname: nick.trim(), title, artist });
+    const r = await postJson<{ duplicate: boolean }>("/api/chat/requests", { clientId: getClientId(), nickname: nick.trim(), title, artist, note });
     setBusy(false);
     if (!r.ok) return setMsg({ ok: false, text: r.error });
     setMsg({ ok: true, text: r.data.duplicate ? "Ese pedido ya está en la lista." : "¡Pedido enviado! El DJ lo verá." });
     setTitle("");
     setArtist("");
+    setNote("");
     onCreated();
   };
 
@@ -293,6 +316,13 @@ function RequestsTab({ config, requests, onCreated }: { config: ChatConfig | nul
         <label className="block">
           <span className="mono muted block text-[0.62rem]">Artista</span>
           <input className="input !py-1.5" value={artist} maxLength={100} onChange={(e) => setArtist(e.target.value)} placeholder="Opcional" />
+        </label>
+        <label className="block">
+          <span className="mono muted flex justify-between text-[0.62rem]">
+            <span>Comentario (opcional)</span>
+            <span>{note.length}/100</span>
+          </span>
+          <input className="input !py-1.5" value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} placeholder="Ej.: dedicada a mi novia 💜" />
         </label>
         {msg && (
           <p role={msg.ok ? "status" : "alert"} className={`mono text-[0.68rem] ${msg.ok ? "text-accent-ink" : "text-[#ff8a8a]"}`}>
@@ -315,6 +345,7 @@ function RequestsTab({ config, requests, onCreated }: { config: ChatConfig | nul
                 {r.artist ? `${r.artist} · ` : ""}
                 {r.nickname}
               </span>
+              {r.note && <span className="block truncate text-[0.72rem] italic text-muted">“{r.note}”</span>}
             </span>
             <span className={r.status === "played" ? "badge badge-ok" : "badge"}>{STATUS_LABEL[r.status]}</span>
           </li>

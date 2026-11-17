@@ -94,6 +94,7 @@ export function RequestsPanel({ feed, refresh, onSearch }: { feed: DeskFeed; ref
                 {r.artist ? `${r.artist} · ` : ""}
                 pide {r.nickname} · {hhmm(r.createdAt)}
               </p>
+              {r.note && <p className="mt-0.5 text-[0.8rem] italic text-accent-ink">“{r.note}”</p>}
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <button type="button" className="btn !px-2.5 !py-0.5 !text-[0.7rem]" onClick={() => onSearch(`${r.title}${r.artist ? ` ${r.artist}` : ""}`)}>
                   Buscar en la biblioteca
@@ -145,7 +146,15 @@ export function ChatModPanel({ feed, refresh, dropMessage }: { feed: DeskFeed; r
           <div key={m.id} className="desk-chat-msg">
             <div className="min-w-0 flex-1">
               <span className="font-bold">{m.nickname}</span> <time className="mono muted text-[0.6rem]">{hhmm(m.at)}</time>
-              {m.body && <p className="text-[0.86rem] leading-snug [overflow-wrap:anywhere]">{m.body}</p>}
+              {m.kind === "request" ? (
+                <p className="text-[0.86rem] leading-snug [overflow-wrap:anywhere]">
+                  <span className="text-accent-ink">🎵 pidió</span> <strong>{m.body}</strong>
+                  {m.artist ? ` — ${m.artist}` : ""}
+                  {m.note && <span className="block italic text-muted">“{m.note}”</span>}
+                </p>
+              ) : (
+                m.body && <p className="text-[0.86rem] leading-snug [overflow-wrap:anywhere]">{m.body}</p>
+              )}
               {m.gif && gifByKey(m.gif) && (
                 // eslint-disable-next-line @next/next/no-img-element -- GIF propio de /public
                 <img src={gifByKey(m.gif)!.src} alt={gifByKey(m.gif)!.label} width={56} height={56} className="mt-1 rounded-md" />
