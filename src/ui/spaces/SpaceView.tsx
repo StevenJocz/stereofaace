@@ -193,7 +193,7 @@ export function SpaceView({ space, preview = false, viewerIsStaff = false }: { s
 
   return (
     <div className="space" style={vars} data-preview={preview || undefined}>
-      <header className="space-cover" style={space.coverUrl ? ({ ["--sp-cover" as string]: `url("${space.coverUrl}")` } as CSSProperties) : undefined} data-has-cover={Boolean(space.coverUrl)}>
+      <header className="space-cover" style={space.coverUrl ? ({ ["--sp-cover" as string]: `url("${space.coverUrl}")` } as CSSProperties) : undefined} data-has-cover={Boolean(space.coverUrl)} data-preset={!space.coverUrl && d.cover ? d.cover : undefined}>
         <div className="space-cover-fade" aria-hidden="true" />
       </header>
 

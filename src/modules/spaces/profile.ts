@@ -107,7 +107,7 @@ export async function getMySpace(db: Db, userId: string): Promise<MySpace> {
     assets: assetRows.map((a) => ({ id: a.id, kind: a.kind, url: assetUrl(a.storageKey), alt: a.alt })),
     avatarUrl: url(p.avatarAssetId),
     coverUrl: url(p.coverAssetId),
-    options: { genres: genreOptions, themes: themes.map((t) => ({ slug: t.slug, name: t.name, description: t.description, design: t.design })) },
+    options: { genres: genreOptions, themes: themes.map((t) => ({ slug: t.slug, name: t.name, description: t.description, design: normalizeDesign(t.design) })) },
   };
 }
 

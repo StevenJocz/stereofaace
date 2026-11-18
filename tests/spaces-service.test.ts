@@ -50,9 +50,9 @@ afterAll(async () => {
 });
 
 describe("datos base", () => {
-  it("hay cinco plantillas y géneros elegibles tras el seed, y el seed es idempotente", async () => {
+  it("hay veinte plantillas y géneros elegibles tras el seed, y el seed es idempotente", async () => {
     await seedBase(h.db);
-    expect(await h.db.select().from(spaceThemes)).toHaveLength(5);
+    expect(await h.db.select().from(spaceThemes)).toHaveLength(20);
     expect((await h.db.select().from(spaceGenreOptions)).length).toBeGreaterThanOrEqual(12);
   });
 });
@@ -361,8 +361,8 @@ describe("reportes y moderación", () => {
     await addGenreOption(h.db, admin, { slug: "dub-techno", name: "Dub Techno" });
     await expect(addGenreOption(h.db, admin, { slug: "dub-techno", name: "x" })).rejects.toMatchObject({ code: "genre_exists" });
     const themes = await h.db.select().from(spaceThemes);
-    for (const t of themes.slice(0, 4)) await setThemeActive(h.db, admin, t.id, false);
-    await expect(setThemeActive(h.db, admin, themes[4].id, false)).rejects.toMatchObject({ code: "last_theme" });
+    for (const t of themes.slice(0, themes.length - 1)) await setThemeActive(h.db, admin, t.id, false);
+    await expect(setThemeActive(h.db, admin, themes[themes.length - 1].id, false)).rejects.toMatchObject({ code: "last_theme" });
     for (const t of themes) await setThemeActive(h.db, admin, t.id, true);
   });
 });

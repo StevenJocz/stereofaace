@@ -4050,3 +4050,99 @@ body[data-radio="on"] .adm-shell {
   font-size: 0.72rem;
   opacity: 0.75;
 }
+
+/* Portadas prediseñadas de los Spaces: solo CSS fijo; usan los colores del diseño. */
+.space-cover[data-preset="topo"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 200' fill='none' stroke='rgba(255,255,255,.32)' stroke-width='0.8'%3E%3Cpath d=%22M0 6.2 L10 11.3 L20 15.1 L30 16.8 L40 16.3 L50 14.4 L60 12.1 L70 10.5 L80 10.1 L90 10.9 L100 11.9 L110 12.1 L120 10.8 L130 7.5 L140 2.9 L150 -1.8 L160 -5.4 L170 -6.9 L180 -5.9 L190 -3.0 L200 0.7 L210 4.0 L220 6.1 L230 6.7 L240 6.2 L250 5.8 L260 6.4 L270 8.5 L280 11.8 L290 15.5 L300 18.4 L310 19.4 L320 17.9 L330 14.3 L340 9.6 L350 5.0 L360 1.8 L370 0.4 L380 0.6 L390 1.6 L400 2.4 L410 2.0 L420 0.4 L430 -1.9 L440 -3.8 L450 -4.3 L460 -2.6 L470 1.2 L480 6.2%22/%3E%3Cpath d=%22M0 19.4 L10 24.2 L20 28.6 L30 31.4 L40 31.9 L50 30.0 L60 26.6 L70 22.8 L80 19.7 L90 18.2 L100 18.0 L110 18.6 L120 18.7 L130 17.7 L140 15.2 L150 11.7 L160 8.2 L170 6.0 L180 6.0 L190 8.4 L200 12.6 L210 17.5 L220 21.8 L230 24.4 L240 25.1 L250 24.4 L260 23.3 L270 22.8 L280 23.5 L290 25.3 L300 27.5 L310 28.9 L320 28.6 L330 26.1 L340 21.7 L350 16.5 L360 11.7 L370 8.7 L380 7.9 L390 9.1 L400 11.4 L410 13.7 L420 14.9 L430 14.9 L440 14.0 L450 13.2 L460 13.5 L470 15.6 L480 19.4%22/%3E%3Cpath d=%22M0 33.3 L10 36.2 L20 39.7 L30 42.8 L40 44.2 L50 43.2 L60 40.0 L70 35.3 L80 30.4 L90 26.7 L100 24.8 L110 24.7 L120 25.7 L130 26.8 L140 27.0 L150 26.0 L160 24.0 L170 22.0 L180 21.2 L190 22.4 L200 25.7 L210 30.6 L220 35.8 L230 39.9 L240 42.1 L250 42.0 L260 40.2 L270 37.7 L280 35.6 L290 34.7 L300 35.1 L310 36.0 L320 36.5 L330 35.5 L340 32.8 L350 28.6 L360 23.9 L370 20.0 L380 18.0 L390 18.5 L400 21.2 L410 25.0 L420 28.8 L430 31.3 L440 32.4 L450 32.2 L460 31.7 L470 31.8 L480 33.3%22/%3E%3Cpath d=%22M0 48.1 L10 48.3 L20 49.6 L30 51.6 L40 53.2 L50 53.3 L60 51.3 L70 47.3 L80 42.1 L90 37.2 L100 33.7 L110 32.4 L120 33.3 L130 35.6 L140 38.2 L150 40.0 L160 40.5 L170 39.9 L180 39.1 L190 39.1 L200 40.6 L210 44.0 L220 48.5 L230 53.0 L240 56.2 L250 57.1 L260 55.6 L270 52.3 L280 48.3 L290 44.8 L300 42.7 L310 42.2 L320 42.6 L330 43.1 L340 42.5 L350 40.5 L360 37.4 L370 34.0 L380 31.5 L390 31.0 L400 33.0 L410 36.9 L420 41.9 L430 46.5 L440 49.6 L450 50.8 L460 50.3 L470 49.1 L480 48.1%22/%3E%3Cpath d=%22M0 63.4 L10 60.9 L20 59.5 L30 59.3 L40 60.1 L50 60.7 L60 60.2 L70 58.0 L80 54.2 L90 49.6 L100 45.5 L110 43.1 L120 43.1 L130 45.5 L140 49.3 L150 53.3 L160 56.5 L170 58.0 L180 58.1 L190 57.5 L200 57.3 L210 58.3 L220 60.7 L230 64.0 L240 67.1 L250 68.8 L260 68.4 L270 65.5 L280 61.0 L290 56.0 L300 51.8 L310 49.4 L320 48.9 L330 49.8 L340 51.2 L350 51.9 L360 51.4 L370 49.8 L380 47.9 L390 46.8 L400 47.5 L410 50.3 L420 54.9 L430 60.1 L440 64.6 L450 67.3 L460 67.7 L470 66.0 L480 63.4%22/%3E%3Cpath d=%22M0 78.1 L10 73.9 L20 70.1 L30 67.4 L40 66.4 L50 66.7 L60 67.3 L70 67.2 L80 65.8 L90 63.0 L100 59.8 L110 57.1 L120 56.2 L130 57.7 L140 61.3 L150 66.2 L160 71.1 L170 74.7 L180 76.4 L190 76.2 L200 74.9 L210 73.6 L220 73.2 L230 74.1 L240 75.8 L250 77.4 L260 77.9 L270 76.3 L280 72.8 L290 67.8 L300 62.7 L310 58.9 L320 57.1 L330 57.6 L340 59.8 L350 62.6 L360 64.9 L370 66.0 L380 65.8 L390 65.0 L400 64.7 L410 65.8 L420 68.6 L430 72.8 L440 77.3 L450 80.8 L460 82.2 L470 81.2 L480 78.1%22/%3E%3Cpath d=%22M0 91.0 L10 86.7 L20 81.6 L30 77.0 L40 74.1 L50 73.2 L60 73.9 L70 75.4 L80 76.6 L90 76.6 L100 75.5 L110 73.8 L120 72.5 L130 72.8 L140 75.1 L150 79.3 L160 84.4 L170 89.2 L180 92.3 L190 93.2 L200 91.9 L210 89.2 L220 86.3 L230 84.3 L240 83.7 L250 84.1 L260 84.8 L270 84.7 L280 83.0 L290 79.7 L300 75.3 L310 71.1 L320 68.3 L330 67.9 L340 69.8 L350 73.6 L360 77.8 L370 81.4 L380 83.5 L390 84.0 L400 83.5 L410 83.0 L420 83.4 L430 85.3 L440 88.2 L450 91.3 L460 93.3 L470 93.3 L480 91.0%22/%3E%3Cpath d=%22M0 101.3 L10 98.2 L20 93.5 L30 88.4 L40 84.1 L50 81.9 L60 81.9 L70 84.0 L80 87.0 L90 89.7 L100 91.3 L110 91.5 L120 90.9 L130 90.5 L140 91.1 L150 93.4 L160 97.2 L170 101.5 L180 105.3 L190 107.1 L200 106.6 L210 103.8 L220 99.6 L230 95.4 L240 92.3 L250 90.8 L260 90.8 L270 91.4 L280 91.7 L290 90.8 L300 88.6 L310 85.6 L320 82.8 L330 81.6 L340 82.5 L350 85.7 L360 90.5 L370 95.6 L380 99.7 L390 101.8 L400 102.0 L410 100.8 L420 99.2 L430 98.3 L440 98.6 L450 100.0 L460 101.6 L470 102.3 L480 101.3%22/%3E%3Cpath d=%22M0 109.1 L10 107.9 L20 105.1 L30 101.0 L40 96.8 L50 93.7 L60 92.8 L70 94.3 L80 97.8 L90 102.2 L100 106.2 L110 108.9 L120 109.8 L130 109.4 L140 108.7 L150 108.7 L160 110.0 L170 112.5 L180 115.5 L190 117.7 L200 118.2 L210 116.3 L220 112.3 L230 107.2 L240 102.4 L250 98.9 L260 97.5 L270 98.0 L280 99.6 L290 101.2 L300 101.8 L310 101.1 L320 99.6 L330 98.3 L340 98.2 L350 100.0 L360 103.8 L370 108.8 L380 113.7 L390 117.2 L400 118.6 L410 117.6 L420 115.0 L430 111.9 L440 109.4 L450 108.2 L460 108.3 L470 108.9 L480 109.1%22/%3E%3Cpath d=%22M0 115.5 L10 116.1 L20 115.7 L30 114.0 L40 111.4 L50 108.6 L60 107.0 L70 107.5 L80 110.3 L90 114.8 L100 120.0 L110 124.5 L120 127.2 L130 127.8 L140 126.7 L150 124.9 L160 123.5 L170 123.3 L180 124.2 L190 125.7 L200 126.6 L210 126.0 L220 123.4 L230 119.1 L240 114.0 L250 109.5 L260 106.8 L270 106.4 L280 108.2 L290 111.2 L300 114.3 L310 116.5 L320 117.2 L330 116.9 L340 116.3 L350 116.5 L360 118.3 L370 121.6 L380 125.8 L390 129.6 L400 131.9 L410 131.9 L420 129.4 L430 125.4 L440 120.9 L450 117.3 L460 115.2 L470 114.9 L480 115.5%22/%3E%3Cpath d=%22M0 122.2 L10 123.8 L20 125.6 L30 126.7 L40 126.6 L50 125.5 L60 124.2 L70 123.7 L80 125.1 L90 128.4 L100 133.1 L110 138.1 L120 142.0 L130 143.8 L140 143.3 L150 140.8 L160 137.5 L170 134.5 L180 132.8 L190 132.5 L200 133.0 L210 133.4 L220 132.6 L230 130.3 L240 126.7 L250 122.5 L260 119.2 L270 117.8 L280 118.9 L290 122.1 L300 126.6 L310 130.9 L320 134.1 L330 135.5 L340 135.3 L350 134.6 L360 134.1 L370 134.9 L380 136.9 L390 139.7 L400 142.0 L410 142.9 L420 141.5 L430 137.9 L440 132.9 L450 127.8 L460 123.9 L470 122.0 L480 122.2%22/%3E%3Cpath d=%22M0 131.0 L10 132.4 L20 135.5 L30 138.9 L40 141.5 L50 142.8 L60 142.8 L70 142.2 L80 142.1 L90 143.4 L100 146.2 L110 150.1 L120 154.0 L130 156.6 L140 157.0 L150 155.0 L160 151.1 L170 146.5 L180 142.4 L190 139.8 L200 139.1 L210 139.6 L220 140.4 L230 140.5 L240 139.4 L250 137.1 L260 134.4 L270 132.6 L280 132.6 L290 134.9 L300 139.2 L310 144.4 L320 149.2 L330 152.3 L340 153.4 L350 152.6 L360 150.7 L370 148.9 L380 148.1 L390 148.5 L400 149.8 L410 150.8 L420 150.6 L430 148.6 L440 144.7 L450 139.7 L460 135.0 L470 131.9 L480 131.0%22/%3E%3Cpath d=%22M0 143.0 L10 143.6 L20 146.5 L30 150.9 L40 155.5 L50 159.1 L60 161.0 L70 161.2 L80 160.4 L90 159.7 L100 159.9 L110 161.4 L120 163.9 L130 166.2 L140 167.4 L150 166.5 L160 163.4 L170 158.6 L180 153.4 L190 149.1 L200 146.7 L210 146.5 L220 147.9 L230 150.0 L240 151.6 L250 152.0 L260 151.3 L270 150.1 L280 149.4 L290 150.3 L300 153.0 L310 157.4 L320 162.4 L330 166.6 L340 168.9 L350 168.8 L360 166.6 L370 163.2 L380 159.8 L390 157.5 L400 156.7 L410 157.0 L420 157.5 L430 157.2 L440 155.5 L450 152.2 L460 148.3 L470 144.8 L480 143.0%22/%3E%3Cpath d=%22M0 158.3 L10 157.9 L20 159.7 L30 163.6 L40 168.7 L50 173.7 L60 177.4 L70 178.9 L80 178.4 L90 176.5 L100 174.4 L110 173.0 L120 172.9 L130 173.9 L140 175.0 L150 175.1 L160 173.6 L170 170.1 L180 165.4 L190 160.6 L200 157.1 L210 155.7 L220 156.8 L230 159.7 L240 163.3 L250 166.4 L260 168.2 L270 168.6 L280 168.2 L290 167.8 L300 168.6 L310 170.8 L320 174.4 L330 178.2 L340 181.1 L350 182.0 L360 180.5 L370 176.8 L380 172.1 L390 167.7 L400 164.6 L410 163.3 L420 163.6 L430 164.6 L440 165.2 L450 164.6 L460 162.7 L470 160.3 L480 158.3%22/%3E%3Cpath d=%22M0 176.0 L10 175.2 L20 175.6 L30 177.9 L40 181.8 L50 186.7 L60 191.1 L70 193.8 L80 194.2 L90 192.3 L100 188.9 L110 185.3 L120 182.5 L130 181.1 L140 181.1 L150 181.7 L160 181.7 L170 180.5 L180 177.7 L190 174.0 L200 170.5 L210 168.3 L220 168.4 L230 170.9 L240 175.1 L250 180.0 L260 184.0 L270 186.5 L280 187.1 L290 186.4 L300 185.4 L310 185.1 L320 186.0 L330 188.1 L340 190.4 L350 191.8 L360 191.4 L370 188.7 L380 184.3 L390 179.0 L400 174.4 L410 171.5 L420 170.8 L430 172.0 L440 174.2 L450 176.3 L460 177.3 L470 177.0 L480 176.0%22/%3E%3Cpath d=%22M0 194.4 L10 194.1 L20 193.6 L30 193.9 L40 195.6 L50 198.7 L60 202.4 L70 205.5 L80 206.8 L90 205.8 L100 202.5 L110 197.8 L120 193.1 L130 189.5 L140 187.7 L150 187.7 L160 188.7 L170 189.7 L180 189.6 L190 188.3 L200 186.1 L210 184.1 L220 183.3 L230 184.6 L240 188.1 L250 193.0 L260 198.2 L270 202.3 L280 204.3 L290 204.1 L300 202.3 L310 200.0 L320 198.1 L330 197.5 L340 198.0 L350 199.0 L360 199.5 L370 198.4 L380 195.5 L390 191.1 L400 186.3 L410 182.5 L420 180.6 L430 181.2 L440 183.9 L450 187.6 L460 191.2 L470 193.5 L480 194.4%22/%3E%3C/svg%3E"), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: 520px 217px, cover;
+  background-position: center;
+}
+.space-cover[data-preset="grid"] {
+  background-image: linear-gradient(color-mix(in srgb, var(--sp-primary) 24%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--sp-primary) 24%, transparent) 1px, transparent 1px), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: 36px 36px, 36px 36px, cover;
+  background-position: center;
+}
+.space-cover[data-preset="rings"] {
+  background-image: repeating-radial-gradient(circle at 78% 130%, transparent 0 16px, color-mix(in srgb, var(--sp-primary) 30%, transparent) 16px 18px), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: cover;
+  background-position: center;
+}
+.space-cover[data-preset="stripes"] {
+  background-image: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--sp-primary) 42%, transparent) 0 12px, transparent 12px 26px), linear-gradient(135deg, var(--sp-bg), color-mix(in srgb, var(--sp-primary) 10%, var(--sp-bg)));
+  background-size: cover;
+  background-position: center;
+}
+.space-cover[data-preset="sunset"] {
+  background-image: linear-gradient(180deg, transparent 50%, var(--sp-bg) 50% 54%, transparent 54% 62%, var(--sp-bg) 62% 67%, transparent 67% 75%, var(--sp-bg) 75% 81%, transparent 81% 89%, var(--sp-bg) 89% 96%, transparent 96%), radial-gradient(circle at 50% 112%, color-mix(in srgb, var(--sp-secondary) 92%, transparent) 0 36%, transparent 36.5%), linear-gradient(180deg, var(--sp-bg), color-mix(in srgb, var(--sp-primary) 28%, var(--sp-bg)));
+  background-size: cover;
+  background-position: center;
+}
+.space-cover[data-preset="dots"] {
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--sp-primary) 40%, transparent) 1.6px, transparent 2.2px), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: 13px 13px, cover;
+  background-position: center;
+}
+.space-cover[data-preset="waves"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 120' fill='none' stroke='rgba(255,255,255,.30)' stroke-width='1.2'%3E%3Cpath d=%22M0 8.6 L10 13.9 L20 18.6 L30 21.8 L40 23.5 L50 23.4 L60 22.1 L70 20.0 L80 17.8 L90 16.2 L100 15.6 L110 16.2 L120 17.8 L130 20.0 L140 22.1 L150 23.4 L160 23.5 L170 21.8 L180 18.6 L190 13.9 L200 8.6 L210 3.2 L220 -1.4 L230 -4.7 L240 -6.3 L250 -6.3 L260 -4.9 L270 -2.8 L280 -0.6 L290 1.0 L300 1.6 L310 1.0 L320 -0.6 L330 -2.8 L340 -4.9 L350 -6.3 L360 -6.3 L370 -4.7 L380 -1.4 L390 3.2 L400 8.6%22/%3E%3Cpath d=%22M0 28.2 L10 31.7 L20 35.9 L30 40.2 L40 43.8 L50 46.1 L60 46.7 L70 45.4 L80 42.4 L90 38.3 L100 33.8 L110 29.6 L120 26.3 L130 24.3 L140 23.7 L150 24.2 L160 25.2 L170 26.1 L180 26.4 L190 25.5 L200 23.2 L210 19.7 L220 15.5 L230 11.3 L240 7.6 L250 5.3 L260 4.8 L270 6.1 L280 9.0 L290 13.1 L300 17.6 L310 21.8 L320 25.1 L330 27.1 L340 27.7 L350 27.3 L360 26.3 L370 25.3 L380 25.1 L390 26.0 L400 28.2%22/%3E%3Cpath d=%22M0 51.8 L10 50.3 L20 49.8 L30 50.5 L40 52.1 L50 54.1 L60 55.9 L70 56.8 L80 56.3 L90 54.1 L100 50.3 L110 45.4 L120 39.9 L130 34.7 L140 30.5 L150 27.8 L160 26.8 L170 27.4 L180 29.2 L190 31.6 L200 33.9 L210 35.5 L220 35.9 L230 35.2 L240 33.6 L250 31.6 L260 29.8 L270 28.9 L280 29.4 L290 31.6 L300 35.4 L310 40.3 L320 45.8 L330 51.0 L340 55.2 L350 57.9 L360 58.9 L370 58.3 L380 56.5 L390 54.1 L400 51.8%22/%3E%3Cpath d=%22M0 75.0 L10 70.5 L20 65.9 L30 61.7 L40 58.7 L50 57.0 L60 56.7 L70 57.3 L80 58.4 L90 59.3 L100 59.3 L110 58.1 L120 55.6 L130 52.1 L140 48.0 L150 44.0 L160 40.9 L170 39.3 L180 39.5 L190 41.5 L200 45.0 L210 49.5 L220 54.1 L230 58.3 L240 61.3 L250 63.0 L260 63.3 L270 62.7 L280 61.6 L290 60.7 L300 60.7 L310 61.9 L320 64.4 L330 67.9 L340 72.0 L350 76.0 L360 79.1 L370 80.7 L380 80.5 L390 78.5 L400 75.0%22/%3E%3Cpath d=%22M0 88.8 L10 86.1 L20 81.9 L30 76.8 L40 71.3 L50 66.4 L60 62.7 L70 60.6 L80 60.2 L90 61.4 L100 63.6 L110 66.3 L120 68.6 L130 70.1 L140 70.5 L150 69.7 L160 68.1 L170 66.2 L180 64.8 L190 64.4 L200 65.5 L210 68.2 L220 72.4 L230 77.5 L240 82.9 L250 87.9 L260 91.6 L270 93.7 L280 94.1 L290 92.9 L300 90.7 L310 88.0 L320 85.7 L330 84.2 L340 83.8 L350 84.6 L360 86.2 L370 88.1 L380 89.5 L390 89.9 L400 88.8%22/%3E%3Cpath d=%22M0 91.7 L10 92.4 L20 92.3 L30 90.8 L40 88.2 L50 84.6 L60 80.7 L70 77.1 L80 74.6 L90 73.6 L100 74.6 L110 77.3 L120 81.3 L130 86.1 L140 90.8 L150 94.8 L160 97.6 L170 98.9 L180 98.9 L190 98.0 L200 96.9 L210 96.1 L220 96.3 L230 97.7 L240 100.4 L250 104.0 L260 107.9 L270 111.5 L280 114.0 L290 114.9 L300 114.0 L310 111.3 L320 107.3 L330 102.5 L340 97.8 L350 93.8 L360 91.0 L370 89.7 L380 89.7 L390 90.5 L400 91.7%22/%3E%3Cpath d=%22M0 93.9 L10 95.7 L20 98.3 L30 101.1 L40 103.5 L50 104.9 L60 105.2 L70 104.3 L80 102.7 L90 101.1 L100 100.0 L110 100.1 L120 101.7 L130 104.9 L140 109.4 L150 114.7 L160 120.0 L170 124.5 L180 127.7 L190 129.2 L200 128.9 L210 127.2 L220 124.6 L230 121.7 L240 119.3 L250 117.9 L260 117.7 L270 118.6 L280 120.1 L290 121.8 L300 122.9 L310 122.8 L320 121.2 L330 117.9 L340 113.4 L350 108.2 L360 102.9 L370 98.3 L380 95.1 L390 93.7 L400 93.9%22/%3E%3C/svg%3E"), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: 360px 108px, cover;
+  background-position: center;
+}
+.space-cover[data-preset="beams"] {
+  background-image: repeating-conic-gradient(from 0deg at 50% 125%, color-mix(in srgb, var(--sp-primary) 20%, transparent) 0 5deg, transparent 5deg 12deg), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: cover;
+  background-position: center;
+}
+.space-cover[data-preset="scan"] {
+  background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.34) 0 2px, transparent 2px 4px), radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--sp-primary) 34%, transparent), transparent 70%), linear-gradient(var(--sp-bg), var(--sp-bg));
+  background-size: cover;
+  background-position: center;
+}
+.space-cover[data-preset="aurora"] {
+  background-image: radial-gradient(60% 100% at 18% 15%, color-mix(in srgb, var(--sp-primary) 60%, transparent), transparent), radial-gradient(55% 90% at 82% 80%, color-mix(in srgb, var(--sp-secondary) 55%, transparent), transparent), linear-gradient(var(--sp-bg), var(--sp-bg));
+  background-size: cover;
+  background-position: center;
+}
+.space-cover[data-preset="checker"] {
+  background-image: conic-gradient(color-mix(in srgb, var(--sp-primary) 20%, transparent) 25%, transparent 0 50%, color-mix(in srgb, var(--sp-primary) 20%, transparent) 0 75%, transparent 0), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: 44px 44px, cover;
+  background-position: center;
+}
+.space-cover[data-preset="bars"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 100' fill='rgba(255,255,255,.18)'%3E%3Crect x='1' y='70' width='5' height='30'/%3E%3Crect x='9' y='48' width='5' height='52'/%3E%3Crect x='17' y='60' width='5' height='40'/%3E%3Crect x='25' y='30' width='5' height='70'/%3E%3Crect x='33' y='42' width='5' height='58'/%3E%3Crect x='41' y='14' width='5' height='86'/%3E%3Crect x='49' y='56' width='5' height='44'/%3E%3Crect x='57' y='36' width='5' height='64'/%3E%3Crect x='65' y='64' width='5' height='36'/%3E%3Crect x='73' y='24' width='5' height='76'/%3E%3Crect x='81' y='50' width='5' height='50'/%3E%3Crect x='89' y='10' width='5' height='90'/%3E%3Crect x='97' y='40' width='5' height='60'/%3E%3Crect x='105' y='58' width='5' height='42'/%3E%3Crect x='113' y='28' width='5' height='72'/%3E%3Crect x='121' y='66' width='5' height='34'/%3E%3C/svg%3E"), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: 170px 133px, cover;
+  background-position: center;
+}
+.space-cover[data-preset="noise"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E"), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: 160px 160px, cover;
+  background-position: center;
+}
+.space-cover[data-preset="diamonds"] {
+  background-image: repeating-linear-gradient(45deg, color-mix(in srgb, var(--sp-primary) 32%, transparent) 0 1px, transparent 1px 22px), repeating-linear-gradient(-45deg, color-mix(in srgb, var(--sp-primary) 32%, transparent) 0 1px, transparent 1px 22px), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+  background-size: cover;
+  background-position: center;
+}
+.space-cover[data-preset="spot"] {
+  background-image: radial-gradient(ellipse 22% 130% at 18% -15%, color-mix(in srgb, var(--sp-primary) 55%, transparent), transparent), radial-gradient(ellipse 22% 130% at 50% -15%, color-mix(in srgb, var(--sp-secondary) 55%, transparent), transparent), radial-gradient(ellipse 22% 130% at 82% -15%, color-mix(in srgb, var(--sp-primary) 55%, transparent), transparent), linear-gradient(var(--sp-bg), var(--sp-bg));
+  background-size: cover;
+  background-position: center;
+}
+.space-cover[data-preset="topo"],
+.space-cover[data-preset="waves"],
+.space-cover[data-preset="bars"],
+.space-cover[data-preset="noise"] {
+  background-repeat: repeat, no-repeat;
+}
+.space-cover[data-preset="grid"] {
+  background-repeat: repeat, repeat, no-repeat;
+}
+.space-cover[data-preset="dots"] {
+  background-repeat: repeat, no-repeat;
+}
+.space-cover.space-cover-mini {
+  display: block;
+  height: 2.2rem;
+  margin-top: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}

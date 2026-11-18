@@ -4,6 +4,7 @@ const blocks = (hidden: string[] = []): SpaceDesign["blocks"] => BLOCK_IDS.map((
 
 const base = (over: Partial<SpaceDesign> & Pick<SpaceDesign, "theme" | "colors">): SpaceDesign => ({
   v: 1,
+  cover: null,
   cardOpacity: 85,
   border: { width: 1, radius: 14, color: "#2e2e36" },
   background: { kind: "gradient", gradient: "noche", assetId: null, position: "center", size: "cover", fixed: true, overlay: 40 },
@@ -15,14 +16,19 @@ const base = (over: Partial<SpaceDesign> & Pick<SpaceDesign, "theme" | "colors">
   ...over,
 });
 
-/** Las cinco plantillas iniciales de StereoFace Spaces. La persona puede modificarlas después. */
-export const DEFAULT_THEMES: { slug: string; name: string; description: string; design: SpaceDesign }[] = [
+/** Las 20 plantillas de StereoFace Spaces (cada una con su portada prediseñada). La persona puede modificarlas después. */
+type ThemeDef = { slug: string; name: string; description: string; design: SpaceDesign };
+const g = (gradient: SpaceDesign["background"]["gradient"], fixed = true): SpaceDesign["background"] => ({ kind: "gradient", gradient, assetId: null, position: "center", size: "cover", fixed, overlay: 40 });
+const solid = (): SpaceDesign["background"] => ({ kind: "color", gradient: "noche", assetId: null, position: "center", size: "cover", fixed: false, overlay: 40 });
+
+export const DEFAULT_THEMES: ThemeDef[] = [
   {
     slug: "underground-techno",
     name: "Underground Techno",
     description: "Negro, gris y acentos industriales.",
     design: base({
       theme: "underground-techno",
+      cover: "topo",
       colors: { bg: "#0b0b0c", primary: "#c6ff00", secondary: "#8a8a92", text: "#efefea", link: "#c6ff00", card: "#141416" },
       border: { width: 1, radius: 4, color: "#3a3a40" },
       background: { kind: "gradient", gradient: "industrial", assetId: null, position: "center", size: "cover", fixed: true, overlay: 40 },
@@ -35,6 +41,7 @@ export const DEFAULT_THEMES: { slug: string; name: string; description: string; 
     description: "Negro, violeta y efectos neón.",
     design: base({
       theme: "neon-rave",
+      cover: "beams",
       colors: { bg: "#08050f", primary: "#c04cff", secondary: "#ff3dbd", text: "#f4ecff", link: "#ff7ad9", card: "#150a26" },
       cardOpacity: 80,
       border: { width: 1, radius: 16, color: "#6a2fb0" },
@@ -48,6 +55,7 @@ export const DEFAULT_THEMES: { slug: string; name: string; description: string; 
     description: "Estética editorial, texturas y colores alternativos.",
     design: base({
       theme: "indie-alternative",
+      cover: "noise",
       colors: { bg: "#1b1214", primary: "#f2a65a", secondary: "#c97b84", text: "#f7efe6", link: "#f2a65a", card: "#2a1c1f" },
       border: { width: 1, radius: 10, color: "#5a3a3f" },
       background: { kind: "gradient", gradient: "amanecer", assetId: null, position: "center", size: "cover", fixed: false, overlay: 40 },
@@ -60,6 +68,7 @@ export const DEFAULT_THEMES: { slug: string; name: string; description: string; 
     description: "Colores ácidos y estética rave.",
     design: base({
       theme: "acid-house",
+      cover: "stripes",
       colors: { bg: "#0c1200", primary: "#d4ff00", secondary: "#ff4d00", text: "#f6ffd6", link: "#d4ff00", card: "#18220a" },
       cardOpacity: 90,
       border: { width: 2, radius: 0, color: "#d4ff00" },
@@ -73,12 +82,221 @@ export const DEFAULT_THEMES: { slug: string; name: string; description: string; 
     description: "Diseño oscuro, elegante y minimalista.",
     design: base({
       theme: "minimal-dark",
+      cover: "waves",
       colors: { bg: "#0a0a0a", primary: "#e8e8e8", secondary: "#7a7a7a", text: "#e6e6e6", link: "#ffffff", card: "#121212" },
       cardOpacity: 70,
       border: { width: 1, radius: 12, color: "#262626" },
       background: { kind: "color", gradient: "noche", assetId: null, position: "center", size: "cover", fixed: false, overlay: 40 },
       font: { heading: "archivo", body: "archivo", scale: 100 },
       blocks: blocks(["quote", "musicinfo"]),
+    }),
+  },
+
+  {
+    slug: "synthwave-sunset",
+    name: "Synthwave Sunset",
+    description: "Atardecer retro, magenta y cian sobre violeta.",
+    design: base({
+      theme: "synthwave-sunset",
+      cover: "sunset",
+      colors: { bg: "#140a26", primary: "#00e5ff", secondary: "#ff2e93", text: "#f6eaff", link: "#5ff0ff", card: "#1f1040" },
+      border: { width: 1, radius: 10, color: "#ff2e93" },
+      background: g("ocaso"),
+      font: { heading: "archivo-wide", body: "sistema", scale: 100 },
+    }),
+  },
+  {
+    slug: "deep-house-night",
+    name: "Deep House Night",
+    description: "Noche azul profunda con aurora turquesa.",
+    design: base({
+      theme: "deep-house-night",
+      cover: "aurora",
+      colors: { bg: "#050d17", primary: "#2de2c8", secondary: "#3b82f6", text: "#e4f4f6", link: "#5eead4", card: "#0b1a2a" },
+      cardOpacity: 78,
+      border: { width: 1, radius: 18, color: "#1c4a63" },
+      background: solid(),
+      font: { heading: "archivo", body: "sistema", scale: 100 },
+    }),
+  },
+  {
+    slug: "post-punk-zine",
+    name: "Post-Punk Zine",
+    description: "Blanco, negro y rojo: fanzine fotocopiado.",
+    design: base({
+      theme: "post-punk-zine",
+      cover: "checker",
+      colors: { bg: "#0d0d0d", primary: "#ff2a2a", secondary: "#f2f2f2", text: "#f5f5f5", link: "#ff5a5a", card: "#1a1a1a" },
+      cardOpacity: 95,
+      border: { width: 2, radius: 0, color: "#f2f2f2" },
+      background: solid(),
+      font: { heading: "impacto", body: "mono", scale: 100 },
+    }),
+  },
+  {
+    slug: "shoegaze-dream",
+    name: "Shoegaze Dream",
+    description: "Niebla rosa y lavanda, sonido envolvente.",
+    design: base({
+      theme: "shoegaze-dream",
+      cover: "aurora",
+      colors: { bg: "#1a1124", primary: "#f4a6d7", secondary: "#a99cff", text: "#f8eefa", link: "#ffbde6", card: "#291a38" },
+      cardOpacity: 72,
+      border: { width: 1, radius: 24, color: "#6b4f8a" },
+      background: g("ocaso", false),
+      font: { heading: "serif", body: "serif", scale: 105 },
+    }),
+  },
+  {
+    slug: "dnb-jungle",
+    name: "Drum & Bass Jungle",
+    description: "Verde oscuro y naranja; ritmo de ecualizador.",
+    design: base({
+      theme: "dnb-jungle",
+      cover: "bars",
+      colors: { bg: "#07120b", primary: "#ff8a00", secondary: "#3ddc84", text: "#eaf7ee", link: "#ffa733", card: "#0f2216" },
+      border: { width: 2, radius: 6, color: "#ff8a00" },
+      background: solid(),
+      font: { heading: "impacto", body: "archivo", scale: 100 },
+    }),
+  },
+  {
+    slug: "trance-horizon",
+    name: "Trance Horizon",
+    description: "Rayos de luz azul sobre el horizonte.",
+    design: base({
+      theme: "trance-horizon",
+      cover: "beams",
+      colors: { bg: "#050a1c", primary: "#5aa9ff", secondary: "#b27cff", text: "#e8f0ff", link: "#8cc2ff", card: "#0c1535" },
+      cardOpacity: 80,
+      border: { width: 1, radius: 14, color: "#27408a" },
+      background: solid(),
+      font: { heading: "archivo-wide", body: "sistema", scale: 100 },
+    }),
+  },
+  {
+    slug: "ambient-mist",
+    name: "Ambient Mist",
+    description: "Ondas suaves, verdes grisáceos y calma.",
+    design: base({
+      theme: "ambient-mist",
+      cover: "waves",
+      colors: { bg: "#0d1514", primary: "#9fd8c8", secondary: "#7aa6b8", text: "#e6f0ee", link: "#b6e8da", card: "#14201f" },
+      cardOpacity: 68,
+      border: { width: 1, radius: 22, color: "#2c4442" },
+      background: solid(),
+      font: { heading: "serif", body: "sistema", scale: 105 },
+      blocks: blocks(["musicinfo"]),
+    }),
+  },
+  {
+    slug: "cyber-grid",
+    name: "Cyber Grid",
+    description: "Cuadrícula de neón cian y magenta.",
+    design: base({
+      theme: "cyber-grid",
+      cover: "grid",
+      colors: { bg: "#04070f", primary: "#00f0ff", secondary: "#ff3df2", text: "#e6fbff", link: "#4df4ff", card: "#0a1224" },
+      cardOpacity: 85,
+      border: { width: 1, radius: 2, color: "#00f0ff" },
+      background: solid(),
+      font: { heading: "mono", body: "mono", scale: 100 },
+    }),
+  },
+  {
+    slug: "vinyl-club",
+    name: "Vinyl Club",
+    description: "Surcos de vinilo, ámbar y madera.",
+    design: base({
+      theme: "vinyl-club",
+      cover: "rings",
+      colors: { bg: "#17110b", primary: "#f0a830", secondary: "#c0692b", text: "#f6ecdc", link: "#ffc15e", card: "#251a10" },
+      border: { width: 1, radius: 12, color: "#5a4025" },
+      background: g("amanecer", false),
+      font: { heading: "serif", body: "serif", scale: 105 },
+    }),
+  },
+  {
+    slug: "concreto",
+    name: "Concreto",
+    description: "Brutalista y claro: gris cemento y naranja.",
+    design: base({
+      theme: "concreto",
+      cover: "stripes",
+      colors: { bg: "#d8d8d2", primary: "#ff5a00", secondary: "#1a1a1a", text: "#111111", link: "#a83a00", card: "#ecece7" },
+      cardOpacity: 95,
+      border: { width: 3, radius: 0, color: "#111111" },
+      background: solid(),
+      font: { heading: "impacto", body: "archivo", scale: 100 },
+    }),
+  },
+  {
+    slug: "retro-disco",
+    name: "Retro Disco",
+    description: "Semitono dorado y magenta, noche de disco.",
+    design: base({
+      theme: "retro-disco",
+      cover: "dots",
+      colors: { bg: "#1a0b1c", primary: "#ffc233", secondary: "#ff3d8b", text: "#fff3e0", link: "#ffd466", card: "#2a1230" },
+      border: { width: 2, radius: 20, color: "#ffc233" },
+      background: g("ocaso"),
+      font: { heading: "archivo-wide", body: "sistema", scale: 100 },
+    }),
+  },
+  {
+    slug: "industrial-rust",
+    name: "Industrial Rust",
+    description: "Óxido, acero y líneas de escáner.",
+    design: base({
+      theme: "industrial-rust",
+      cover: "scan",
+      colors: { bg: "#120d0a", primary: "#e2672a", secondary: "#9a9a94", text: "#eee6df", link: "#ff8a4d", card: "#1c1511" },
+      cardOpacity: 90,
+      border: { width: 1, radius: 3, color: "#4a3a30" },
+      background: g("industrial"),
+      font: { heading: "impacto", body: "mono", scale: 100 },
+    }),
+  },
+  {
+    slug: "cosmic-dub",
+    name: "Cosmic Dub",
+    description: "Focos de escenario violeta y azul eléctrico.",
+    design: base({
+      theme: "cosmic-dub",
+      cover: "spot",
+      colors: { bg: "#0a0716", primary: "#8f6bff", secondary: "#3fd0ff", text: "#eee9ff", link: "#b49cff", card: "#150f2b" },
+      cardOpacity: 82,
+      border: { width: 1, radius: 16, color: "#3b2f7a" },
+      background: g("neon"),
+      font: { heading: "archivo", body: "sistema", scale: 100 },
+    }),
+  },
+  {
+    slug: "papel-indie",
+    name: "Papel Indie",
+    description: "Papel crema con grano, tinta oscura y rojo.",
+    design: base({
+      theme: "papel-indie",
+      cover: "noise",
+      colors: { bg: "#efe6d4", primary: "#c0392b", secondary: "#3a5a40", text: "#231a14", link: "#9b2a1f", card: "#f8f1e2" },
+      cardOpacity: 92,
+      border: { width: 1, radius: 4, color: "#b9a98c" },
+      background: solid(),
+      font: { heading: "serif", body: "serif", scale: 105 },
+    }),
+  },
+  {
+    slug: "magma-techno",
+    name: "Magma Techno",
+    description: "Curvas de nivel sobre negro y rojo lava.",
+    design: base({
+      theme: "magma-techno",
+      cover: "topo",
+      colors: { bg: "#0c0606", primary: "#ff3b1f", secondary: "#ffb199", text: "#f7e9e4", link: "#ff6b52", card: "#180d0c" },
+      cardOpacity: 88,
+      border: { width: 1, radius: 6, color: "#5a1f17" },
+      background: solid(),
+      font: { heading: "impacto", body: "archivo", scale: 100 },
     }),
   },
 ];

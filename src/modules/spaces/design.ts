@@ -29,6 +29,27 @@ export const GRADIENTS = [
 export type GradientId = (typeof GRADIENTS)[number]["id"];
 export const GRADIENT_IDS = GRADIENTS.map((g) => g.id) as [GradientId, ...GradientId[]];
 
+/** Portadas prediseñadas (CSS fijo del código: la persona solo elige el id; usan los colores de su diseño). */
+export const COVERS = [
+  { id: "topo", name: "Topográfica" },
+  { id: "grid", name: "Cuadrícula" },
+  { id: "rings", name: "Anillos" },
+  { id: "stripes", name: "Rayas" },
+  { id: "sunset", name: "Atardecer retro" },
+  { id: "dots", name: "Semitono" },
+  { id: "waves", name: "Ondas" },
+  { id: "beams", name: "Rayos" },
+  { id: "scan", name: "Escáner" },
+  { id: "aurora", name: "Aurora" },
+  { id: "checker", name: "Ajedrez" },
+  { id: "bars", name: "Ecualizador" },
+  { id: "noise", name: "Grano" },
+  { id: "diamonds", name: "Rombos" },
+  { id: "spot", name: "Focos de escenario" },
+] as const;
+export type CoverId = (typeof COVERS)[number]["id"];
+export const COVER_IDS = COVERS.map((c) => c.id) as [CoverId, ...CoverId[]];
+
 export const BLOCK_IDS = ["about", "genres", "artists", "player", "gallery", "links", "quote", "musicinfo"] as const;
 export type BlockId = (typeof BLOCK_IDS)[number];
 export const BLOCK_LABEL: Record<BlockId, string> = {
@@ -121,6 +142,8 @@ export const designSchema = z
     v: z.literal(1),
     theme: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(40),
     colors: z.object({ bg: hex, primary: hex, secondary: hex, text: hex, link: hex, card: hex }).strict(),
+    /** Portada prediseñada; se usa solo si la persona no subió una imagen de portada. */
+    cover: z.enum(COVER_IDS).nullable().default(null),
     cardOpacity: z.number().int().min(20).max(100),
     border: z.object({ width: z.number().int().min(0).max(4), radius: z.number().int().min(0).max(28), color: hex }).strict(),
     background: z
@@ -224,7 +247,7 @@ export function designVars(d: SpaceDesign, bgImageUrl: string | null): Record<st
 /** Diseños guardados antes de existir Spotify/YouTube no traen esos campos: se completan al leerlos. */
 export function normalizeDesign(d: SpaceDesign): SpaceDesign {
   const p = d.player as Partial<SpaceDesign["player"]>;
-  return { ...d, player: { ...d.player, spotify: p.spotify ?? { profile: null, playlist: null }, videos: p.videos ?? [] } };
+  return { ...d, cover: (d as Partial<SpaceDesign>).cover ?? null, player: { ...d.player, spotify: p.spotify ?? { profile: null, playlist: null }, videos: p.videos ?? [] } };
 }
 
 export function orderedBlocks(d: SpaceDesign, column: "main" | "side"): BlockId[] {

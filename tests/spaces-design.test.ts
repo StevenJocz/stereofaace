@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_THEMES } from "@/modules/spaces/defaults";
-import { BLOCK_IDS, contrast, designSchema, designVars, normalizeDesign, orderedBlocks, parseSpotify, parseYouTube, safeUrl, spotifyEmbedSrc, spotifyHref, youtubeEmbedSrc, type SpaceDesign } from "@/modules/spaces/design";
+import { BLOCK_IDS, COVER_IDS, contrast, designSchema, designVars, normalizeDesign, orderedBlocks, parseSpotify, parseYouTube, safeUrl, spotifyEmbedSrc, spotifyHref, youtubeEmbedSrc, type SpaceDesign } from "@/modules/spaces/design";
 
 const ok = () => structuredClone(DEFAULT_THEMES[0].design) as SpaceDesign;
 const bad = (mut: (d: Record<string, unknown>) => void) => {
@@ -10,9 +10,29 @@ const bad = (mut: (d: Record<string, unknown>) => void) => {
 };
 
 describe("plantillas iniciales", () => {
-  it("son cinco y todas pasan la validación (incluida la legibilidad)", () => {
-    expect(DEFAULT_THEMES.map((t) => t.slug)).toEqual(["underground-techno", "neon-rave", "indie-alternative", "acid-house", "minimal-dark"]);
-    for (const t of DEFAULT_THEMES) expect(designSchema.safeParse(t.design).success, t.slug).toBe(true);
+  it("son veinte, las cinco originales primero, y todas pasan la validación (incluida la legibilidad)", () => {
+    const slugs = DEFAULT_THEMES.map((t) => t.slug);
+    expect(slugs).toHaveLength(20);
+    expect(new Set(slugs).size).toBe(20);
+    expect(slugs.slice(0, 5)).toEqual(["underground-techno", "neon-rave", "indie-alternative", "acid-house", "minimal-dark"]);
+    for (const t of DEFAULT_THEMES) {
+      const r = designSchema.safeParse(t.design);
+      expect(r.success, `${t.slug}: ${r.success ? "" : r.error.message}`).toBe(true);
+      expect(t.design.theme, t.slug).toBe(t.slug);
+    }
+  });
+  it("cada plantilla trae una portada prediseñada válida y las portadas no se agotan en una sola", () => {
+    for (const t of DEFAULT_THEMES) expect(COVER_IDS, t.slug).toContain(t.design.cover);
+    expect(new Set(DEFAULT_THEMES.map((t) => t.design.cover)).size).toBeGreaterThanOrEqual(12);
+    expect(bad((d) => (d.cover = "url(javascript:alert(1))")).success).toBe(false);
+    expect(bad((d) => (d.cover = "no-existe")).success).toBe(false);
+    expect(bad((d) => (d.cover = null)).success).toBe(true);
+  });
+  it("un diseño guardado sin portada sigue siendo válido y se completa al leerlo", () => {
+    const old = ok() as unknown as Record<string, unknown>;
+    delete old.cover;
+    expect(designSchema.safeParse(old).success).toBe(true);
+    expect(normalizeDesign(old as unknown as SpaceDesign).cover).toBeNull();
   });
 });
 

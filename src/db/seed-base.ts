@@ -3,6 +3,7 @@
  * (`ON CONFLICT DO NOTHING`): se puede ejecutar en cada despliegue sin duplicar ni pisar cambios del administrador.
  * No contiene contenido de demostración.
  */
+import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "@/lib/db";
 import { categories, genres } from "@/modules/taxonomy/schema";
 import { pages } from "@/modules/content/schema";
@@ -77,4 +78,11 @@ export async function seedBase(db: Db): Promise<void> {
     .insert(spaceThemes)
     .values(DEFAULT_THEMES.map((t, position) => ({ slug: t.slug, name: t.name, description: t.description, design: t.design, position })))
     .onConflictDoNothing();
+  // Las plantillas que ya existían (editables por el administrador) reciben su portada prediseñada solo si aún no tienen ninguna.
+  for (const t of DEFAULT_THEMES) {
+    await db
+      .update(spaceThemes)
+      .set({ design: sql`${spaceThemes.design} || ${JSON.stringify({ cover: t.design.cover })}::jsonb` })
+      .where(and(eq(spaceThemes.slug, t.slug), sql`${spaceThemes.design} -> 'cover' is null`));
+  }
 }

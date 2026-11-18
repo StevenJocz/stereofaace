@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BLOCK_LABEL, FONTS, GRADIENTS, type BlockId, type SpaceDesign } from "@/modules/spaces/design";
+import { BLOCK_LABEL, COVERS, FONTS, GRADIENTS, type BlockId, type SpaceDesign } from "@/modules/spaces/design";
 import type { MySpace } from "@/modules/spaces/profile";
 import type { SpacePrivacy } from "@/modules/spaces/schema";
 
@@ -101,6 +101,14 @@ export function ThemesPanel({ s }: { s: Studio }) {
                 <span key={i} className="size-5 rounded-full border border-line" style={{ background: c }} />
               ))}
             </span>
+            {t.design.cover && (
+              <span
+                className="space-cover space-cover-mini"
+                data-preset={t.design.cover}
+                aria-hidden="true"
+                style={{ ["--sp-primary" as string]: t.design.colors.primary, ["--sp-secondary" as string]: t.design.colors.secondary, ["--sp-bg" as string]: t.design.colors.bg }}
+              />
+            )}
             <span className="display-up mt-2 block text-[1rem]">{t.name}</span>
             <span className="mono muted block text-[0.68rem]">{t.description}</span>
           </button>
@@ -137,6 +145,16 @@ export function ImagesPanel({ s }: { s: Studio }) {
           </label>
           {space.coverUrl && idOf("cover") && <button type="button" className="btn !px-4 !py-2" onClick={() => removeImage(idOf("cover")!)}>Quitar</button>}
         </div>
+        <L label="Portada prediseñada (se usa si no subes una imagen)">
+          <select className="input" value={s.design.cover ?? ""} onChange={(e) => s.setDesign((d) => ({ ...d, cover: (e.target.value || null) as SpaceDesign["cover"] }))}>
+            <option value="">Ninguna (degradado simple)</option>
+            {COVERS.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </L>
       </Section>
       <Section title="Galería (hasta 6 imágenes)">
         <ul className="grid grid-cols-3 gap-2">
