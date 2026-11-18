@@ -61,6 +61,12 @@ export async function logoutAction(): Promise<void> {
   redirect("/spaces");
 }
 
+/** Cerrar sesión desde el menú del encabezado: vuelve a la portada (no al editor de Spaces). */
+export async function logoutFromMenuAction(): Promise<void> {
+  await endSession();
+  redirect("/");
+}
+
 export async function forgotAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const ip = await ipOf();
   if (!rateLimit(`spaces:forgot:${ip}`, 5, 3600_000).ok) return { message: "Demasiados intentos. Espera un rato." };

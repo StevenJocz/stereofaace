@@ -4216,6 +4216,20 @@ body[data-radio="on"] .adm-shell {
 .spm-more:hover {
   color: var(--accent);
 }
+.spm-out {
+  width: 100%;
+  margin-top: 0.1rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--muted, #9a9aa0);
+  cursor: pointer;
+}
+.spm-out:hover,
+.spm-out:focus-visible {
+  color: #ff8a8a;
+}
 @keyframes spm-in {
   from {
     opacity: 0;

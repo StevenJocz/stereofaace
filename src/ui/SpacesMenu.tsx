@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { logoutFromMenuAction } from "@/app/(public)/spaces/actions";
 
 type Status = { signedIn: false } | { signedIn: true; hasSpace: false } | { signedIn: true; hasSpace: true; username: string; avatarUrl: string | null; disabled: boolean };
 
@@ -76,6 +77,19 @@ export function SpacesMenu() {
         <Link href="/spaces" className="spm-more" onClick={() => setOpen(false)}>
           Explorar Spaces →
         </Link>
+        {status?.signedIn && (
+          <form
+            action={logoutFromMenuAction}
+            onSubmit={() => {
+              setOpen(false);
+              setStatus({ signedIn: false });
+            }}
+          >
+            <button type="submit" className="spm-out">
+              Cerrar sesión
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
