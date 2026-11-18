@@ -316,7 +316,7 @@ export function RadioBar() {
                 </p>
               )}
               <div className="rb-wave">
-                <Visualizer active={r.status === "playing"} analysable={r.analysable} silenced={silenced} getAnalyser={r.getAnalyser} />
+                <Visualizer deck active={r.status === "playing"} analysable={r.analysable} silenced={silenced} getAnalyser={r.getAnalyser} />
               </div>
               <div className="rb-controls">
                 {own && (
@@ -327,19 +327,15 @@ export function RadioBar() {
                     </svg>
                   </button>
                 )}
-                {r.stations.length > 1 && (
-                  <button type="button" className="rb-ghost" onClick={() => r.step(-1)} aria-label="Emisora anterior">
-                    <Ico name="prev" size={17} />
-                  </button>
-                )}
+                <button type="button" className="rb-ghost" onClick={() => r.step(-1)} disabled={r.stations.length < 2} aria-label="Emisora anterior">
+                  <Ico name="prev" size={17} />
+                </button>
                 <button type="button" onClick={onPlay} className="rb-play" aria-label={playLabel}>
                   <Ico name={playIcon} size={20} />
                 </button>
-                {r.stations.length > 1 && (
-                  <button type="button" className="rb-ghost" onClick={() => r.step(1)} aria-label="Emisora siguiente">
-                    <Ico name="next" size={17} />
-                  </button>
-                )}
+                <button type="button" className="rb-ghost" onClick={() => r.step(1)} disabled={r.stations.length < 2} aria-label="Emisora siguiente">
+                  <Ico name="next" size={17} />
+                </button>
                 {own && (
                   <button type="button" className="rb-ghost" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen} aria-controls="chat-panel" aria-label="Chat y pedidos de canciones">
                     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -385,11 +381,17 @@ export function RadioBar() {
                   style={{ ["--v" as string]: `${(r.muted ? 0 : r.volume) * 100}%` }}
                   className="radio-range"
                 />
-                {r.stations.length > 1 && (
+                {r.stations.length > 1 ? (
                   <button type="button" className="rb-ghost rb-ghost-sm" onClick={() => r.setPanelOpen(!r.panelOpen)} aria-expanded={r.panelOpen} aria-controls="radio-panel" aria-label="Lista de emisoras">
                     <Ico name="list" size={18} />
                   </button>
-                )}
+                ) : own ? (
+                  <button type="button" className="rb-ghost rb-ghost-sm" onClick={() => setScheduleOpen(true)} aria-label="Abrir la programación completa">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                    </svg>
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>

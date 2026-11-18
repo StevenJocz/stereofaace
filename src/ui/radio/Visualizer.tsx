@@ -10,6 +10,8 @@ type Props = {
   /** La persona silenció o bajó el volumen a 0: el analizador no recibe señal por decisión suya. */
   silenced: boolean;
   getAnalyser: () => AnalyserNode | null;
+  /** Variante del reproductor en tarjeta: sin texto de estado y, sin señal, barras en reposo (estáticas, apagadas). */
+  deck?: boolean;
 };
 
 type VizState = "none" | "analyzing" | "live" | "blocked" | "silenced" | "reduced";
@@ -23,13 +25,19 @@ const LABEL: Record<VizState, string> = {
   reduced: "Visualizador en pausa (movimiento reducido)",
 };
 
-const BARS = 44;
+const BARS = 72;
 
 /**
  * Visualizador con datos REALES del AnalyserNode. Si la emisora no permite leer el audio (sin CORS) o el
  * analizador no recibe señal, lo dice con claridad en vez de dibujar una animación decorativa.
  */
-export function Visualizer({ active, analysable, silenced, getAnalyser }: Props) {
+/** Envolvente fija de las barras en reposo (decorativa y estática: no simula audio). */
+const IDLE = Array.from({ length: 72 }, (_, i) => {
+  const x = i / 71;
+  return 18 + 42 * Math.exp(-(((x - 0.38) / 0.28) ** 2)) + 10 * Math.sin(i * 1.7) ** 2;
+});
+
+export function Visualizer({ active, analysable, silenced, getAnalyser, deck = false }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   // Resultado medido por el bucle de dibujo; el resto de estados se derivan de las propiedades.
   const [measured, setMeasured] = useState<"live" | "blocked" | null>(null);
@@ -134,8 +142,16 @@ export function Visualizer({ active, analysable, silenced, getAnalyser }: Props)
 
   return (
     <div className="relative h-full min-h-10 w-full" role="img" aria-label={`Visualizador de audio: ${LABEL[state]}`}>
+      {deck && state !== "live" && (
+        <span className="viz-idle" aria-hidden="true">
+          {IDLE.map((h, i) => (
+            <i key={i} style={{ height: `${h}%` }} />
+          ))}
+        </span>
+      )}
       <canvas ref={canvas} className="absolute inset-0 h-full w-full" aria-hidden="true" />
       <p
+        hidden={deck}
         className={`mono absolute bottom-0 right-0 text-[0.62rem] ${state === "live" ? "text-accent-ink" : "text-muted"} ${
           state === "live" ? "" : "left-0 flex h-full items-center justify-center text-center"
         }`}
