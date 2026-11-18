@@ -11,6 +11,8 @@ export const radioPrograms = pgTable("radio_programs", {
   hosts: text("hosts"),
   /** Usuario del DJ de AzuraCast que conduce el programa (p. ej. dj1). Nunca se expone en la API pública. */
   djUsername: text("dj_username"),
+  /** Lista de música de AzuraCast ligada a este programa: suena en los horarios del programa (los toma de su parrilla). */
+  playlistId: integer("playlist_id"),
   photoId: uuid("photo_id").references(() => media.id, { onDelete: "set null" }),
   color: text("color").notNull().default("#c6ff00"),
   active: boolean("active").notNull().default(true),

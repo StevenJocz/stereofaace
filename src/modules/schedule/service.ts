@@ -7,6 +7,7 @@ import { assertCan, type Actor } from "@/lib/rbac";
 import { slugify } from "@/lib/slug";
 import { media } from "@/modules/media/schema";
 import { syncAllDjAccounts } from "@/modules/studio/dj-accounts";
+import { syncProgramPlaylists } from "@/modules/studio/program-playlists";
 import { recordAudit } from "@/modules/users/audit";
 import { radioPrograms, radioSchedule } from "./schema";
 
@@ -110,6 +111,7 @@ export async function saveProgram(db: Db, actor: Actor | null, raw: ProgramInput
     if (!row) throw new DomainError("program_not_found", "Ese programa ya no existe.");
     await recordAudit(db, { userId: actor.id, action: "schedule.program.update", entity: "radio_program", entityId: row.id, diff: { fields: Object.keys(values) } });
     await syncAllDjAccounts(db);
+    await syncProgramPlaylists(db);
     return row;
   }
   const slug = await uniqueSlug(db, radioPrograms, slugify(input.name), "programa");
@@ -125,6 +127,7 @@ export async function deleteProgram(db: Db, actor: Actor | null, id: string): Pr
   if (!row) throw new DomainError("program_not_found", "Ese programa ya no existe.");
   await recordAudit(db, { userId: actor.id, action: "schedule.program.delete", entity: "radio_program", entityId: id });
   await syncAllDjAccounts(db);
+    await syncProgramPlaylists(db);
 }
 
 export type SlotAdminView = { id: string; programId: string; kind: "weekly" | "once"; weekday: number | null; date: string | null; start: string; end: string };
@@ -151,6 +154,7 @@ export async function addSlot(db: Db, actor: Actor | null, raw: SlotInput): Prom
     .returning({ id: radioSchedule.id });
   await recordAudit(db, { userId: actor.id, action: "schedule.slot.create", entity: "radio_schedule", entityId: row.id, diff: { programId: input.programId, kind: input.kind } });
   await syncAllDjAccounts(db);
+    await syncProgramPlaylists(db);
   return row;
 }
 
@@ -160,4 +164,5 @@ export async function removeSlot(db: Db, actor: Actor | null, id: string): Promi
   if (!row) throw new DomainError("slot_not_found", "Ese tramo ya no existe.");
   await recordAudit(db, { userId: actor.id, action: "schedule.slot.delete", entity: "radio_schedule", entityId: id });
   await syncAllDjAccounts(db);
+    await syncProgramPlaylists(db);
 }

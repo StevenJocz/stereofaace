@@ -5,6 +5,7 @@ import { assertCan, type Actor } from "@/lib/rbac";
 import { recordAudit } from "@/modules/users/audit";
 import type { AzPlaylistRaw, AzScheduleItem } from "./azuracast";
 import { MAX_SONG_BYTES, validateAudioUpload } from "./audio-validation";
+import { linkedPlaylists } from "./program-playlists";
 import { loadAzuraClient } from "./settings";
 
 /* ───────────── Nombres y rutas seguros ───────────── */
@@ -108,8 +109,10 @@ export type ScheduleRow = { days: number[]; start: string; end: string };
 export type AutoDjPlaylist = {
   id: number;
   name: string;
-  /** Solo las listas de canciones se editan aquí; las de señal externa las maneja la pestaña «Señal». */
+  /** Solo las listas de canciones libres se editan aquí; las de señal externa las maneja la pestaña «Señal». */
   editable: boolean;
+  /** Si la lista pertenece a un programa, su horario sale de la parrilla de ese programa. */
+  program: string | null;
   enabled: boolean;
   order: "shuffle" | "random" | "sequential";
   weight: number;
@@ -151,10 +154,11 @@ export function fromAzSchedule(items: AzScheduleItem[] | undefined): ScheduleRow
   return (items ?? []).map((i) => ({ days: i.days?.length ? [...i.days].sort() : DAYS, start: toTime(i.start_time), end: toTime(i.end_time) }));
 }
 
-const view = (p: AzPlaylistRaw): AutoDjPlaylist => ({
+const view = (p: AzPlaylistRaw, owner?: { name: string }): AutoDjPlaylist => ({
   id: p.id,
   name: p.name,
-  editable: (p.source ?? "songs") === "songs",
+  editable: (p.source ?? "songs") === "songs" && !owner,
+  program: owner?.name ?? null,
   enabled: p.is_enabled !== false,
   order: p.order === "random" || p.order === "sequential" ? p.order : "shuffle",
   weight: p.weight ?? 3,
@@ -164,7 +168,8 @@ const view = (p: AzPlaylistRaw): AutoDjPlaylist => ({
 
 export async function listAutoDjPlaylists(db: Db, actor: Actor | null, fetchImpl?: typeof fetch): Promise<AutoDjPlaylist[]> {
   assertCan(actor, "studio:update");
-  return (await (await loadAzuraClient(db, actor, fetchImpl)).listPlaylistsRaw()).map(view);
+  const [raw, owners] = await Promise.all([(await loadAzuraClient(db, actor, fetchImpl)).listPlaylistsRaw(), linkedPlaylists(db)]);
+  return raw.map((p) => view(p, owners.get(p.id)));
 }
 
 /** Crea o actualiza una lista de canciones del AutoDJ con su horario. */
@@ -185,6 +190,8 @@ export async function saveAutoDjPlaylist(db: Db, actor: Actor | null, raw: unkno
     const current = (await client.listPlaylistsRaw()).find((p) => p.id === input.id);
     if (!current) throw new DomainError("playlist_not_found", "Esa lista ya no existe.");
     if ((current.source ?? "songs") !== "songs") throw new DomainError("library_playlist", "Esa lista es de señal externa: se gestiona en la pestaña Señal.");
+    const owner = (await linkedPlaylists(db)).get(input.id);
+    if (owner) throw new DomainError("library_playlist", `Esa lista es del programa «${owner.name}»: su horario sale de la Programación.`);
     await client.updatePlaylist(input.id, body);
   } else await client.createPlaylist(body);
   await recordAudit(db, { userId: actor.id, action: input.id ? "autodj.playlist.update" : "autodj.playlist.create", entity: "azuracast", diff: { name: input.name, schedule: input.schedule.length } });
@@ -198,6 +205,8 @@ export async function deleteAutoDjPlaylist(db: Db, actor: Actor | null, id: unkn
   const current = (await client.listPlaylistsRaw()).find((p) => p.id === pid);
   if (!current) throw new DomainError("playlist_not_found", "Esa lista ya no existe.");
   if ((current.source ?? "songs") !== "songs") throw new DomainError("library_playlist", "Esa lista es de señal externa: se gestiona en la pestaña Señal.");
+  const owner = (await linkedPlaylists(db)).get(pid);
+  if (owner) throw new DomainError("library_playlist", `Esa lista es del programa «${owner.name}»: suéltala del programa antes de eliminarla.`);
   await client.deletePlaylist(pid);
   await recordAudit(db, { userId: actor.id, action: "autodj.playlist.delete", entity: "azuracast", diff: { name: current.name } });
   return { ok: true };

@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AzFile, AzFolder } from "@/modules/studio/azuracast";
 import type { AutoDjPlaylist, ScheduleRow } from "@/modules/studio/library-admin";
+import type { ProgramMusic } from "@/modules/studio/program-playlists";
 
 type Listing = { folders: AzFolder[]; files: AzFile[] };
 
@@ -34,7 +36,7 @@ function Alert({ text, ok = false }: { text: string | null; ok?: boolean }) {
 }
 
 /** Biblioteca de la radio: archivos y carpetas de AzuraCast, y las listas del AutoDJ con su horario. */
-export function LibraryManager() {
+export function LibraryManager({ canEditSchedule = false }: { canEditSchedule?: boolean }) {
   const [tab, setTab] = useState<"files" | "lists">("files");
   return (
     <div>
@@ -42,7 +44,7 @@ export function LibraryManager() {
         {(
           [
             ["files", "Archivos y carpetas"],
-            ["lists", "Listas y programación"],
+            ["lists", "Programas y música"],
           ] as const
         ).map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className="studio-tab" onClick={() => setTab(k)}>
@@ -50,7 +52,7 @@ export function LibraryManager() {
           </button>
         ))}
       </div>
-      <div className="mt-6">{tab === "files" ? <FilesTab /> : <ListsTab />}</div>
+      <div className="mt-6">{tab === "files" ? <FilesTab /> : <ListsTab canEditSchedule={canEditSchedule} />}</div>
     </div>
   );
 }
@@ -90,7 +92,7 @@ function FilesTab() {
   }, [path, load]);
   useEffect(() => {
     call<AutoDjPlaylist[]>("/api/studio/autodj/playlists")
-      .then((l) => setLists(l.filter((x) => x.editable)))
+      .then((l) => setLists(l.filter((x) => x.editable || x.program)))
       .catch(() => undefined);
   }, []);
 
@@ -249,7 +251,7 @@ function FilesTab() {
               <option value="">Elige una lista…</option>
               {lists.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.name}
+                  {l.program ? `Programa · ${l.program}` : l.name}
                 </option>
               ))}
             </select>
@@ -336,14 +338,14 @@ function FilesTab() {
 
 /* ───────────────────────── Listas y programación ───────────────────────── */
 
-const emptyList = (): AutoDjPlaylist => ({ id: 0, name: "", editable: true, enabled: true, order: "shuffle", weight: 3, tracks: 0, schedule: [] });
+const emptyList = (): AutoDjPlaylist => ({ id: 0, name: "", editable: true, program: null, enabled: true, order: "shuffle", weight: 3, tracks: 0, schedule: [] });
 
 const summary = (rows: ScheduleRow[]) =>
   rows.length === 0
     ? "Siempre (según su peso)"
     : rows.map((r) => `${r.days.length === 7 ? "Todos los días" : r.days.map((d) => DAY_NAME[d]).join(" · ")} ${r.start}–${r.end}`).join(" | ");
 
-function ListsTab() {
+function GeneralLists() {
   const [lists, setLists] = useState<AutoDjPlaylist[] | null>(null);
   const [editing, setEditing] = useState<AutoDjPlaylist | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -352,7 +354,8 @@ function ListsTab() {
 
   const load = useCallback(async () => {
     try {
-      setLists(await call<AutoDjPlaylist[]>("/api/studio/autodj/playlists"));
+      // Las listas de un programa se gestionan arriba, en «Música de cada programa».
+      setLists((await call<AutoDjPlaylist[]>("/api/studio/autodj/playlists")).filter((l) => !l.program));
     } catch (e) {
       setLists([]);
       setError(e instanceof Error ? e.message : "No se pudieron leer las listas.");
@@ -396,9 +399,9 @@ function ListsTab() {
 
   return (
     <div>
-      <p className="muted max-w-[70ch]">
-        Cada lista es un bloque de música del AutoDJ. Sin horario suena siempre según su peso; con horario, solo en esos días y horas. Agrega canciones o carpetas a una lista desde
-        «Archivos y carpetas». Las horas son las de la estación (Colombia).
+      <h2 className="display-up text-[1.3rem]">Rotación general (sin programa)</h2>
+      <p className="muted mt-1 max-w-[70ch]">
+        Música que suena cuando no hay un programa con su propia lista. Sin horario suena siempre según su peso; con horario, solo en esos días y horas (hora de Colombia).
       </p>
       <div className="mt-4 grid gap-1">
         <Alert text={error} />
@@ -420,7 +423,9 @@ function ListsTab() {
                     {l.editable ? `${l.tracks} pistas · peso ${l.weight} · ${l.order === "shuffle" ? "mezcla" : l.order === "random" ? "aleatorio" : "en orden"}` : "Señal externa"} ·{" "}
                     {l.enabled ? "Activa" : "Pausada"}
                   </p>
-                  <p className="mono mt-1 text-[0.75rem]">{l.editable ? summary(l.schedule) : "Se gestiona en la pestaña Señal del estudio"}</p>
+                  <p className="mono mt-1 text-[0.75rem]">
+                    {l.program ? `Del programa «${l.program}»: su horario sale de la Programación` : l.editable ? summary(l.schedule) : "Se gestiona en la pestaña Señal del estudio"}
+                  </p>
                 </div>
                 {l.editable && (
                   <div className="flex gap-2">
@@ -525,6 +530,178 @@ function ListsTab() {
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+/* ───────────────────────── Música de cada programa ───────────────────────── */
+
+function ProgramMusicSection({ canEditSchedule }: { canEditSchedule: boolean }) {
+  const [items, setItems] = useState<ProgramMusic[] | null>(null);
+  const [free, setFree] = useState<AutoDjPlaylist[]>([]);
+  const [pick, setPick] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [programs, lists] = await Promise.all([call<ProgramMusic[]>("/api/studio/programs/music"), call<AutoDjPlaylist[]>("/api/studio/autodj/playlists")]);
+      setItems(programs);
+      setFree(lists.filter((l) => l.editable));
+    } catch (e) {
+      setItems([]);
+      setError(e instanceof Error ? e.message : "No se pudieron leer los programas.");
+    }
+  }, []);
+  useEffect(() => {
+    void load(); // eslint-disable-line react-hooks/set-state-in-effect -- carga inicial
+  }, [load]);
+
+  const act = async (programId: string, work: () => Promise<string>) => {
+    setBusy(programId);
+    setError(null);
+    setNotice(null);
+    try {
+      setNotice(await work());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo completar la acción.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section aria-labelledby="prog-music-h">
+      <h2 id="prog-music-h" className="display-up text-[1.3rem]">
+        Música de cada programa
+      </h2>
+      <p className="muted mt-1 max-w-[70ch]">
+        Cada programa de la Programación tiene su lista de música: suena en los horarios del programa y, si cambias esos horarios, se actualiza sola. Para llenarla, ve a «Archivos y carpetas», elige canciones o
+        una carpeta y agrégalas a la lista del programa.
+        {canEditSchedule && (
+          <>
+            {" "}
+            <Link href="/admin/radio/programacion" className="text-accent-ink underline">
+              Editar horarios en Programación →
+            </Link>
+          </>
+        )}
+      </p>
+      <div className="mt-3 grid gap-1">
+        <Alert text={error} />
+        <Alert text={notice} ok />
+      </div>
+
+      {items === null ? (
+        <p className="muted mt-4" aria-busy="true">
+          Cargando programas…
+        </p>
+      ) : items.length === 0 ? (
+        <p className="muted mt-4">No tienes programas asignados todavía. Pide a quien administra que te asigne uno en Usuarios o en Programación.</p>
+      ) : (
+        <ul className="mt-5 grid gap-3">
+          {items.map((p) => (
+            <li key={p.id} className="panel p-4" style={{ borderLeft: `4px solid ${p.color}` }}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="display-up text-[1.15rem]">
+                    {p.name}
+                    {!p.active && <span className="mono muted text-[0.7rem]"> · inactivo</span>}
+                  </p>
+                  {p.schedule.length > 0 ? (
+                    <ul className="mono mt-1 grid gap-0.5 text-[0.75rem]">
+                      {p.schedule.map((l) => (
+                        <li key={l}>{l}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mono muted mt-1 text-[0.75rem]">Sin horarios en la Programación: la lista no sonará hasta que los tenga.</p>
+                  )}
+                </div>
+
+                <div className="grid min-w-[16rem] gap-2">
+                  {p.playlist ? (
+                    <>
+                      <p className="mono text-[0.78rem]">
+                        Lista: <b>{p.playlist.name}</b> · {p.playlist.tracks} pistas · {p.playlist.enabled ? "activa" : "pausada"}
+                      </p>
+                      <button
+                        type="button"
+                        className="btn !px-3 !py-1.5 w-fit"
+                        disabled={busy === p.id}
+                        onClick={() => {
+                          if (window.confirm(`La lista seguirá en AzuraCast con su último horario, pero ya no seguirá los cambios de «${p.name}». ¿Soltarla?`))
+                            void act(p.id, async () => {
+                              await call(`/api/studio/programs/music?programId=${p.id}`, { method: "DELETE" });
+                              return "Lista soltada del programa.";
+                            });
+                        }}
+                      >
+                        Soltar lista
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {p.missing && <p className="mono text-[0.75rem] text-[#ffb020]">La lista de este programa ya no existe en AzuraCast. Suéltala o crea otra.</p>}
+                      <button
+                        type="button"
+                        className="btn btn-accent !px-4 !py-2 w-fit"
+                        disabled={busy === p.id}
+                        onClick={() =>
+                          void act(p.id, async () => {
+                            if (p.missing) await call(`/api/studio/programs/music?programId=${p.id}`, { method: "DELETE" });
+                            await post("/api/studio/programs/music", { programId: p.id, playlistId: "new" });
+                            return `Lista creada para «${p.name}» con el horario del programa.`;
+                          })
+                        }
+                      >
+                        Crear lista de música
+                      </button>
+                      {free.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select className="input !py-1.5" value={pick[p.id] ?? ""} onChange={(e) => setPick({ ...pick, [p.id]: e.target.value })} aria-label={`Lista existente para ${p.name}`}>
+                            <option value="">…o usar una lista existente</option>
+                            {free.map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="btn !px-3 !py-1.5"
+                            disabled={busy === p.id || !pick[p.id]}
+                            onClick={() =>
+                              void act(p.id, async () => {
+                                if (p.missing) await call(`/api/studio/programs/music?programId=${p.id}`, { method: "DELETE" });
+                                await post("/api/studio/programs/music", { programId: p.id, playlistId: Number(pick[p.id]) });
+                                return `Lista vinculada a «${p.name}»: ahora usa el horario del programa.`;
+                              })
+                            }
+                          >
+                            Vincular
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ListsTab({ canEditSchedule }: { canEditSchedule: boolean }) {
+  return (
+    <div className="grid gap-12">
+      <ProgramMusicSection canEditSchedule={canEditSchedule} />
+      <GeneralLists />
     </div>
   );
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "radio_programs" ADD COLUMN "playlist_id" integer;

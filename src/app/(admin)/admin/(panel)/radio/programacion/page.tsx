@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/session";
 import { can } from "@/lib/rbac";
@@ -17,6 +18,11 @@ export default async function ProgramacionPage() {
         Crea los programas de la emisora (nombre, imagen, descripción y el DJ que lo conduce) y ponles horario. En el
         reproductor del sitio se muestra el programa que está al aire y, al pulsarlo, la programación completa del día,
         la semana o el mes. El DJ que entra al estudio ve su programa a su hora.
+        La música de cada programa (su lista en AzuraCast) sigue estos horarios y se gestiona en{" "}
+        <Link href="/admin/radio/biblioteca" className="text-accent-ink underline">
+          Biblioteca
+        </Link>
+        .
       </p>
 
       <section className="mt-10" aria-labelledby="parrilla-h">
