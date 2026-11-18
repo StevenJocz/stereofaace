@@ -32,6 +32,8 @@ export const releases = pgTable(
     kind: releaseKindEnum("kind").notNull(),
     releasedAt: date("released_at", { mode: "date" }).notNull(),
     label: text("label"),
+    /** Texto corto de presentación del lanzamiento (ficha pública). */
+    description: text("description"),
     coverId: uuid("cover_id").references(() => media.id, { onDelete: "set null" }),
     coverArt: jsonb("cover_art").$type<CoverArt>(),
     /** URL de reproductor oficial de un proveedor permitido (ver validators). Nunca se aloja audio propio. */

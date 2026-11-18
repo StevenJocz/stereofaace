@@ -15,6 +15,7 @@ function releaseRaw(fd: FormData) {
     kind: str(fd, "kind"),
     releasedAt: str(fd, "releasedAt"),
     label: str(fd, "label"),
+    description: str(fd, "description"),
     artistIds: strs(fd, "artistIds"),
     coverId: str(fd, "coverId"),
     coverArt: scene ? { scene, tone: str(fd, "tone"), seed: Number(str(fd, "seed") ?? 0) } : undefined,

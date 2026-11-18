@@ -43,6 +43,7 @@ export default async function EditReleasePage({
             kind: release.kind,
             releasedAt: release.releasedAt.toISOString().slice(0, 10),
             label: release.label ?? "",
+            description: release.description ?? "",
             artistIds: release.artistIds,
             cover: release.coverId && release.coverUrl ? { id: release.coverId, url: release.coverUrl } : null,
             coverArt: release.coverArt,

@@ -514,10 +514,12 @@ async function HomeContent() {
             )}
             <ul>
               {data.releases.map((r) => (
-                <li key={r.id} className="spec-row !grid-cols-[5rem_1fr_auto]" data-reveal>
+                <li key={r.id} className="spec-row hover-host relative !grid-cols-[5rem_1fr_auto]" data-reveal>
                   <span className="tag w-fit">{RELEASE_KIND_LABEL[r.kind]}</span>
                   <span>
-                    <span className="display-up block text-[1.2rem]">{r.artistNames.join(", ")}</span>
+                    <Link href={`/lanzamientos/${r.slug}`} className="stretch" aria-label={`${r.title}: ver el lanzamiento`}>
+                      <span className="display-up block text-[1.2rem]">{r.artistNames.join(", ")}</span>
+                    </Link>
                     <span className="muted">
                       {r.title}{" "}
                       {r.label && (

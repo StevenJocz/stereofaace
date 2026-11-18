@@ -93,7 +93,7 @@ export const musicUrl = z.string().trim().refine((v) => safeUrl(v, MUSIC_HOSTS) 
 
 /* ───────────── Spotify y YouTube (incrustados) ───────────── */
 
-export type SpotifyKind = "artist" | "user" | "playlist";
+export type SpotifyKind = "artist" | "user" | "playlist" | "album" | "track" | "show" | "episode";
 export type SpotifyRef = { kind: SpotifyKind; id: string };
 
 /**
@@ -107,6 +107,7 @@ export function parseSpotify(raw: string, kinds: SpotifyKind[]): SpotifyRef | nu
   if (u.hostname.toLowerCase() !== "open.spotify.com") return null;
   const seg = u.pathname.split("/").filter(Boolean);
   if (seg[0] && /^intl-[a-z]{2}(-[a-z]{2})?$/i.test(seg[0])) seg.shift();
+  if (seg[0] === "embed") seg.shift(); // también acepta el enlace de «insertar» de Spotify
   const [kind, id] = seg;
   if (!kind || !id || !kinds.includes(kind as SpotifyKind)) return null;
   if (kind === "user" ? !/^[A-Za-z0-9._~-]{1,64}$/.test(id) : !/^[A-Za-z0-9]{22}$/.test(id)) return null;

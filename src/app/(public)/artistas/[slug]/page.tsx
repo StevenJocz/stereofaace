@@ -175,10 +175,12 @@ async function ProfileView({ params }: { params: Promise<Params> }) {
           </h2>
           <ul className="mt-6">
             {p.releases.map((r) => (
-              <li key={r.id} className="spec-row !grid-cols-[5rem_1fr_auto]">
+              <li key={r.id} className="spec-row hover-host relative !grid-cols-[5rem_1fr_auto]">
                 <span className="tag w-fit">{RELEASE_KIND_LABEL[r.kind]}</span>
                 <span>
-                  <span className="display-up block text-[1.2rem]">{r.title}</span>
+                  <Link href={`/lanzamientos/${r.slug}`} className="stretch">
+                    <span className="display-up block text-[1.2rem]">{r.title}</span>
+                  </Link>
                   {r.label && <span className="mono muted">{r.label}</span>}
                 </span>
                 <span className="mono">{formatShortDate(r.releasedAt)}</span>

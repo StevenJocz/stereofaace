@@ -7,22 +7,25 @@ import { listPublishedPageSlugs } from "@/modules/content/pages-admin";
 import { listArtistSlugs } from "@/modules/artists/profile";
 import { listPublicPrograms } from "@/modules/schedule/public";
 import { listEventSlugs } from "@/modules/events/service";
+import { listReleaseSlugs } from "@/modules/releases/service";
 
 /** Sitemap dinámico: solo artículos públicos (publicados o programados con fecha cumplida). */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   await connection();
   const db = await getDb();
-  const [entries, fixedPages, artistPages, programs, eventPages] = await Promise.all([
+  const [entries, fixedPages, artistPages, programs, eventPages, releasePages] = await Promise.all([
     listSitemapEntries(db),
     listPublishedPageSlugs(db),
     listArtistSlugs(db),
     listPublicPrograms(db),
     listEventSlugs(db),
+    listReleaseSlugs(db),
   ]);
   return [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/noticias`, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/artistas`, changeFrequency: "weekly" as const, priority: 0.6 },
+    ...releasePages.map((r) => ({ url: `${SITE_URL}/lanzamientos/${r.slug}`, lastModified: r.updatedAt, changeFrequency: "monthly" as const, priority: 0.5 })),
     { url: `${SITE_URL}/agenda`, changeFrequency: "daily" as const, priority: 0.7 },
     ...eventPages.map((e) => ({ url: `${SITE_URL}/agenda/${e.slug}`, lastModified: e.updatedAt, changeFrequency: "weekly" as const, priority: 0.5 })),
     { url: `${SITE_URL}/programas`, changeFrequency: "weekly" as const, priority: 0.6 },

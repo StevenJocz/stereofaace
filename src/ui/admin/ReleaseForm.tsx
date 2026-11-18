@@ -16,6 +16,7 @@ export type ReleaseFormValues = {
   kind?: string;
   releasedAt?: string;
   label?: string;
+  description?: string;
   artistIds?: string[];
   cover?: { id: string; url: string } | null;
   coverArt?: { scene: string; tone: string; seed: number } | null;
@@ -62,11 +63,14 @@ export function ReleaseForm({ initial, artists }: { initial: ReleaseFormValues; 
       <Field label="Sello" name="label" errors={e("label")}>
         <input id="label" name="label" className="input" maxLength={120} defaultValue={v("label", initial.label)} />
       </Field>
+      <Field label="Texto corto" name="description" errors={e("description")} hint="Hasta 600 caracteres. Se muestra en la ficha del lanzamiento." className="md:col-span-2">
+        <textarea id="description" name="description" className="input" maxLength={600} rows={3} defaultValue={v("description", initial.description)} />
+      </Field>
       <Field
         label="Reproductor oficial (https)"
         name="embedUrl"
         errors={e("embedUrl")}
-        hint="Solo Spotify, SoundCloud, Bandcamp, YouTube, Apple Music o Mixcloud. Nunca se aloja audio propio."
+        hint="Pega el enlace del álbum, sencillo o playlist de Spotify (Compartir → Copiar enlace); también SoundCloud, YouTube, Apple Music, Mixcloud o Bandcamp. Nunca se aloja audio propio."
       >
         <input id="embedUrl" name="embedUrl" type="url" className="input" maxLength={2048} defaultValue={v("embedUrl", initial.embedUrl)} />
       </Field>
