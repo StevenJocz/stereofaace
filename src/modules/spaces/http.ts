@@ -25,6 +25,7 @@ const STATUS: Record<string, number> = {
   image_too_big: 413,
   quota: 413,
   gallery_full: 409,
+  space_exists: 409,
   self_follow: 409,
   follow_limit: 409,
   token_invalid: 400,

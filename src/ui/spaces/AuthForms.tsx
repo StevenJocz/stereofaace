@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { forgotAction, registerAction, resendAction, resetAction, spacesLoginAction, verifyAction, type FormState } from "@/app/(public)/spaces/actions";
+import { createStaffSpaceAction, forgotAction, registerAction, resendAction, resetAction, spacesLoginAction, verifyAction, type FormState } from "@/app/(public)/spaces/actions";
 
 function Msg({ s }: { s: FormState }) {
   if (!s?.message) return null;
@@ -176,5 +176,31 @@ export function ResendButton() {
       </button>
       <Msg s={s} />
     </form>
+  );
+}
+
+/** Para quien ya tiene cuenta en el administrador y aún no tiene Space: elige su nombre de usuario y empieza. */
+export function StaffSpaceStart({ suggestion, name }: { suggestion: string; name: string }) {
+  const [s, action, pending] = useActionState<FormState, FormData>(createStaffSpaceAction, null);
+  return (
+    <Shell eyebrow="StereoFace Spaces" title="Crea tu Space">
+      <p className="muted -mt-2 text-[0.95rem]">
+        Hola, {name}. Tu cuenta del equipo también puede tener su Space: un perfil público con tu música y tu estilo. Es la misma cuenta; solo elige tu nombre de usuario.
+      </p>
+      <form action={action} className="grid gap-4" noValidate>
+        <F label="Nombre de usuario" hint="3 a 20 caracteres: letras, números y guion bajo. Tu dirección será stereoface.online/@usuario">
+          <input className="input" name="username" defaultValue={suggestion} autoComplete="off" required maxLength={20} autoCapitalize="none" />
+        </F>
+        <Msg s={s} />
+        <button type="submit" className="btn btn-accent" disabled={pending}>
+          Crear mi Space
+        </button>
+      </form>
+      <p className="muted text-[0.9rem]">
+        <Link href="/admin" className="text-accent-ink underline">
+          Ir al administrador
+        </Link>
+      </p>
+    </Shell>
   );
 }

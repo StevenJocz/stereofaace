@@ -111,7 +111,7 @@ const REASONS: [string, string][] = [
 ];
 
 /** Acciones del perfil: editar (dueño), compartir y reportar. */
-export function SpaceActions({ username, isOwner, isDraft }: { username: string; isOwner: boolean; isDraft: boolean }) {
+export function SpaceActions({ username, isOwner, isDraft, staffAdmin = false }: { username: string; isOwner: boolean; isDraft: boolean; staffAdmin?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -150,6 +150,11 @@ export function SpaceActions({ username, isOwner, isDraft }: { username: string;
       {isOwner && (
         <Link href="/spaces/editar" className="space-btn">
           ✎ Editar perfil
+        </Link>
+      )}
+      {staffAdmin && (
+        <Link href="/admin" className="space-btn">
+          ⚙ Ir al administrador
         </Link>
       )}
       {isDraft && <span className="space-pill">Borrador: solo tú lo ves</span>}

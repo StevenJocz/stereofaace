@@ -71,7 +71,7 @@ export type MySpace = {
 export async function getMySpace(db: Db, userId: string): Promise<MySpace> {
   const p = await profileOf(db, userId);
   const [u, genreRows, artistRows, assetRows, genreOptions, themes, follows] = await Promise.all([
-    db.select({ createdAt: users.createdAt, verified: users.emailVerifiedAt }).from(users).where(eq(users.id, userId)),
+    db.select({ createdAt: users.createdAt, verified: users.emailVerifiedAt, role: users.role }).from(users).where(eq(users.id, userId)),
     db.select({ slug: spaceGenreOptions.slug }).from(spaceProfileGenres).innerJoin(spaceGenreOptions, eq(spaceGenreOptions.id, spaceProfileGenres.genreId)).where(eq(spaceProfileGenres.userId, userId)).orderBy(asc(spaceProfileGenres.position)),
     db.select({ artistId: spaceFavoriteArtists.artistId, name: spaceFavoriteArtists.name }).from(spaceFavoriteArtists).where(eq(spaceFavoriteArtists.userId, userId)).orderBy(asc(spaceFavoriteArtists.position)),
     db.select().from(spaceAssets).where(and(eq(spaceAssets.userId, userId), eq(spaceAssets.status, "ok"))).orderBy(asc(spaceAssets.position), asc(spaceAssets.createdAt)),
@@ -97,7 +97,7 @@ export async function getMySpace(db: Db, userId: string): Promise<MySpace> {
       featured: p.featured,
       publishedAt: p.publishedAt?.toISOString() ?? null,
       joinedAt: (u[0]?.createdAt ?? p.createdAt).toISOString(),
-      verified: Boolean(u[0]?.verified),
+      verified: Boolean(u[0]?.verified) || u[0]?.role !== "oyente",
     },
     design,
     follows,
@@ -202,8 +202,9 @@ export async function publishSpace(db: Db, userId: string, opts: { requireVerifi
   const p = await profileOf(db, userId);
   if (p.status === "disabled") throw new DomainError("space_disabled", "Tu Space fue desactivado por incumplir las normas. Escribe a StereoFace si crees que es un error.");
   if (opts.requireVerified) {
-    const [u] = await db.select({ v: users.emailVerifiedAt }).from(users).where(eq(users.id, userId));
-    if (!u?.v) throw new DomainError("email_unverified", "Confirma tu correo para publicar tu Space (revisa tu bandeja de entrada).");
+    const [u] = await db.select({ v: users.emailVerifiedAt, role: users.role }).from(users).where(eq(users.id, userId));
+    // El personal (locutores, editorial, administración) lo creó quien administra: su correo ya es de confianza.
+    if (!u?.v && u?.role === "oyente") throw new DomainError("email_unverified", "Confirma tu correo para publicar tu Space (revisa tu bandeja de entrada).");
   }
   if (!p.draftDesign) throw new DomainError("no_design", "Elige una plantilla antes de publicar.");
   await db.update(spaceProfiles).set({ status: "published", publishedDesign: p.draftDesign, publishedAt: new Date() }).where(eq(spaceProfiles.userId, userId));

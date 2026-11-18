@@ -8,19 +8,25 @@ import { SESSION_DAYS, createSession, destroySession, getSessionUser, type Sessi
 /** Cookie de sesión: HttpOnly (no la lee JavaScript), SameSite=Lax y Secure en producción. */
 export const SESSION_COOKIE = "sf_session";
 
-export async function startSession(userId: string) {
+/** `days`: duración de la sesión (7 por defecto; 3 si se entra por Spaces). La cookie y la base vencen a la vez. */
+export async function startSession(userId: string, days: number = SESSION_DAYS) {
   const h = await headers();
-  const { token, expiresAt } = await createSession(await getDb(), userId, {
-    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined,
-    userAgent: h.get("user-agent") ?? undefined,
-  });
+  const { token, expiresAt } = await createSession(
+    await getDb(),
+    userId,
+    {
+      ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined,
+      userAgent: h.get("user-agent") ?? undefined,
+    },
+    days,
+  );
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     expires: expiresAt,
-    maxAge: SESSION_DAYS * 24 * 3600,
+    maxAge: days * 24 * 3600,
   });
 }
 

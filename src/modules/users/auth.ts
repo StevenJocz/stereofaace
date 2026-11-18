@@ -7,6 +7,8 @@ import type { Actor } from "@/lib/rbac";
 import { sessions, users, type Role } from "./schema";
 
 export const SESSION_DAYS = 7;
+/** Quien entra por StereoFace Spaces mantiene la sesión abierta unos 3 días. */
+export const SPACES_SESSION_DAYS = 3;
 
 export type SessionUser = Actor & { email: string; name: string };
 
@@ -42,9 +44,9 @@ export async function authenticate(db: Db, email: string, password: string): Pro
 }
 
 /** Crea una sesión y devuelve el token en claro (solo viaja en la cookie HttpOnly; en la BD queda su hash). */
-export async function createSession(db: Db, userId: string, meta: { ip?: string; userAgent?: string } = {}) {
+export async function createSession(db: Db, userId: string, meta: { ip?: string; userAgent?: string } = {}, days: number = SESSION_DAYS) {
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 3600 * 1000);
+  const expiresAt = new Date(Date.now() + days * 24 * 3600 * 1000);
   await db
     .insert(sessions)
     .values({ userId, tokenHash: hashToken(token), expiresAt, ip: meta.ip, userAgent: meta.userAgent?.slice(0, 300) });

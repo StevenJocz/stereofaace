@@ -38,7 +38,7 @@ const profilePayload = (p: MySpace["profile"]) => ({ displayName: p.displayName,
  * componente que ve el público, alimentado por ese estado. Todo pasa por las rutas /api/spaces/me: no hay identificadores
  * de otras personas en ninguna llamada, así que cada quien solo puede cambiar lo suyo.
  */
-export function SpaceStudio({ initial, mode, mailConfigured, logout }: { initial: MySpace; mode: "wizard" | "editor"; mailConfigured: boolean; logout: () => Promise<void> }) {
+export function SpaceStudio({ initial, mode, mailConfigured, logout, isStaff = false }: { initial: MySpace; mode: "wizard" | "editor"; mailConfigured: boolean; logout: () => Promise<void>; isStaff?: boolean }) {
   const router = useRouter();
   const [space, setSpace] = useState(initial);
   const [tab, setTab] = useState<Tab>("identidad");
@@ -202,6 +202,11 @@ export function SpaceStudio({ initial, mode, mailConfigured, logout }: { initial
           {status} {saveLabel && <span aria-live="polite">· {saveLabel}</span>}
         </p>
       </div>
+      {isStaff && (
+        <Link href="/admin" className="btn !px-4 !py-2" aria-label="Ir al administrador">
+          ⚙ Ir al administrador
+        </Link>
+      )}
       {mode === "editor" && (
         <div className="flex flex-wrap gap-2">
           <Link href={`/@${profile.username}?vista=borrador`} className="btn !px-4 !py-2" target="_blank">

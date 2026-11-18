@@ -82,6 +82,41 @@ export async function registerListener(db: Db, raw: unknown, deps: AccountDeps):
   return { userId: u.id, verificationSent };
 }
 
+/** Propuesta de nombre de usuario libre a partir del nombre o del correo (para el personal que crea su Space). */
+export async function suggestUsername(db: Db, name: string, email: string): Promise<string> {
+  const clean = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16);
+  const bases = [clean(name), clean(email.split("@")[0] ?? "")].filter((b) => b.length >= 3);
+  for (const base of bases.length ? bases : ["space"]) {
+    for (let i = 0; i < 100; i++) {
+      const candidate = i === 0 ? base : `${base}${i + 1}`;
+      if (!usernameSchema.safeParse(candidate).success) continue;
+      const [taken] = await db.select({ id: spaceProfiles.userId }).from(spaceProfiles).where(sql`lower(${spaceProfiles.username}) = ${candidate}`).limit(1);
+      if (!taken) return candidate;
+    }
+  }
+  return `space${Math.floor(Math.random() * 9000 + 1000)}`;
+}
+
+/**
+ * Crea el Space de una cuenta que ya existe (locutores, editorial, administración): misma cuenta y misma sesión,
+ * sin registrarse otra vez. Una sola vez por cuenta.
+ */
+export async function createSpaceForUser(db: Db, userId: string, usernameRaw: unknown): Promise<{ username: string }> {
+  const username = usernameSchema.parse(usernameRaw);
+  const [u] = await db.select({ name: users.name, active: users.active }).from(users).where(eq(users.id, userId));
+  if (!u?.active) throw new DomainError("not_found", "Cuenta no encontrada.");
+  const [have] = await db.select({ id: spaceProfiles.userId }).from(spaceProfiles).where(eq(spaceProfiles.userId, userId));
+  if (have) throw new DomainError("space_exists", "Esta cuenta ya tiene un Space.");
+  const [taken] = await db.select({ id: spaceProfiles.userId }).from(spaceProfiles).where(sql`lower(${spaceProfiles.username}) = ${username}`).limit(1);
+  if (taken) throw new DomainError("username_taken", "Ese nombre de usuario ya está en uso.");
+  try {
+    await db.insert(spaceProfiles).values({ userId, username, displayName: u.name.slice(0, 40) || username, draftDesign: DEFAULT_THEMES[0].design });
+  } catch {
+    throw new DomainError("username_taken", "Ese nombre de usuario ya está en uso.");
+  }
+  return { username };
+}
+
 export async function verifyEmail(db: Db, token: string): Promise<void> {
   const userId = await consumeToken(db, token, "verify");
   await db.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, userId));

@@ -23,7 +23,7 @@ function Card({ id, title, children }: { id: BlockId; title: string; children: R
  * llega solo como variables CSS validadas, dentro de `.space`, así que no puede tocar el resto del sitio.
  * Es el mismo componente para la vista pública y para la vista previa del editor.
  */
-export function SpaceView({ space, preview = false }: { space: PublicSpace; preview?: boolean }) {
+export function SpaceView({ space, preview = false, viewerIsStaff = false }: { space: PublicSpace; preview?: boolean; viewerIsStaff?: boolean }) {
   const d = space.design;
   const vars = designVars(d, space.backgroundUrl) as CSSProperties;
   const has: Record<BlockId, boolean> = {
@@ -194,7 +194,7 @@ export function SpaceView({ space, preview = false }: { space: PublicSpace; prev
             </ul>
             {space.follows && <SpaceFollow username={space.username} initial={space.follows} viewerFollows={space.viewerFollows} viewerSignedIn={space.viewerSignedIn} isOwner={space.isOwner} interactive={!preview} />}
           </div>
-          {!preview && <SpaceActions username={space.username} isOwner={space.isOwner} isDraft={space.isDraftPreview} />}
+          {!preview && <SpaceActions username={space.username} isOwner={space.isOwner} isDraft={space.isDraftPreview} staffAdmin={space.isOwner && viewerIsStaff} />}
         </div>
 
         <div className="space-body">

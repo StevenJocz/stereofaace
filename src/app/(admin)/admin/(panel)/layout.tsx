@@ -24,6 +24,8 @@ async function Shell({ children }: { children: React.ReactNode }) {
     items: g.items.filter((i) => can(user.role, i.permission)).map(({ href, label }) => ({ href, label })),
   })).filter((g) => g.items.length > 0);
   const db = await getDb();
+  // Todas las cuentas del equipo tienen acceso a su Space desde el administrador.
+  groups.push({ group: "Mi cuenta", items: [{ href: "/spaces/editar", label: "Mi Space" }] });
   const relay = can(user.role, "studio:update") ? await getRelayPublic(db, user) : null;
   const locutor = user.role === "locutor" ? await djUsernameOf(db, user) : null;
   return (

@@ -35,7 +35,7 @@ async function View({ params, searchParams }: { params: Promise<Params>; searchP
   // El dueño puede ver su borrador con ?vista=borrador; el resto, solo lo publicado.
   const s = await getPublicSpace(await getDb(), username, viewer ? { id: viewer.id } : null, { preview: sp.vista === "borrador" });
   if (!s) notFound();
-  return <SpaceView space={s} />;
+  return <SpaceView space={s} viewerIsStaff={Boolean(viewer && viewer.role !== "oyente")} />;
 }
 
 export default function SpacePage(props: { params: Promise<Params>; searchParams: Promise<Search> }) {
