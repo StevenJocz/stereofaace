@@ -14,7 +14,7 @@ import { TodaySchedule } from "@/ui/radio/TodaySchedule";
 import { HomeSkeleton } from "@/ui/Skeleton";
 import { SpacesShowcase } from "@/ui/spaces/SpacesShowcase";
 import { getCurrentUser } from "@/lib/auth/session";
-import { listSpaces } from "@/modules/spaces/public";
+import { getNetwork } from "@/modules/spaces/public";
 import { NewsletterForm } from "@/ui/NewsletterForm";
 import { getDb } from "@/lib/db";
 import { DEFAULT_SITE_SETTINGS, getSiteSettings } from "@/modules/settings/site";
@@ -153,7 +153,7 @@ async function HomeContent() {
     getHomeData(db, now),
     getSiteSettings(db).catch(() => DEFAULT_SITE_SETTINGS),
     // La portada nunca falla por Spaces: sin datos, la banda solo invita.
-    listSpaces(db, {}).catch(() => ({ featured: [], recent: [], total: 0, page: 1 })),
+    getNetwork(db).catch(() => ({ nodes: [], edges: [], total: 0 })),
     getCurrentUser().catch(() => null),
   ]);
   const hasDemo = [...data.hero, ...data.features, ...data.recent, ...data.latest].some((s) => s.isDemo);
@@ -481,7 +481,7 @@ async function HomeContent() {
       )}
 
       {/* STEREOFACE SPACES: perfiles de la comunidad + invitación a crear el propio */}
-      <SpacesShowcase cards={[...spaces.featured, ...spaces.recent].slice(0, 5)} total={spaces.total} signedIn={me !== null} />
+      <SpacesShowcase network={spaces} signedIn={me !== null} />
 
       <div className="wrap">
         <AdSlot name="home" />

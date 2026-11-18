@@ -70,6 +70,47 @@ export function safeUrl(raw: string, allowed: string[] | null): string | null {
 }
 export const musicUrl = z.string().trim().refine((v) => safeUrl(v, MUSIC_HOSTS) !== null, "Usa un enlace https de Spotify, SoundCloud, YouTube, Bandcamp, Mixcloud, Tidal, Deezer o Apple Music.");
 
+/* ───────────── Spotify y YouTube (incrustados) ───────────── */
+
+export type SpotifyKind = "artist" | "user" | "playlist";
+export type SpotifyRef = { kind: SpotifyKind; id: string };
+
+/**
+ * Lee un enlace de open.spotify.com y devuelve el tipo y el id. Del enlace de la persona NUNCA se usa el texto: el iframe se
+ * construye siempre desde estos dos valores ya validados (id de 22 caracteres para artista/playlist; nombre de usuario para perfiles).
+ */
+export function parseSpotify(raw: string, kinds: SpotifyKind[]): SpotifyRef | null {
+  const href = safeUrl(raw, ["open.spotify.com"]);
+  if (!href) return null;
+  const u = new URL(href);
+  if (u.hostname.toLowerCase() !== "open.spotify.com") return null;
+  const seg = u.pathname.split("/").filter(Boolean);
+  if (seg[0] && /^intl-[a-z]{2}(-[a-z]{2})?$/i.test(seg[0])) seg.shift();
+  const [kind, id] = seg;
+  if (!kind || !id || !kinds.includes(kind as SpotifyKind)) return null;
+  if (kind === "user" ? !/^[A-Za-z0-9._~-]{1,64}$/.test(id) : !/^[A-Za-z0-9]{22}$/.test(id)) return null;
+  return { kind: kind as SpotifyKind, id };
+}
+/** Los perfiles de usuario no tienen reproductor incrustable: se muestran como enlace. */
+export const spotifyEmbedSrc = (r: SpotifyRef): string | null => (r.kind === "user" ? null : `https://open.spotify.com/embed/${r.kind}/${r.id}`);
+export const spotifyHref = (r: SpotifyRef): string => `https://open.spotify.com/${r.kind}/${r.id}`;
+
+/** Id de un video de YouTube (watch, youtu.be, shorts, embed o live). */
+export function parseYouTube(raw: string): string | null {
+  const href = safeUrl(raw, ["youtube.com", "youtu.be"]);
+  if (!href) return null;
+  const u = new URL(href);
+  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  const seg = u.pathname.split("/").filter(Boolean);
+  const id = host === "youtu.be" ? seg[0] : u.pathname === "/watch" ? u.searchParams.get("v") : ["shorts", "embed", "live"].includes(seg[0] ?? "") ? seg[1] : null;
+  return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+}
+export const youtubeEmbedSrc = (id: string) => `https://www.youtube-nocookie.com/embed/${id}?rel=0`;
+
+const spotifyProfileUrl = z.string().trim().refine((v) => parseSpotify(v, ["artist", "user"]) !== null, "Usa el enlace de tu perfil de artista o de usuario de Spotify (open.spotify.com/artist/… o /user/…).");
+const spotifyPlaylistUrl = z.string().trim().refine((v) => parseSpotify(v, ["playlist"]) !== null, "Usa el enlace de una playlist de Spotify (open.spotify.com/playlist/…).");
+const youtubeUrl = z.string().trim().refine((v) => parseYouTube(v) !== null, "Usa el enlace de un video de YouTube (youtube.com/watch?v=… o youtu.be/…).");
+
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Usa un color #rrggbb");
 const text = (max: number) => z.string().trim().max(max).refine((s) => !/[\u0000-\u001f\u007f]/.test(s), "Texto no válido");
 
@@ -101,6 +142,10 @@ export const designSchema = z
         showRadio: z.boolean(),
         song: z.object({ title: text(80), artist: text(80), url: musicUrl.nullable() }).strict().nullable(),
         links: z.array(musicUrl).max(3),
+        /** Tu Spotify (perfil de artista o de usuario) y una playlist suya. */
+        spotify: z.object({ profile: spotifyProfileUrl.nullable(), playlist: spotifyPlaylistUrl.nullable() }).strict().default({ profile: null, playlist: null }),
+        /** Videos de YouTube (por enlace; no se sube ningún archivo). */
+        videos: z.array(youtubeUrl).max(3).default([]),
       })
       .strict(),
     quote: text(200),
@@ -174,6 +219,12 @@ export function designVars(d: SpaceDesign, bgImageUrl: string | null): Record<st
     "--sp-head-stretch": font(d.font.heading).id === "archivo-wide" ? "125%" : "100%",
     "--sp-scale": String(d.font.scale / 100),
   };
+}
+
+/** Diseños guardados antes de existir Spotify/YouTube no traen esos campos: se completan al leerlos. */
+export function normalizeDesign(d: SpaceDesign): SpaceDesign {
+  const p = d.player as Partial<SpaceDesign["player"]>;
+  return { ...d, player: { ...d.player, spotify: p.spotify ?? { profile: null, playlist: null }, videos: p.videos ?? [] } };
 }
 
 export function orderedBlocks(d: SpaceDesign, column: "main" | "side"): BlockId[] {

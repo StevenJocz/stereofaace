@@ -38,3 +38,8 @@
 - Sin moderación automática de imágenes: solo reportes y marcado manual. Las imágenes marcadas no se pueden previsualizar en el administrador.
 - Un Space desactivado no se puede ver ni siquiera por su dueño; la reactivación lo deja en borrador.
 - Fase 1 únicamente: sin seguidores, Top 8, comentarios, muro ni salas de escucha.
+
+## Red de la portada y reproductores externos
+
+- **Red de amigos (portada):** `getNetwork` devuelve hasta 9 Spaces públicos y listados (destacados primero) y los seguimientos entre ellos. Una conexión solo se dibuja si **las dos** personas dejan visible «mostrar seguidores y seguidos». Sin Spaces no se inventa nada: solo la invitación y huecos libres. Componente `SpacesNetwork` (animaciones CSS/SMIL; se apagan con `prefers-reduced-motion`).
+- **Spotify y YouTube en el Space:** en el bloque «Reproductor» (`design.player.spotify.{profile,playlist}` y `design.player.videos`, máx. 3). Se guardan enlaces validados (`parseSpotify`, `parseYouTube`); el `src` del iframe se construye siempre desde el id validado (`open.spotify.com/embed/...`, `youtube-nocookie.com/embed/...`), nunca desde texto libre. Los perfiles de *usuario* de Spotify no son incrustables y salen como botón. Los reproductores usan «clic para cargar» (no se contacta al tercero ni suena nada hasta que la persona visitante lo pide) y `sandbox`. No se suben videos: se pega el enlace de YouTube. Diseños antiguos sin estos campos se completan con `normalizeDesign`.

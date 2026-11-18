@@ -7,7 +7,7 @@ import { contrast, mix } from "@/modules/spaces/design";
 import type { MySpace } from "@/modules/spaces/profile";
 import type { PublicSpace } from "@/modules/spaces/public";
 import { ResendButton } from "./AuthForms";
-import { BlocksPanel, DesignPanel, GenresPanel, IdentityPanel, ImagesPanel, L, MusicPanel, PrivacyPanel, Section, ThemesPanel, type Studio } from "./SpacePanels";
+import { BlocksPanel, DesignPanel, EmbedsPanel, GenresPanel, IdentityPanel, ImagesPanel, L, MusicPanel, PrivacyPanel, Section, ThemesPanel, type Studio } from "./SpacePanels";
 import { SpaceView } from "./SpaceView";
 
 type Save = "idle" | "saving" | "saved" | "error";
@@ -367,7 +367,12 @@ export function SpaceStudio({ initial, mode, mailConfigured, logout, isStaff = f
           </div>
           <div className="mt-4 grid gap-5">
             {tab === "identidad" && <IdentityPanel s={studio} />}
-            {tab === "musica" && <MusicPanel s={studio} />}
+            {tab === "musica" && (
+              <>
+                <MusicPanel s={studio} />
+                <EmbedsPanel s={studio} />
+              </>
+            )}
             {tab === "diseno" && <DesignPanel s={studio} />}
             {tab === "bloques" && <BlocksPanel s={studio} />}
             {tab === "imagenes" && <ImagesPanel s={studio} />}

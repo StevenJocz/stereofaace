@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { PublicSpace } from "@/modules/spaces/public";
-import { BLOCK_LABEL, designVars, orderedBlocks, safeUrl, type BlockId } from "@/modules/spaces/design";
+import { BLOCK_LABEL, designVars, orderedBlocks, parseSpotify, parseYouTube, safeUrl, spotifyEmbedSrc, spotifyHref, youtubeEmbedSrc, type BlockId } from "@/modules/spaces/design";
+import { SpaceEmbed } from "./SpaceEmbed";
 import { SpaceActions, SpaceFollow, SpaceRadio } from "./SpaceIslands";
 
 const LINK_LABEL: Record<string, string> = { instagram: "Instagram", x: "X", tiktok: "TikTok", facebook: "Facebook", youtube: "YouTube", spotify: "Spotify", soundcloud: "SoundCloud", bandcamp: "Bandcamp", web: "Sitio web" };
@@ -30,12 +31,19 @@ export function SpaceView({ space, preview = false, viewerIsStaff = false }: { s
     about: Boolean(space.bio || space.tagline),
     genres: space.genres.length > 0,
     artists: space.artists.length > 0,
-    player: d.player.showRadio || Boolean(d.player.song) || d.player.links.length > 0,
+    player: d.player.showRadio || Boolean(d.player.song) || d.player.links.length > 0 || Boolean(d.player.spotify.profile || d.player.spotify.playlist) || d.player.videos.length > 0,
     gallery: space.gallery.length > 0,
     links: Object.keys(space.links).length > 0,
     quote: Boolean(d.quote),
     musicinfo: Object.values(d.musicinfo).some(Boolean),
   };
+  const sp = (u: string | null, kinds: ("artist" | "user" | "playlist")[]) => {
+    const r = u ? parseSpotify(u, kinds) : null;
+    return r ? { src: spotifyEmbedSrc(r), href: spotifyHref(r) } : null;
+  };
+  const spotifyProfile = sp(d.player.spotify.profile, ["artist", "user"]);
+  const spotifyPlaylist = sp(d.player.spotify.playlist, ["playlist"]);
+  const videoIds = d.player.videos.map((v) => parseYouTube(v)).filter((v): v is string => v !== null);
   const show = (id: BlockId) => has[id] || (space.isOwner && preview);
 
   const render: Record<BlockId, () => React.ReactNode> = {
@@ -117,6 +125,21 @@ export function SpaceView({ space, preview = false, viewerIsStaff = false }: { s
             )}
           </div>
         )}
+        {spotifyProfile && (
+          <>
+            {spotifyProfile.src ? (
+              <SpaceEmbed src={spotifyProfile.src} title="Mi perfil en Spotify" provider="Spotify" height={352} />
+            ) : (
+              <a href={spotifyProfile.href} target="_blank" rel="noopener noreferrer nofollow ugc" className="space-btn">
+                Mi perfil en Spotify ↗
+              </a>
+            )}
+          </>
+        )}
+        {spotifyPlaylist?.src && <SpaceEmbed src={spotifyPlaylist.src} title="Mi playlist en Spotify" provider="Spotify" height={352} />}
+        {videoIds.map((id, i) => (
+          <SpaceEmbed key={id} src={youtubeEmbedSrc(id)} title={videoIds.length > 1 ? `Mi video ${i + 1} en YouTube` : "Mi video en YouTube"} provider="YouTube" ratio="16 / 9" />
+        ))}
         {d.player.links.length > 0 && (
           <ul className="space-links">
             {d.player.links.map((u) => (

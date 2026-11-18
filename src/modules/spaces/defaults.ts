@@ -9,7 +9,7 @@ const base = (over: Partial<SpaceDesign> & Pick<SpaceDesign, "theme" | "colors">
   background: { kind: "gradient", gradient: "noche", assetId: null, position: "center", size: "cover", fixed: true, overlay: 40 },
   font: { heading: "archivo", body: "sistema", scale: 100 },
   blocks: blocks(),
-  player: { showRadio: true, song: null, links: [] },
+  player: { showRadio: true, song: null, links: [], spotify: { profile: null, playlist: null }, videos: [] },
   quote: "",
   musicinfo: { favoriteSong: "", favoriteArtist: "", since: "", scene: "" },
   ...over,

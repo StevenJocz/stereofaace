@@ -24,7 +24,7 @@ export type Studio = {
 
 const COLOR_FIELDS: [keyof SpaceDesign["colors"], string][] = [["bg", "Fondo"], ["primary", "Principal"], ["secondary", "Secundario"], ["text", "Texto"], ["link", "Enlaces"], ["card", "Tarjetas"]];
 const LINK_FIELDS: [string, string][] = [["instagram", "Instagram"], ["x", "X"], ["tiktok", "TikTok"], ["facebook", "Facebook"], ["youtube", "YouTube"], ["spotify", "Spotify"], ["soundcloud", "SoundCloud"], ["bandcamp", "Bandcamp"], ["web", "Sitio web"]];
-const PRIVACY_FIELDS: [keyof SpacePrivacy, string][] = [["listed", "Aparecer en /spaces y en las búsquedas"], ["showLocation", "Mostrar mi ubicación"], ["showJoined", "Mostrar desde cuándo estoy en StereoFace"], ["showLinks", "Mostrar mis enlaces"], ["showFavorites", "Mostrar mis artistas favoritos"], ["showFollows", "Mostrar cuántas personas me siguen y a cuántas sigo"]];
+const PRIVACY_FIELDS: [keyof SpacePrivacy, string][] = [["listed", "Aparecer en /spaces y en las búsquedas"], ["showLocation", "Mostrar mi ubicación"], ["showJoined", "Mostrar desde cuándo estoy en StereoFace"], ["showLinks", "Mostrar mis enlaces"], ["showFavorites", "Mostrar mis artistas favoritos"], ["showFollows", "Mostrar cuántas personas me siguen y a cuántas sigo (y mis conexiones en la red de la portada)"]];
 const IMG = "image/jpeg,image/png,image/webp,image/avif";
 
 export function move<T>(arr: T[], i: number, d: -1 | 1): T[] {
@@ -237,6 +237,41 @@ export function MusicPanel({ s }: { s: Studio }) {
           />
         </L>
       ))}
+    </Section>
+  );
+}
+
+export function EmbedsPanel({ s }: { s: Studio }) {
+  const { design, setDesign } = s;
+  const setPlayer = (patch: Partial<SpaceDesign["player"]>) => setDesign((d) => ({ ...d, player: { ...d.player, ...patch } }));
+  const sp = design.player.spotify;
+  const setSpotify = (patch: Partial<typeof sp>) => setPlayer({ spotify: { ...sp, ...patch } });
+  return (
+    <Section title="Spotify y videos">
+      <p className="mono muted text-[0.68rem]">Se muestran en el bloque «Reproductor». Quien visita tu Space decide cuándo cargarlos: nada suena solo.</p>
+      <L label="Mi Spotify (enlace de tu perfil de artista o de usuario)">
+        <input className="input" inputMode="url" placeholder="https://open.spotify.com/artist/…" value={sp.profile ?? ""} onChange={(e) => setSpotify({ profile: e.target.value || null })} />
+      </L>
+      <L label="Una playlist de ese Spotify">
+        <input className="input" inputMode="url" placeholder="https://open.spotify.com/playlist/…" value={sp.playlist ?? ""} onChange={(e) => setSpotify({ playlist: e.target.value || null })} />
+      </L>
+      <p className="mono muted text-[0.68rem]">En Spotify: ⋯ → Compartir → Copiar enlace. Un perfil de usuario se muestra como botón; un artista y una playlist, como reproductor.</p>
+      {[0, 1, 2].map((i) => (
+        <L key={i} label={`Video de YouTube ${i + 1}`}>
+          <input
+            className="input"
+            inputMode="url"
+            placeholder="https://www.youtube.com/watch?v=…"
+            value={design.player.videos[i] ?? ""}
+            onChange={(e) => {
+              const videos = [...design.player.videos];
+              videos[i] = e.target.value;
+              setPlayer({ videos: videos.filter(Boolean) });
+            }}
+          />
+        </L>
+      ))}
+      <p className="mono muted text-[0.68rem]">Los videos se suben primero a tu canal de YouTube; aquí pegas el enlace (youtube.com/watch, youtu.be o Shorts).</p>
     </Section>
   );
 }

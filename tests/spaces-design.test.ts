@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_THEMES } from "@/modules/spaces/defaults";
-import { BLOCK_IDS, contrast, designSchema, designVars, orderedBlocks, safeUrl, type SpaceDesign } from "@/modules/spaces/design";
+import { BLOCK_IDS, contrast, designSchema, designVars, normalizeDesign, orderedBlocks, parseSpotify, parseYouTube, safeUrl, spotifyEmbedSrc, spotifyHref, youtubeEmbedSrc, type SpaceDesign } from "@/modules/spaces/design";
 
 const ok = () => structuredClone(DEFAULT_THEMES[0].design) as SpaceDesign;
 const bad = (mut: (d: Record<string, unknown>) => void) => {
@@ -78,5 +78,44 @@ describe("render: diseño → variables CSS", () => {
     const d = ok();
     Object.assign(d.background, { kind: "image", assetId: "6b1a4e0e-3f0a-4a3b-8f6e-0c9d2b7a1e55" });
     expect(designVars(d, "/s/6b1a4e0e-3f0a-4a3b-8f6e-0c9d2b7a1e55")["--sp-bg-image"]).toContain('url("/s/6b1a4e0e-3f0a-4a3b-8f6e-0c9d2b7a1e55")');
+  });
+});
+
+describe("Spotify y YouTube incrustados", () => {
+  const ID = "37i9dQZF1DXcBWIGoYBM5M"; // 22 caracteres
+  const withPlayer = (patch: Record<string, unknown>) => bad((d) => Object.assign(d.player as Record<string, unknown>, patch));
+
+  it("acepta perfil de artista/usuario, playlist y videos de YouTube en sus formas habituales", () => {
+    expect(withPlayer({ spotify: { profile: `https://open.spotify.com/artist/${ID}?si=abc`, playlist: `https://open.spotify.com/intl-es/playlist/${ID}` }, videos: ["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://youtu.be/dQw4w9WgXcQ?t=3", "https://youtube.com/shorts/dQw4w9WgXcQ"] }).success).toBe(true);
+    expect(withPlayer({ spotify: { profile: "https://open.spotify.com/user/mi.usuario_123", playlist: null } }).success).toBe(true);
+  });
+  it("un diseño guardado antes de existir estos campos sigue siendo válido y se completa al leerlo", () => {
+    const old = ok() as unknown as { player: Record<string, unknown> };
+    delete old.player.spotify;
+    delete old.player.videos;
+    expect(designSchema.safeParse(old).success).toBe(true);
+    const n = normalizeDesign(old as unknown as SpaceDesign);
+    expect(n.player.spotify).toEqual({ profile: null, playlist: null });
+    expect(n.player.videos).toEqual([]);
+  });
+  it("rechaza hosts falsos, http, playlist donde va perfil, ids raros y más de 3 videos", () => {
+    for (const profile of [`https://open.spotify.com.evil.io/artist/${ID}`, `http://open.spotify.com/artist/${ID}`, `https://open.spotify.com/playlist/${ID}`, "https://open.spotify.com/artist/corto", `https://open.spotify.com/artist/${ID}/../x"onload=alert(1)`, "https://spotify.link/abc"]) {
+      expect(withPlayer({ spotify: { profile, playlist: null } }).success, profile).toBe(false);
+    }
+    expect(withPlayer({ spotify: { profile: null, playlist: `https://open.spotify.com/artist/${ID}` } }).success).toBe(false);
+    for (const v of ["https://youtube.com.evil.io/watch?v=dQw4w9WgXcQ", "https://www.youtube.com/watch?v=corto", "https://www.youtube.com/watch?v=dQw4w9WgXcQ\"onload=x", "https://www.youtube.com/results?search_query=x", "javascript:alert(1)"]) {
+      expect(withPlayer({ videos: [v] }).success, v).toBe(false);
+    }
+    const v = "https://youtu.be/dQw4w9WgXcQ";
+    expect(withPlayer({ videos: [v, v, v, v] }).success).toBe(false);
+  });
+  it("el iframe se construye solo desde ids validados (nunca desde el texto de la persona)", () => {
+    expect(parseYouTube("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=x")).toBe("dQw4w9WgXcQ");
+    expect(youtubeEmbedSrc("dQw4w9WgXcQ")).toBe("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0");
+    const art = parseSpotify(`https://open.spotify.com/artist/${ID}?si=zzz`, ["artist"])!;
+    expect(spotifyEmbedSrc(art)).toBe(`https://open.spotify.com/embed/artist/${ID}`);
+    const user = parseSpotify("https://open.spotify.com/user/yo", ["user"])!;
+    expect(spotifyEmbedSrc(user)).toBeNull(); // los perfiles de usuario van como enlace
+    expect(spotifyHref(user)).toBe("https://open.spotify.com/user/yo");
   });
 });

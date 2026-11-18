@@ -4,9 +4,9 @@ import { DomainError } from "@/lib/errors";
 import { artists } from "@/modules/artists/schema";
 import { media } from "@/modules/media/schema";
 import { users } from "@/modules/users/schema";
-import { DEFAULT_PRIVACY, REPORT_REASONS, spaceAssets, spaceFavoriteArtists, spaceGenreOptions, spaceProfileGenres, spaceProfiles, spaceReports, type SpaceLinks } from "./schema";
+import { DEFAULT_PRIVACY, REPORT_REASONS, spaceAssets, spaceFollows, spaceFavoriteArtists, spaceGenreOptions, spaceProfileGenres, spaceProfiles, spaceReports, type SpaceLinks } from "./schema";
 import { assetUrl } from "./profile";
-import type { SpaceDesign } from "./design";
+import { normalizeDesign, type SpaceDesign } from "./design";
 import { followCounts, isFollowing } from "./follows";
 import { normalizeUsername } from "./username";
 import { z } from "zod";
@@ -53,8 +53,9 @@ export async function getPublicSpace(db: Db, usernameRaw: string, viewer: { id: 
   const published = p.status === "published";
   if (!published && !(isOwner && p.status !== "disabled")) return null;
   const useDraft = isOwner && (opts.preview || !published);
-  const design = useDraft ? (p.draftDesign ?? p.publishedDesign) : p.publishedDesign;
-  if (!design) return null;
+  const rawDesign = useDraft ? (p.draftDesign ?? p.publishedDesign) : p.publishedDesign;
+  if (!rawDesign) return null;
+  const design = normalizeDesign(rawDesign);
   const privacy = { ...DEFAULT_PRIVACY, ...p.privacy };
 
   const [u, genreRows, artistRows, assets, counts, viewerFollows] = await Promise.all([
@@ -149,4 +150,50 @@ export async function reportSpace(db: Db, raw: unknown, reporterId: string | nul
   if (!p || p.status !== "published") throw new DomainError("not_found", "Ese Space no existe.");
   if (reporterId === p.userId) throw new DomainError("self_report", "No puedes reportar tu propio Space.");
   await db.insert(spaceReports).values({ profileUserId: p.userId, reporterId, reason: input.reason, detail: input.detail || null });
+}
+
+export type NetworkNode = { username: string; displayName: string; avatarUrl: string | null; genres: string[]; featured: boolean; followers: number | null };
+export type Network = { nodes: NetworkNode[]; edges: { from: string; to: string }[]; total: number };
+
+/**
+ * «Red de amigos» de la portada: hasta `limit` Spaces públicos (destacados primero) y los seguimientos que hay entre ellos.
+ * Solo salen Spaces publicados y que aceptan aparecer en el listado. Un seguimiento se dibuja únicamente si las DOS personas
+ * dejaron visibles sus números de seguidores (la opción «mostrar seguidores y seguidos»); si no, la relación no se revela.
+ */
+export async function getNetwork(db: Db, limit = 9): Promise<Network> {
+  const visible = and(eq(spaceProfiles.status, "published"), sql`coalesce((${spaceProfiles.privacy} ->> 'listed')::boolean, true)`);
+  const rows = await db
+    .select({ p: spaceProfiles, avatarKey: spaceAssets.storageKey })
+    .from(spaceProfiles)
+    .leftJoin(spaceAssets, and(eq(spaceAssets.id, spaceProfiles.avatarAssetId), eq(spaceAssets.status, "ok")))
+    .where(visible)
+    .orderBy(desc(spaceProfiles.featured), desc(spaceProfiles.publishedAt))
+    .limit(Math.max(1, Math.min(limit, 16)));
+  const [{ c }] = await db.select({ c: sql<number>`count(*)` }).from(spaceProfiles).where(visible);
+  if (!rows.length) return { nodes: [], edges: [], total: 0 };
+  const ids = rows.map((r) => r.p.userId);
+  const shows = (r: (typeof rows)[number]) => ({ ...DEFAULT_PRIVACY, ...r.p.privacy }).showFollows;
+  const [genreRows, followRows, countRows] = await Promise.all([
+    db.select({ userId: spaceProfileGenres.userId, name: spaceGenreOptions.name }).from(spaceProfileGenres).innerJoin(spaceGenreOptions, eq(spaceGenreOptions.id, spaceProfileGenres.genreId)).where(inArray(spaceProfileGenres.userId, ids)).orderBy(asc(spaceProfileGenres.position)),
+    db.select({ from: spaceFollows.followerId, to: spaceFollows.followedId }).from(spaceFollows).where(and(inArray(spaceFollows.followerId, ids), inArray(spaceFollows.followedId, ids))),
+    db
+      .select({ id: spaceFollows.followedId, n: sql<number>`count(*)` })
+      .from(spaceFollows)
+      .innerJoin(spaceProfiles, eq(spaceProfiles.userId, spaceFollows.followerId))
+      .where(and(inArray(spaceFollows.followedId, ids), sql`${spaceProfiles.status} <> 'disabled'`))
+      .groupBy(spaceFollows.followedId),
+  ]);
+  const byId = new Map(rows.map((r) => [r.p.userId, r]));
+  const nodes: NetworkNode[] = rows.map((r) => ({
+    username: r.p.username,
+    displayName: r.p.displayName,
+    avatarUrl: r.avatarKey ? assetUrl(r.avatarKey) : null,
+    genres: genreRows.filter((g) => g.userId === r.p.userId).slice(0, 2).map((g) => g.name),
+    featured: r.p.featured,
+    followers: shows(r) ? Number(countRows.find((x) => x.id === r.p.userId)?.n ?? 0) : null,
+  }));
+  const edges = followRows
+    .filter((e) => shows(byId.get(e.from)!) && shows(byId.get(e.to)!))
+    .map((e) => ({ from: byId.get(e.from)!.p.username, to: byId.get(e.to)!.p.username }));
+  return { nodes, edges, total: Number(c) };
 }

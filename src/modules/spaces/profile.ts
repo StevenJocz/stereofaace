@@ -5,7 +5,7 @@ import { DomainError } from "@/lib/errors";
 import { artists } from "@/modules/artists/schema";
 import { users } from "@/modules/users/schema";
 import { DEFAULT_THEMES } from "./defaults";
-import { designSchema, safeUrl, type SpaceDesign } from "./design";
+import { designSchema, normalizeDesign, safeUrl, type SpaceDesign } from "./design";
 import { followCounts } from "./follows";
 import { DEFAULT_PRIVACY, spaceAssets, spaceFavoriteArtists, spaceGenreOptions, spaceProfileGenres, spaceProfiles, spaceThemes, type SpaceLinks, type SpacePrivacy } from "./schema";
 import { usernameSchema } from "./username";
@@ -79,7 +79,7 @@ export async function getMySpace(db: Db, userId: string): Promise<MySpace> {
     db.select().from(spaceThemes).where(eq(spaceThemes.active, true)).orderBy(asc(spaceThemes.position)),
     followCounts(db, userId),
   ]);
-  const design = p.draftDesign ?? p.publishedDesign ?? DEFAULT_THEMES[0].design;
+  const design = normalizeDesign(p.draftDesign ?? p.publishedDesign ?? DEFAULT_THEMES[0].design);
   const url = (id: string | null) => {
     const a = assetRows.find((x) => x.id === id);
     return a ? assetUrl(a.storageKey) : null;
