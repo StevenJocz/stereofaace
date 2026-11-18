@@ -9,10 +9,10 @@ export async function GET() {
   await connection();
   try {
     const feed = await getStationFeed(await getDb());
-    if (!feed) return Response.json({ nowPlaying: null, history: [] }, { headers: HEADERS });
-    return Response.json({ nowPlaying: feed.nowPlaying, history: feed.history.slice(0, 2) }, { headers: HEADERS });
+    if (!feed) return Response.json({ nowPlaying: null, history: [], listeners: null }, { headers: HEADERS });
+    return Response.json({ nowPlaying: feed.nowPlaying, history: feed.history.slice(0, 2), listeners: feed.listeners }, { headers: HEADERS });
   } catch (error) {
     console.error("[radio/nowplaying]", error);
-    return Response.json({ nowPlaying: null, history: [] }, { headers: HEADERS });
+    return Response.json({ nowPlaying: null, history: [], listeners: null }, { headers: HEADERS });
   }
 }

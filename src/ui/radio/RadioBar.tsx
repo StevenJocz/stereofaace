@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Art } from "@/ui/Art";
 import { Mark } from "@/ui/Header";
+import { TopoLines } from "@/ui/spaces/TopoLines";
 import { useRadio, type RadioStatus } from "./RadioProvider";
 import { ScheduleModal } from "./ScheduleModal";
 import { OWN_STATION_SLUG, useNowPlayingProgram } from "./useNowPlayingProgram";
 import { ChatPanel } from "@/ui/chat/ChatPanel";
-import { TrackList } from "./StationTracks";
 import { useStationTracks } from "./useStationTracks";
 import { Visualizer } from "./Visualizer";
 import type { PublicStation } from "@/modules/radio/service";
@@ -200,6 +200,7 @@ export function RadioBar() {
   // La programación solo existe para la emisora propia (StereoFace Radio).
   const program = useNowPlayingProgram(r.current?.slug === OWN_STATION_SLUG);
   const tracks = useStationTracks(r.current?.slug === OWN_STATION_SLUG);
+  const listeners = tracks?.listeners ?? null;
 
   // Publica la altura real para reservar espacio y colocar el panel.
   useEffect(() => {
@@ -234,191 +235,167 @@ export function RadioBar() {
       <StationPanel />
       {own && <ScheduleModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />}
       {own && <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />}
-      <section ref={bar} aria-label="StereoFace Frequencies, radio en vivo" className="radio-bar">
-        {/* Móvil: fila 1 = emisora + reproducir; fila 2 = estado + volumen y lista.
-            Escritorio (lg): tres columnas con transporte y visualizador. */}
-        <div className="wrap grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.5fr)_auto] lg:gap-x-4 lg:py-3 xl:grid-cols-[minmax(0,22rem)_minmax(0,46rem)_auto] xl:justify-between xl:gap-x-8">
-          {/* Emisora */}
-          <div className="flex min-w-0 items-center gap-3">
-            {own && program ? (
-              <button
-                type="button"
-                className="program-block flex min-w-0 items-center gap-3 text-left"
-                onClick={() => setScheduleOpen(true)}
-                aria-label={`Al aire: ${program.program.name}. Ver programación completa`}
-              >
-                <span
-                  className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-[8px] border border-line lg:size-14"
-                  style={{ background: `linear-gradient(135deg, ${program.program.color}, #0c0c0c)` }}
-                >
-                  {program.program.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- imagen propia del programa servida por /media
-                    <img src={program.program.imageUrl} alt="" className="absolute inset-0 size-full object-cover" />
-                  ) : (
-                    <span className="display-up text-[1.2rem] text-black">{program.program.name.slice(0, 1)}</span>
-                  )}
-                </span>
-                <span className="min-w-0">
-                  <span className="mono flex items-center gap-2 whitespace-nowrap text-[0.6rem] text-accent-ink">
-                    <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-accent live-dot" />
-                    Al aire · hasta {new Date(program.endsAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota", hour12: false })}
-                    <span aria-hidden="true" className="hidden opacity-70 lg:inline">›</span>
-                  </span>
-                  <span className="block truncate font-bold leading-tight">{program.program.name}</span>
-                  <span className="mono block truncate text-[0.66rem] text-muted">
-                    {s.name}
-                    {program.program.hosts ? ` · Con ${program.program.hosts}` : ""}
-                  </span>
-                </span>
-              </button>
-            ) : own ? (
-              // Sin programa al aire: la emisora propia se presenta con su logo, sin datos de relleno.
-              <button
-                type="button"
-                className="program-block flex min-w-0 items-center gap-3 text-left"
-                onClick={() => setScheduleOpen(true)}
-                aria-label={`${s.name}, en vivo. Ver programación completa`}
-              >
-                <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-[8px] border border-line bg-black lg:size-14">
-                  <Mark size={44} />
-                </span>
-                <span className="min-w-0">
-                  <span className="mono flex items-center gap-2 whitespace-nowrap text-[0.6rem] text-accent-ink">
-                    <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-accent live-dot" />
-                    Radio en vivo
-                    <span aria-hidden="true" className="hidden opacity-70 lg:inline">›</span>
-                  </span>
-                  <span className="block truncate font-bold leading-tight">{s.name}</span>
-                  <span className="mono block truncate text-[0.66rem] text-muted">Electrónica, indie y underground</span>
-                </span>
-              </button>
-            ) : (
-              <>
-                <Cover s={s} size="size-12 lg:size-14" />
-                <div className="min-w-0">
-                  <p className="mono flex items-center gap-2 text-[0.6rem] text-accent-ink">
-                    StereoFace Frequencies
-                    {s.isDemo && <span className="tag tag-demo !px-1.5 !py-0 !text-[0.55rem]">Demo</span>}
-                  </p>
-                  <p className="truncate font-bold leading-tight">{s.name}</p>
-                  <p className="mono truncate text-[0.66rem] text-muted">
-                    {[s.country, s.genres.join(", ") || "Género por definir"].filter(Boolean).join(" · ")}
-                  </p>
-                  {own ? (
-                    <button type="button" className="mono hidden text-[0.62rem] text-accent-ink underline underline-offset-2 lg:inline" onClick={() => setScheduleOpen(true)}>
-                      Ver programación
-                    </button>
-                  ) : (
-                    <Attribution s={s} className="hidden lg:inline-flex" />
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+      <section ref={bar} aria-label="StereoFace Radio, en directo" className="radio-bar">
+        <div className="wrap">
+          <div className="rb-card">
+            <span className="rb-glow" aria-hidden="true" />
 
-          {/* Reproducir (solo móvil) */}
-          <button type="button" onClick={onPlay} className="radio-play lg:hidden" aria-label={playLabel}>
-            <Ico name={playIcon} size={22} />
-          </button>
-
-          {/* Estado; en escritorio también transporte y visualizador */}
-          <div className="flex min-w-0 items-center gap-3 lg:gap-4">
-            <div className="hidden items-center gap-2 lg:flex">
-              {!own && (
-              <button
-                type="button"
-                className="btn-icon !size-9"
-                onClick={() => r.step(-1)}
-                disabled={r.stations.length < 2}
-                aria-label="Emisora anterior"
-              >
-                <Ico name="prev" size={16} />
-              </button>
-              )}
-              <button type="button" onClick={onPlay} className="radio-play" aria-label={playLabel}>
-                <Ico name={playIcon} size={22} />
-              </button>
-              {!own && (
-              <button
-                type="button"
-                className="btn-icon !size-9"
-                onClick={() => r.step(1)}
-                disabled={r.stations.length < 2}
-                aria-label="Emisora siguiente"
-              >
-                <Ico name="next" size={16} />
-              </button>
-              )}
+            {/* Marca (solo pantallas amplias) */}
+            <div className="rb-logo" aria-hidden="true">
+              <span className="rb-logo-mark">
+                <Mark size={26} />
+                <span className="display-wide rb-logo-name">
+                  Stereo<span className="text-accent-ink">Face</span>
+                </span>
+              </span>
+              <span className="mono rb-logo-sub">R A D I O</span>
+              <TopoLines />
             </div>
 
-            <div className="min-w-0 flex-1 lg:flex-none">
-              <div className="flex flex-wrap items-center gap-2">
-                {!(own && tracks?.nowPlaying && ["idle", "paused", "playing"].includes(r.status)) && (
-                  <StatusPill status={r.status} attempt={r.attempt} max={r.maxAttempts} />
+            {/* Portada */}
+            {own ? (
+              <button type="button" className="rb-cover" onClick={() => setScheduleOpen(true)} aria-label={program ? `Al aire: ${program.program.name}. Ver programación completa` : `${s.name}, en vivo. Ver programación completa`}>
+                <i className="rb-plus rb-plus-a" aria-hidden="true" />
+                <i className="rb-plus rb-plus-b" aria-hidden="true" />
+                <i className="rb-plus rb-plus-c" aria-hidden="true" />
+                <i className="rb-plus rb-plus-d" aria-hidden="true" />
+                {program?.program.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- imagen propia del programa servida por /media
+                  <img src={program.program.imageUrl} alt="" className="absolute inset-0 size-full object-cover" />
+                ) : program ? (
+                  <span className="display-up grid size-full place-items-center text-[2rem] text-black" style={{ background: `linear-gradient(135deg, ${program.program.color}, #0c0c0c)` }}>
+                    {program.program.name.slice(0, 1)}
+                  </span>
+                ) : (
+                  <span className="grid size-full place-items-center bg-black">
+                    <Mark size={54} />
+                  </span>
                 )}
+              </button>
+            ) : (
+              <span className="rb-cover" aria-hidden="true">
+                <i className="rb-plus rb-plus-a" />
+                <i className="rb-plus rb-plus-b" />
+                <i className="rb-plus rb-plus-c" />
+                <i className="rb-plus rb-plus-d" />
+                {s.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- imagen remota de la emisora: no se optimiza ni se almacena en nuestro servidor
+                  <img src={s.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="absolute inset-0 size-full object-cover" />
+                ) : (
+                  <Art scene="wave" tone="acid" seed={seedOf(s.name)} />
+                )}
+              </span>
+            )}
+
+            {/* Información, onda y controles */}
+            <div className="rb-main">
+              <p className="rb-top">
+                <span className="rb-badge">
+                  <span aria-hidden="true" className={`rb-badge-dot ${playing ? "live-dot" : ""}`} />
+                  {own ? "En directo" : "Radio en vivo"}
+                </span>
+                <span className="rb-station">{own ? "StereoFace Radio" : (s.isDemo ? `${s.name} · demo` : s.name)}</span>
                 {r.status === "error" && (
                   <button type="button" onClick={r.retry} className="mono text-accent-ink underline">
                     Reintentar
                   </button>
                 )}
-              </div>
-              <p className="mono mt-1 truncate text-[0.62rem] text-muted lg:hidden">
-                {own && tracks?.nowPlaying ? `♪ ${tracks.nowPlaying.artist ? `${tracks.nowPlaying.title} — ${tracks.nowPlaying.artist}` : tracks.nowPlaying.title}` : <Attribution s={s} />}
               </p>
-              <span className="sr-only" role="status" aria-live="polite">
-                {STATUS[r.status].label}. {r.detail}
-              </span>
+              <h2 className="rb-title">{own && program ? program.program.name : s.name}</h2>
+              <p className="rb-genres">
+                {own
+                  ? (program?.program.hosts ? `Con ${program.program.hosts}` : "Electrónica / Indie / Underground")
+                  : ([s.country, s.genres.join(" / ") || "Género por definir"].filter(Boolean).join(" · "))}
+              </p>
+              {own && tracks?.nowPlaying && (
+                <p className="rb-track">♪ {tracks.nowPlaying.artist ? `${tracks.nowPlaying.title} — ${tracks.nowPlaying.artist}` : tracks.nowPlaying.title}</p>
+              )}
+              {!own && (
+                <p className="rb-track">
+                  <Attribution s={s} />
+                </p>
+              )}
+              <div className="rb-wave">
+                <Visualizer active={r.status === "playing"} analysable={r.analysable} silenced={silenced} getAnalyser={r.getAnalyser} />
+              </div>
+              <div className="rb-controls">
+                {own && (
+                  <button type="button" className="rb-ghost" onClick={() => setScheduleOpen(true)} aria-label="Ver la programación">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="4" y="5" width="16" height="15" rx="2.5" />
+                      <path d="M8 3v4M16 3v4M4 10h16" />
+                    </svg>
+                  </button>
+                )}
+                {r.stations.length > 1 && (
+                  <button type="button" className="rb-ghost" onClick={() => r.step(-1)} aria-label="Emisora anterior">
+                    <Ico name="prev" size={22} />
+                  </button>
+                )}
+                <button type="button" onClick={onPlay} className="rb-play" aria-label={playLabel}>
+                  <Ico name={playIcon} size={26} />
+                </button>
+                {r.stations.length > 1 && (
+                  <button type="button" className="rb-ghost" onClick={() => r.step(1)} aria-label="Emisora siguiente">
+                    <Ico name="next" size={22} />
+                  </button>
+                )}
+                {own && (
+                  <button type="button" className="rb-ghost" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen} aria-controls="chat-panel" aria-label="Chat y pedidos de canciones">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
-            {own && tracks?.nowPlaying && (
-              <div className="hidden min-w-0 flex-1 lg:block">
-                <TrackList tracks={tracks} fallbackArt={program?.program.imageUrl ?? null} />
+            {/* Estado, oyentes y volumen */}
+            <div className="rb-side">
+              <div className="rb-live">
+                <p className="rb-live-top">
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                    <path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.2 5.2a9.6 9.6 0 0 0 0 13.6M18.8 5.2a9.6 9.6 0 0 1 0 13.6" />
+                  </svg>
+                  <span>{r.status === "playing" ? "En vivo" : STATUS[r.status].label}</span>
+                </p>
+                {own && listeners !== null && (
+                  <p className="rb-live-sub">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                      <circle cx="12" cy="9" r="3.6" />
+                      <path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4" />
+                    </svg>
+                    {new Intl.NumberFormat("es-CO").format(listeners)} {listeners === 1 ? "oyente" : "oyentes"}
+                  </p>
+                )}
               </div>
-            )}
-            {/* Con la tarjeta de canciones no se muestra el visualizador: queda más limpio. */}
-            {!(own && tracks?.nowPlaying) && (
-              <div className="hidden h-11 min-w-0 flex-1 lg:block">
-                <Visualizer
-                  active={r.status === "playing"}
-                  analysable={r.analysable}
-                  silenced={silenced}
-                  getAnalyser={r.getAnalyser}
+              <div className="rb-vol">
+                <button type="button" className="rb-ghost rb-ghost-sm" onClick={r.toggleMute} aria-pressed={r.muted} aria-label={r.muted ? "Activar sonido" : "Silenciar"}>
+                  <Ico name={silenced ? "mute" : "vol"} size={18} />
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={r.muted ? 0 : r.volume}
+                  onChange={(e) => r.setVolume(Number(e.target.value))}
+                  aria-label="Volumen"
+                  style={{ ["--v" as string]: `${(r.muted ? 0 : r.volume) * 100}%` }}
+                  className="radio-range"
                 />
+                {r.stations.length > 1 && (
+                  <button type="button" className="rb-ghost rb-ghost-sm" onClick={() => r.setPanelOpen(!r.panelOpen)} aria-expanded={r.panelOpen} aria-controls="radio-panel" aria-label="Lista de emisoras">
+                    <Ico name="list" size={18} />
+                  </button>
+                )}
               </div>
-            )}
+            </div>
           </div>
-
-          {/* Volumen y lista */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="btn-icon !size-9"
-              onClick={r.toggleMute}
-              aria-pressed={r.muted}
-              aria-label={r.muted ? "Activar sonido" : "Silenciar"}
-            >
-              <Ico name={silenced ? "mute" : "vol"} size={16} />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={r.muted ? 0 : r.volume}
-              onChange={(e) => r.setVolume(Number(e.target.value))}
-              aria-label="Volumen"
-              style={{ ["--v" as string]: `${(r.muted ? 0 : r.volume) * 100}%` }}
-              className="radio-range hidden w-24 lg:block"
-            />
-            {own && (
-              <button type="button" className="btn !px-3.5 !py-2" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen} aria-controls="chat-panel">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z" />
-                </svg>
-                <span className="hidden sm:inline">Chat</span>
-              </button>
-            )}
-          </div>
+          <span className="sr-only" role="status" aria-live="polite">
+            {STATUS[r.status].label}. {r.detail}
+          </span>
         </div>
       </section>
     </>

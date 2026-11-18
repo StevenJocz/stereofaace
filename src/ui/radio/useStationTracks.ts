@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FeedTrack, StationFeed } from "@/modules/radio/nowplaying";
 
-export type StationTracks = { nowPlaying: StationFeed["nowPlaying"]; history: FeedTrack[] };
+export type StationTracks = { nowPlaying: StationFeed["nowPlaying"]; history: FeedTrack[]; listeners?: number | null };
 
 /** Lo que suena y las dos anteriores en la emisora propia (se refresca cada 15 s). Solo consulta si `enabled`. */
 export function useStationTracks(enabled: boolean): StationTracks | null {

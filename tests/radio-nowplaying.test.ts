@@ -33,7 +33,7 @@ describe("parseFeed", () => {
   });
 
   it("una respuesta rota no revienta: sin pista y sin historial", () => {
-    expect(parseFeed(null)).toEqual({ nowPlaying: null, history: [], live: { isLive: false, streamer: null } });
+    expect(parseFeed(null)).toEqual({ nowPlaying: null, history: [], live: { isLive: false, streamer: null }, listeners: null });
     expect(parseFeed({ now_playing: { song: {} }, song_history: "x" }).nowPlaying).toBeNull();
   });
 });
@@ -103,5 +103,15 @@ describe("getRecentTracks (últimas canciones del dashboard)", () => {
   it("si el historial con clave falla, cae al público", async () => {
     const list = await getRecentTracks(h.db, admin, 10, (async (url: string) => (String(url).includes("/history") ? json({}, 403) : json(raw))) as unknown as typeof fetch);
     expect(list.map((t) => t.title)).toEqual(["Ahora", "Antes 1", "Antes 2", "Antes 3"]);
+  });
+});
+
+describe("oyentes conectados", () => {
+  it("lee listeners.current y descarta lo que no sea un número válido", () => {
+    expect(parseFeed({ listeners: { current: 1248 } }).listeners).toBe(1248);
+    expect(parseFeed({ listeners: { current: 0 } }).listeners).toBe(0);
+    for (const bad of [{ listeners: { current: -3 } }, { listeners: { current: "12" } }, { listeners: 5 }, { listeners: null }, {}]) {
+      expect(parseFeed(bad).listeners, JSON.stringify(bad)).toBeNull();
+    }
   });
 });

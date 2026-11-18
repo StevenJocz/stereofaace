@@ -8,6 +8,8 @@ export type StationFeed = {
   nowPlaying: (FeedTrack & { durationSec: number | null }) | null;
   history: FeedTrack[];
   live: { isLive: boolean; streamer: string | null };
+  /** Oyentes conectados ahora (AzuraCast), o `null` si no se informa. */
+  listeners: number | null;
 };
 export type RecentTrack = FeedTrack & { onAir: boolean };
 
@@ -35,6 +37,10 @@ export function parseFeed(raw: unknown, historyLimit = 10): StationFeed {
     nowPlaying: np ? { ...np, durationSec: typeof dur === "number" && dur > 0 ? dur : null } : null,
     history,
     live: { isLive: live.is_live === true, streamer: str(live.streamer_name) || null },
+    listeners: (() => {
+      const n = obj(r.listeners).current;
+      return typeof n === "number" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+    })(),
   };
 }
 
