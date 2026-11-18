@@ -7,6 +7,7 @@ import { users } from "@/modules/users/schema";
 import { DEFAULT_PRIVACY, REPORT_REASONS, spaceAssets, spaceFavoriteArtists, spaceGenreOptions, spaceProfileGenres, spaceProfiles, spaceReports, type SpaceLinks } from "./schema";
 import { assetUrl } from "./profile";
 import type { SpaceDesign } from "./design";
+import { followCounts, isFollowing } from "./follows";
 import { normalizeUsername } from "./username";
 import { z } from "zod";
 
@@ -28,6 +29,12 @@ export type PublicSpace = {
   featured: boolean;
   /** Acepta aparecer en el listado y en buscadores. */
   listed: boolean;
+  /** Seguidores y seguidos; `null` si la persona decidió no mostrarlos. */
+  follows: { followers: number; following: number } | null;
+  /** Quien mira ya sigue a esta persona. */
+  viewerFollows: boolean;
+  /** Quien mira tiene una cuenta con sesión iniciada. */
+  viewerSignedIn: boolean;
   /** Es el propio dueño viendo su Space (puede ver el borrador). */
   isOwner: boolean;
   isDraftPreview: boolean;
@@ -50,7 +57,7 @@ export async function getPublicSpace(db: Db, usernameRaw: string, viewer: { id: 
   if (!design) return null;
   const privacy = { ...DEFAULT_PRIVACY, ...p.privacy };
 
-  const [u, genreRows, artistRows, assets] = await Promise.all([
+  const [u, genreRows, artistRows, assets, counts, viewerFollows] = await Promise.all([
     db.select({ createdAt: users.createdAt }).from(users).where(eq(users.id, p.userId)),
     db.select({ slug: spaceGenreOptions.slug, name: spaceGenreOptions.name }).from(spaceProfileGenres).innerJoin(spaceGenreOptions, eq(spaceGenreOptions.id, spaceProfileGenres.genreId)).where(eq(spaceProfileGenres.userId, p.userId)).orderBy(asc(spaceProfileGenres.position)),
     db
@@ -61,6 +68,8 @@ export async function getPublicSpace(db: Db, usernameRaw: string, viewer: { id: 
       .where(eq(spaceFavoriteArtists.userId, p.userId))
       .orderBy(asc(spaceFavoriteArtists.position)),
     db.select().from(spaceAssets).where(and(eq(spaceAssets.userId, p.userId), eq(spaceAssets.status, "ok"))).orderBy(asc(spaceAssets.position)),
+    followCounts(db, p.userId),
+    viewer && !isOwner ? isFollowing(db, viewer.id, p.userId) : Promise.resolve(false),
   ]);
   const url = (id: string | null) => {
     const a = assets.find((x) => x.id === id);
@@ -83,6 +92,9 @@ export async function getPublicSpace(db: Db, usernameRaw: string, viewer: { id: 
     design,
     featured: p.featured,
     listed: privacy.listed,
+    follows: privacy.showFollows || isOwner ? counts : null,
+    viewerFollows,
+    viewerSignedIn: viewer !== null,
     isOwner,
     isDraftPreview: useDraft,
   };

@@ -24,7 +24,7 @@ export type Studio = {
 
 const COLOR_FIELDS: [keyof SpaceDesign["colors"], string][] = [["bg", "Fondo"], ["primary", "Principal"], ["secondary", "Secundario"], ["text", "Texto"], ["link", "Enlaces"], ["card", "Tarjetas"]];
 const LINK_FIELDS: [string, string][] = [["instagram", "Instagram"], ["x", "X"], ["tiktok", "TikTok"], ["facebook", "Facebook"], ["youtube", "YouTube"], ["spotify", "Spotify"], ["soundcloud", "SoundCloud"], ["bandcamp", "Bandcamp"], ["web", "Sitio web"]];
-const PRIVACY_FIELDS: [keyof SpacePrivacy, string][] = [["listed", "Aparecer en /spaces y en las búsquedas"], ["showLocation", "Mostrar mi ubicación"], ["showJoined", "Mostrar desde cuándo estoy en StereoFace"], ["showLinks", "Mostrar mis enlaces"], ["showFavorites", "Mostrar mis artistas favoritos"]];
+const PRIVACY_FIELDS: [keyof SpacePrivacy, string][] = [["listed", "Aparecer en /spaces y en las búsquedas"], ["showLocation", "Mostrar mi ubicación"], ["showJoined", "Mostrar desde cuándo estoy en StereoFace"], ["showLinks", "Mostrar mis enlaces"], ["showFavorites", "Mostrar mis artistas favoritos"], ["showFollows", "Mostrar cuántas personas me siguen y a cuántas sigo"]];
 const IMG = "image/jpeg,image/png,image/webp,image/avif";
 
 export function move<T>(arr: T[], i: number, d: -1 | 1): T[] {

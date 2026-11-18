@@ -152,6 +152,9 @@ export function SpaceStudio({ initial, mode, mailConfigured, logout }: { initial
       design: space.design,
       featured: p.featured,
       listed: p.privacy.listed,
+      follows: space.follows,
+      viewerFollows: false,
+      viewerSignedIn: true,
       isOwner: true,
       isDraftPreview: true,
     };

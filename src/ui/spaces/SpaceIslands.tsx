@@ -23,6 +23,85 @@ export function SpaceRadio() {
   );
 }
 
+/**
+ * Seguidores y seguidos de un Space, con el botón de seguir. Sin sesión, el botón lleva a entrar; el dueño ve sus números sin botón.
+ * Actualiza el contador al momento y lo corrige con lo que responde el servidor.
+ */
+export function SpaceFollow({
+  username,
+  initial,
+  viewerFollows,
+  viewerSignedIn,
+  isOwner,
+  interactive,
+}: {
+  username: string;
+  initial: { followers: number; following: number };
+  viewerFollows: boolean;
+  viewerSignedIn: boolean;
+  isOwner: boolean;
+  interactive: boolean;
+}) {
+  const [counts, setCounts] = useState(initial);
+  const [following, setFollowing] = useState(viewerFollows);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = async () => {
+    if (busy) return;
+    const was = following;
+    setBusy(true);
+    setError(null);
+    setFollowing(!was); // optimista
+    setCounts((c) => ({ ...c, followers: Math.max(0, c.followers + (was ? -1 : 1)) }));
+    try {
+      const res = await fetch(was ? `/api/spaces/follow?username=${encodeURIComponent(username)}` : "/api/spaces/follow", {
+        method: was ? "DELETE" : "POST",
+        headers: was ? undefined : { "content-type": "application/json" },
+        body: was ? undefined : JSON.stringify({ username }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; counts?: { followers: number; following: number } };
+      if (!res.ok) throw new Error(body.error ?? "No se pudo completar.");
+      if (body.counts) setCounts((c) => ({ ...c, followers: body.counts!.followers }));
+    } catch (e) {
+      setFollowing(was); // se deshace
+      setCounts((c) => ({ ...c, followers: Math.max(0, c.followers + (was ? 1 : -1)) }));
+      setError(e instanceof Error ? e.message : "No se pudo completar.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const n = (v: number) => new Intl.NumberFormat("es-CO").format(v);
+  return (
+    <div className="space-follow">
+      <ul className="space-counts" aria-label="Seguidores y seguidos">
+        <li>
+          <b>{n(counts.followers)}</b> {counts.followers === 1 ? "seguidor" : "seguidores"}
+        </li>
+        <li>
+          <b>{n(counts.following)}</b> siguiendo
+        </li>
+      </ul>
+      {interactive && !isOwner &&
+        (viewerSignedIn ? (
+          <button type="button" className="space-btn" data-following={following} aria-pressed={following} disabled={busy} onClick={() => void toggle()}>
+            {following ? "Siguiendo ✓" : "Seguir"}
+          </button>
+        ) : (
+          <Link href="/spaces/entrar" className="space-btn">
+            Seguir
+          </Link>
+        ))}
+      {error && (
+        <p role="alert" className="space-msg">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const REASONS: [string, string][] = [
   ["spam", "Spam o publicidad"],
   ["ofensivo", "Contenido ofensivo"],

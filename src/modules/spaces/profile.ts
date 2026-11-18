@@ -6,6 +6,7 @@ import { artists } from "@/modules/artists/schema";
 import { users } from "@/modules/users/schema";
 import { DEFAULT_THEMES } from "./defaults";
 import { designSchema, safeUrl, type SpaceDesign } from "./design";
+import { followCounts } from "./follows";
 import { DEFAULT_PRIVACY, spaceAssets, spaceFavoriteArtists, spaceGenreOptions, spaceProfileGenres, spaceProfiles, spaceThemes, type SpaceLinks, type SpacePrivacy } from "./schema";
 import { usernameSchema } from "./username";
 
@@ -35,7 +36,7 @@ const linksSchema = z
     return out;
   });
 
-const privacySchema = z.object({ listed: z.boolean(), showLocation: z.boolean(), showJoined: z.boolean(), showLinks: z.boolean(), showFavorites: z.boolean() }).strict();
+const privacySchema = z.object({ listed: z.boolean(), showLocation: z.boolean(), showJoined: z.boolean(), showLinks: z.boolean(), showFavorites: z.boolean(), showFollows: z.boolean().default(true) }).strict();
 
 export const profileSchema = z.object({
   displayName: text(40).refine((s) => s.length >= 1, "Escribe cómo quieres que te vean"),
@@ -57,6 +58,7 @@ async function profileOf(db: Db, userId: string) {
 export type MySpace = {
   profile: { username: string; displayName: string; bio: string | null; location: string | null; tagline: string | null; links: SpaceLinks; privacy: SpacePrivacy; status: string; featured: boolean; publishedAt: string | null; joinedAt: string; verified: boolean };
   design: SpaceDesign;
+  follows: { followers: number; following: number };
   dirty: boolean;
   genres: string[];
   artists: { artistId: string | null; name: string }[];
@@ -68,13 +70,14 @@ export type MySpace = {
 
 export async function getMySpace(db: Db, userId: string): Promise<MySpace> {
   const p = await profileOf(db, userId);
-  const [u, genreRows, artistRows, assetRows, genreOptions, themes] = await Promise.all([
+  const [u, genreRows, artistRows, assetRows, genreOptions, themes, follows] = await Promise.all([
     db.select({ createdAt: users.createdAt, verified: users.emailVerifiedAt }).from(users).where(eq(users.id, userId)),
     db.select({ slug: spaceGenreOptions.slug }).from(spaceProfileGenres).innerJoin(spaceGenreOptions, eq(spaceGenreOptions.id, spaceProfileGenres.genreId)).where(eq(spaceProfileGenres.userId, userId)).orderBy(asc(spaceProfileGenres.position)),
     db.select({ artistId: spaceFavoriteArtists.artistId, name: spaceFavoriteArtists.name }).from(spaceFavoriteArtists).where(eq(spaceFavoriteArtists.userId, userId)).orderBy(asc(spaceFavoriteArtists.position)),
     db.select().from(spaceAssets).where(and(eq(spaceAssets.userId, userId), eq(spaceAssets.status, "ok"))).orderBy(asc(spaceAssets.position), asc(spaceAssets.createdAt)),
     db.select({ slug: spaceGenreOptions.slug, name: spaceGenreOptions.name }).from(spaceGenreOptions).where(eq(spaceGenreOptions.active, true)).orderBy(asc(spaceGenreOptions.position)),
     db.select().from(spaceThemes).where(eq(spaceThemes.active, true)).orderBy(asc(spaceThemes.position)),
+    followCounts(db, userId),
   ]);
   const design = p.draftDesign ?? p.publishedDesign ?? DEFAULT_THEMES[0].design;
   const url = (id: string | null) => {
@@ -97,6 +100,7 @@ export async function getMySpace(db: Db, userId: string): Promise<MySpace> {
       verified: Boolean(u[0]?.verified),
     },
     design,
+    follows,
     dirty: JSON.stringify(p.draftDesign) !== JSON.stringify(p.publishedDesign) || p.status !== "published",
     genres: genreRows.map((g) => g.slug),
     artists: artistRows,

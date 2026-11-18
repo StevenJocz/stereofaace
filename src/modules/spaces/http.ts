@@ -8,6 +8,7 @@ import type { SessionUser } from "@/modules/users/auth";
 import { removeAsset, readSpaceAsset, uploadAsset } from "./assets";
 import type { Mailer } from "./mailer";
 import { getMySpace, publishSpace, saveDraft, searchCatalogArtists, setFavoriteArtists, setGenres, unpublishSpace, updateProfile, updateUsername } from "./profile";
+import { follow, unfollow } from "./follows";
 import { reportSpace } from "./public";
 
 const NO_STORE = { "cache-control": "no-store" } as const;
@@ -24,6 +25,8 @@ const STATUS: Record<string, number> = {
   image_too_big: 413,
   quota: 413,
   gallery_full: 409,
+  self_follow: 409,
+  follow_limit: 409,
   token_invalid: 400,
 };
 
@@ -180,5 +183,26 @@ export async function spaceImageHandler(db: Db, actor: SessionUser | null, root:
       "x-content-type-options": "nosniff",
       "content-security-policy": "default-src 'none'; sandbox",
     },
+  });
+}
+
+/** Seguir (POST {username}) y dejar de seguir (DELETE ?username=). Siempre con la sesión: nadie sigue «en nombre de» otra persona. */
+export async function followHandler(db: Db, actor: SessionUser | null, request: Request): Promise<Response> {
+  if (!actor) return reply(401, "Inicia sesión para seguir a otras personas.");
+  if (!sameOrigin(request)) return reply(403, "Origen no permitido.");
+  if (!rateLimit(`spaces:follow:${actor.id}`, 30, 60_000).ok) return reply(429, "Demasiadas acciones seguidas. Espera un minuto.");
+  return guarded(actor, async (u) => {
+    if (request.method === "DELETE") {
+      const username = new URL(request.url).searchParams.get("username") ?? "";
+      return Response.json({ following: false, counts: await unfollow(db, u.id, username) }, { headers: NO_STORE });
+    }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return reply(400, "Cuerpo no válido.");
+    }
+    const username = typeof (body as { username?: unknown })?.username === "string" ? (body as { username: string }).username : "";
+    return Response.json({ following: true, counts: await follow(db, u.id, username) }, { headers: NO_STORE });
   });
 }

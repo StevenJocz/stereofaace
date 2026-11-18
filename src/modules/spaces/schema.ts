@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { pk } from "@/lib/db/columns";
 import { artists } from "@/modules/artists/schema";
@@ -15,8 +15,10 @@ export type SpacePrivacy = {
   showJoined: boolean;
   showLinks: boolean;
   showFavorites: boolean;
+  /** Mostrar cuántas personas la siguen y a cuántas sigue. */
+  showFollows: boolean;
 };
-export const DEFAULT_PRIVACY: SpacePrivacy = { listed: true, showLocation: true, showJoined: true, showLinks: true, showFavorites: true };
+export const DEFAULT_PRIVACY: SpacePrivacy = { listed: true, showLocation: true, showJoined: true, showLinks: true, showFavorites: true, showFollows: true };
 export type SpaceLinks = Partial<Record<"instagram" | "x" | "tiktok" | "facebook" | "youtube" | "spotify" | "soundcloud" | "bandcamp" | "web", string>>;
 
 /** Perfil público de una persona (StereoFace Spaces). Una fila por usuario; el diseño se guarda como JSON validado, nunca como HTML ni CSS. */
@@ -160,4 +162,19 @@ export const authTokens = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("auth_tokens_user_idx").on(t.userId, t.kind)],
+);
+
+/** Quién sigue a quién. Una persona no se sigue a sí misma; las dos puntas son cuentas con Space. */
+export const spaceFollows = pgTable(
+  "space_follows",
+  {
+    followerId: uuid("follower_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    followedId: uuid("followed_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.followerId, t.followedId] }), index("space_follows_followed_idx").on(t.followedId), check("space_follows_not_self", sql`${t.followerId} <> ${t.followedId}`)],
 );

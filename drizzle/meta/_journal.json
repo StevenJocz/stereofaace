@@ -92,6 +92,13 @@
       "when": 1795017344144,
       "tag": "0012_spaces_fase1",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795030099265,
+      "tag": "0013_spaces_seguir",
+      "breakpoints": true
     }
   ]
 }

@@ -3597,3 +3597,26 @@ body[data-radio="on"] .adm-shell {
 .space-frame .space-motto {
   display: none;
 }
+
+/* Seguir y seguidores */
+.space-follow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.7rem;
+}
+.space-counts {
+  display: flex;
+  gap: 1.1rem;
+  font-size: 0.9rem;
+}
+.space-counts b {
+  font-family: var(--sp-font-head);
+  font-size: 1.1rem;
+  color: var(--sp-primary);
+}
+.space-btn[data-following="true"] {
+  border-color: var(--sp-primary);
+  color: var(--sp-primary);
+}

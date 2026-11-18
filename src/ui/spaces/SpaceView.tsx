@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { PublicSpace } from "@/modules/spaces/public";
 import { BLOCK_LABEL, designVars, orderedBlocks, safeUrl, type BlockId } from "@/modules/spaces/design";
-import { SpaceActions, SpaceRadio } from "./SpaceIslands";
+import { SpaceActions, SpaceFollow, SpaceRadio } from "./SpaceIslands";
 
 const LINK_LABEL: Record<string, string> = { instagram: "Instagram", x: "X", tiktok: "TikTok", facebook: "Facebook", youtube: "YouTube", spotify: "Spotify", soundcloud: "SoundCloud", bandcamp: "Bandcamp", web: "Sitio web" };
 const NAV: [BlockId, string][] = [["about", "Mi Space"], ["player", "Música"], ["gallery", "Galería"], ["artists", "Favoritos"], ["links", "Enlaces"]];
@@ -192,6 +192,7 @@ export function SpaceView({ space, preview = false }: { space: PublicSpace; prev
               {space.joinedAt && <li>En StereoFace desde {joined(space.joinedAt)}</li>}
               {space.featured && <li>★ Destacado</li>}
             </ul>
+            {space.follows && <SpaceFollow username={space.username} initial={space.follows} viewerFollows={space.viewerFollows} viewerSignedIn={space.viewerSignedIn} isOwner={space.isOwner} interactive={!preview} />}
           </div>
           {!preview && <SpaceActions username={space.username} isOwner={space.isOwner} isDraft={space.isDraftPreview} />}
         </div>
