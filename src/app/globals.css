@@ -4146,3 +4146,103 @@ body[data-radio="on"] .adm-shell {
   border-radius: 6px;
   border: 1px solid var(--line);
 }
+
+/* Menú «Mi Space» del encabezado (icono de perfil con ventanita al pasar el mouse). */
+.spm {
+  position: relative;
+}
+.spm-btn {
+  overflow: hidden;
+}
+.spm-btn[data-has="true"] {
+  border-color: var(--accent);
+}
+.spm-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+}
+.spm-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.6rem);
+  z-index: 60;
+  width: min(18.5rem, 88vw);
+  padding: 1.1rem;
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 96%, var(--violet));
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
+  animation: spm-in 0.18s ease-out;
+}
+.spm-pop[hidden] {
+  display: none;
+}
+/* Puente invisible para que el menú no se cierre al cruzar el espacio entre el icono y la ventana. */
+.spm-pop::before {
+  content: "";
+  position: absolute;
+  inset: -0.7rem 0 auto 0;
+  height: 0.7rem;
+}
+.spm-kicker {
+  font-size: 0.65rem;
+  color: var(--accent);
+}
+.spm-title {
+  font-family: var(--font-archivo), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+.spm-text {
+  font-size: 0.85rem;
+  color: var(--muted, #9a9aa0);
+}
+.spm-cta {
+  margin-top: 0.4rem;
+  justify-content: center;
+  text-align: center;
+}
+.spm-more {
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--muted, #9a9aa0);
+}
+.spm-more:hover {
+  color: var(--accent);
+}
+@keyframes spm-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spm-pop {
+    animation: none;
+  }
+}
+
+/* Aviso para quien aún no tiene cuenta (chat y pedidos). */
+.chat-gate {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.85rem;
+  border: 1px dashed var(--accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.chat-gate-title {
+  font-weight: 800;
+  font-size: 1rem;
+  line-height: 1;
+}
+.chat-gate-text {
+  font-size: 0.8rem;
+  color: var(--muted, #9a9aa0);
+}

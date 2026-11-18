@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CHAT_GIFS, gifByKey } from "@/modules/chat/gifs";
 import type { PublicMessage, PublicRequest } from "@/modules/chat/service";
 import { EMOJI_GROUPS } from "./emojis";
-import { getClientId, getNick, mergeMessages, postJson, saveNick, type ChatConfig, type MessagesResponse, type RequestsResponse } from "./chat-client";
+import { mergeMessages, postJson, type ChatConfig, type MessagesResponse, type RequestsResponse, type Viewer } from "./chat-client";
 
 const POLL_MS = 3500;
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota", hour12: false });
@@ -17,27 +17,26 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
   const [config, setConfig] = useState<ChatConfig | null>(null);
   const [messages, setMessages] = useState<PublicMessage[]>([]);
   const [requests, setRequests] = useState<PublicRequest[]>([]);
+  const [viewer, setViewer] = useState<Viewer | null>(null);
   const lastRef = useRef<number | undefined>(undefined);
-  const idRef = useRef("");
 
   // Mensajes y pedidos: sondeo suave mientras el panel está abierto y la pestaña visible.
   useEffect(() => {
     if (!open) return;
-    idRef.current = getClientId();
     let alive = true;
     const pull = async () => {
       if (document.visibilityState === "hidden") return;
-      const cid = encodeURIComponent(idRef.current);
       try {
         const after = lastRef.current !== undefined ? `&after=${lastRef.current}` : "";
-        const r = await fetch(`/api/chat/messages?clientId=${cid}${after}`, { cache: "no-store" });
+        const r = await fetch(`/api/chat/messages?${after.slice(1)}`, { cache: "no-store" });
         if (r.ok && alive) {
           const d = (await r.json()) as MessagesResponse;
           setConfig(d.config);
+          setViewer(d.viewer);
           lastRef.current = d.last;
           setMessages((cur) => mergeMessages(cur, d.messages));
         }
-        const q = await fetch(`/api/chat/requests?clientId=${cid}`, { cache: "no-store" });
+        const q = await fetch("/api/chat/requests", { cache: "no-store" });
         if (q.ok && alive) {
           const d = (await q.json()) as RequestsResponse;
           setRequests(d.requests);
@@ -79,33 +78,45 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         </button>
       </header>
       {tab === "chat" ? (
-        <ChatTab config={config} messages={messages} onSent={(m) => setMessages((cur) => mergeMessages(cur, [m]))} />
+        <ChatTab config={config} viewer={viewer} messages={messages} onSent={(m) => setMessages((cur) => mergeMessages(cur, [m]))} />
       ) : (
-        <RequestsTab config={config} requests={requests} onCreated={() => void 0} />
+        <RequestsTab config={config} viewer={viewer} requests={requests} onCreated={() => void 0} />
       )}
     </section>
   );
 }
 
-function NickField({ nick, setNick }: { nick: string; setNick: (v: string) => void }) {
+/** Quien no tiene cuenta puede leer, pero para escribir o pedir canciones debe registrarse (gratis) o entrar. */
+function AuthGate({ what }: { what: string }) {
   return (
-    <label className="block">
-      <span className="mono muted block text-[0.62rem]">Tu apodo</span>
-      <input
-        className="input !py-1.5"
-        value={nick}
-        maxLength={20}
-        onChange={(e) => setNick(e.target.value)}
-        onBlur={() => saveNick(nick.trim())}
-        placeholder="Ej.: Ana"
-        autoComplete="nickname"
-      />
-    </label>
+    <div className="chat-gate" role="note">
+      <p className="chat-gate-title">Necesitas una cuenta</p>
+      <p className="chat-gate-text">Para {what} regístrate gratis: obtienes tu propio Space y tu nombre en la radio.</p>
+      <div className="flex flex-wrap gap-2">
+        <a href="/spaces/registro" className="btn btn-accent !px-3 !py-2">
+          Crear mi Space — gratis
+        </a>
+        <a href="/spaces/entrar" className="btn !px-3 !py-2">
+          Ya tengo cuenta
+        </a>
+      </div>
+    </div>
   );
 }
 
-function ChatTab({ config, messages, onSent }: { config: ChatConfig | null; messages: PublicMessage[]; onSent: (m: PublicMessage) => void }) {
-  const [nick, setNick] = useState("");
+/** «Participas como @usuario · Mi Space». */
+function AsLine({ nickname }: { nickname: string }) {
+  return (
+    <p className="mono muted text-[0.6rem]">
+      Participas como <strong className="text-fg">{nickname}</strong> ·{" "}
+      <a href="/spaces/editar" className="underline">
+        Mi Space
+      </a>
+    </p>
+  );
+}
+
+function ChatTab({ config, viewer, messages, onSent }: { config: ChatConfig | null; viewer: Viewer | null; messages: PublicMessage[]; onSent: (m: PublicMessage) => void }) {
   const [text, setText] = useState("");
   const [picker, setPicker] = useState<"emoji" | "gif" | null>(null);
   const [group, setGroup] = useState(0);
@@ -116,26 +127,15 @@ function ChatTab({ config, messages, onSent }: { config: ChatConfig | null; mess
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // El apodo guardado solo existe en el navegador.
-    setNick(getNick()); // eslint-disable-line react-hooks/set-state-in-effect
-  }, []);
-
-  useEffect(() => {
     const el = listRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   const send = useCallback(
     async (payload: { text?: string; gif?: string }) => {
-      const n = nick.trim();
-      if (n.length < 2) {
-        setError("Escribe un apodo de al menos 2 letras.");
-        return;
-      }
-      saveNick(n);
       setBusy(true);
       setError(null);
-      const r = await postJson<{ message: PublicMessage }>("/api/chat/messages", { clientId: getClientId(), nickname: n, ...payload });
+      const r = await postJson<{ message: PublicMessage }>("/api/chat/messages", payload);
       setBusy(false);
       if (!r.ok) return setError(r.error);
       onSent(r.data.message);
@@ -143,7 +143,7 @@ function ChatTab({ config, messages, onSent }: { config: ChatConfig | null; mess
       setPicker(null);
       stick.current = true;
     },
-    [nick, onSent],
+    [onSent],
   );
 
   if (config && !config.enabled) {
@@ -234,57 +234,54 @@ function ChatTab({ config, messages, onSent }: { config: ChatConfig | null; mess
         </div>
       )}
 
-      <form
-        className="chat-compose"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (text.trim()) void send({ text });
-        }}
-      >
-        {nick.trim().length < 2 && <NickField nick={nick} setNick={setNick} />}
-        {error && (
-          <p role="alert" className="mono text-[0.68rem] text-[#ff8a8a]">
-            {error}
-          </p>
-        )}
-        <div className="flex items-center gap-1.5">
-          <button type="button" className="btn-icon !size-9" aria-pressed={picker === "emoji"} aria-label="Emojis" onClick={() => setPicker(picker === "emoji" ? null : "emoji")}>
-            😊
-          </button>
-          <button type="button" className="btn-icon !size-9 mono !text-[0.62rem]" aria-pressed={picker === "gif"} aria-label="GIFs" onClick={() => setPicker(picker === "gif" ? null : "gif")}>
-            GIF
-          </button>
-          <input ref={inputRef} className="input !py-2" value={text} maxLength={280} onChange={(e) => setText(e.target.value)} placeholder="Escribe un mensaje…" aria-label="Mensaje" />
-          <button type="submit" className="btn btn-accent !px-3 !py-2" disabled={busy || !text.trim()}>
-            Enviar
-          </button>
+      {viewer && !viewer.signedIn ? (
+        <div className="chat-compose">
+          <AuthGate what="hablar en el chat" />
         </div>
-        {nick.trim().length >= 2 && (
-          <p className="mono muted text-[0.6rem]">
-            Chateas como <strong>{nick.trim()}</strong> ·{" "}
-            <button type="button" className="underline" onClick={() => setNick("")}>
-              cambiar
+      ) : viewer && viewer.nickname === null ? (
+        <div className="chat-compose">
+          <p className="mono text-[0.68rem] text-[#ff8a8a]">Tu cuenta está suspendida del chat.</p>
+        </div>
+      ) : (
+        <form
+          className="chat-compose"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (text.trim()) void send({ text });
+          }}
+        >
+          {error && (
+            <p role="alert" className="mono text-[0.68rem] text-[#ff8a8a]">
+              {error}
+            </p>
+          )}
+          <div className="flex items-center gap-1.5">
+            <button type="button" className="btn-icon !size-9" aria-pressed={picker === "emoji"} aria-label="Emojis" onClick={() => setPicker(picker === "emoji" ? null : "emoji")} disabled={!viewer}>
+              😊
             </button>
-          </p>
-        )}
-      </form>
+            <button type="button" className="btn-icon !size-9 mono !text-[0.62rem]" aria-pressed={picker === "gif"} aria-label="GIFs" onClick={() => setPicker(picker === "gif" ? null : "gif")} disabled={!viewer}>
+              GIF
+            </button>
+            <input ref={inputRef} className="input !py-2" value={text} maxLength={280} onChange={(e) => setText(e.target.value)} placeholder="Escribe un mensaje…" aria-label="Mensaje" disabled={!viewer} />
+            <button type="submit" className="btn btn-accent !px-3 !py-2" disabled={busy || !viewer || !text.trim()}>
+              Enviar
+            </button>
+          </div>
+          {viewer?.nickname && <AsLine nickname={viewer.nickname} />}
+        </form>
+      )}
     </>
   );
 }
 
 const STATUS_LABEL = { pending: "Esperando", played: "Sonó", rejected: "—" } as const;
 
-function RequestsTab({ config, requests, onCreated }: { config: ChatConfig | null; requests: PublicRequest[]; onCreated: () => void }) {
-  const [nick, setNick] = useState("");
+function RequestsTab({ config, viewer, requests, onCreated }: { config: ChatConfig | null; viewer: Viewer | null; requests: PublicRequest[]; onCreated: () => void }) {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    setNick(getNick()); // eslint-disable-line react-hooks/set-state-in-effect
-  }, []);
 
   if (config && !config.requestsEnabled) {
     return <p className="chat-off">Los pedidos de canciones están cerrados por ahora. Se abren cuando hay un DJ en vivo.</p>;
@@ -292,10 +289,8 @@ function RequestsTab({ config, requests, onCreated }: { config: ChatConfig | nul
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (nick.trim().length < 2) return setMsg({ ok: false, text: "Escribe un apodo de al menos 2 letras." });
-    saveNick(nick.trim());
     setBusy(true);
-    const r = await postJson<{ duplicate: boolean }>("/api/chat/requests", { clientId: getClientId(), nickname: nick.trim(), title, artist, note });
+    const r = await postJson<{ duplicate: boolean }>("/api/chat/requests", { title, artist, note });
     setBusy(false);
     if (!r.ok) return setMsg({ ok: false, text: r.error });
     setMsg({ ok: true, text: r.data.duplicate ? "Ese pedido ya está en la lista." : "¡Pedido enviado! El DJ lo verá." });
@@ -307,8 +302,12 @@ function RequestsTab({ config, requests, onCreated }: { config: ChatConfig | nul
 
   return (
     <div className="chat-requests">
+      {viewer && !viewer.signedIn ? (
+        <AuthGate what="pedir canciones" />
+      ) : viewer && viewer.nickname === null ? (
+        <p className="mono text-[0.68rem] text-[#ff8a8a]">Tu cuenta está suspendida del chat.</p>
+      ) : (
       <form onSubmit={submit} className="grid gap-2">
-        <NickField nick={nick} setNick={setNick} />
         <label className="block">
           <span className="mono muted block text-[0.62rem]">Canción *</span>
           <input className="input !py-1.5" value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} placeholder="Título" />
@@ -332,8 +331,10 @@ function RequestsTab({ config, requests, onCreated }: { config: ChatConfig | nul
         <button type="submit" className="btn btn-accent w-full" disabled={busy || !title.trim()}>
           Pedir canción
         </button>
+        {viewer?.nickname && <AsLine nickname={viewer.nickname} />}
         <p className="mono muted text-[0.6rem]">El DJ decide qué suena. No hay garantía de que se reproduzca.</p>
       </form>
+      )}
       <h3 className="mono mt-3 text-[0.66rem] text-accent-ink">Pedidos recientes</h3>
       <ul className="chat-req-list">
         {requests.length === 0 && <li className="mono muted text-[0.7rem]">Todavía no hay pedidos.</li>}

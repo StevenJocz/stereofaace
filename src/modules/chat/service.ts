@@ -5,6 +5,7 @@ import { DomainError } from "@/lib/errors";
 import { assertCan, type Actor } from "@/lib/rbac";
 import { siteSettings } from "@/modules/settings/schema";
 import { gifByKey } from "./gifs";
+import { spaceProfiles } from "@/modules/spaces/schema";
 import { chatMessages, chatMutes, songRequests } from "./schema";
 
 const KEY = "chat";
@@ -71,6 +72,23 @@ export async function saveChatConfig(db: Db, actor: Actor | null, cfg: ChatConfi
 async function assertNotMuted(db: Db, clientId: string, now: Date) {
   const [m] = await db.select().from(chatMutes).where(eq(chatMutes.clientId, clientId));
   if (m && m.until.getTime() > now.getTime()) throw new DomainError("chat_muted", "El equipo silenció este chat para ti por un rato.");
+}
+
+/* ───────────── Identidad: solo con cuenta ───────────── */
+
+export type ChatIdentity = { clientId: string; nickname: string };
+
+/**
+ * Escribir en el chat y pedir canciones exige tener cuenta. La identidad sale del servidor (nunca del navegador):
+ * el `clientId` se deriva del id de la cuenta (así los silencios del equipo siguen a la persona) y el apodo es el
+ * @usuario de su Space, o, si no tiene Space (personal del equipo), su nombre limpio. Un Space desactivado por moderación no puede escribir.
+ */
+export async function chatIdentity(db: Db, user: { id: string; name: string }): Promise<ChatIdentity> {
+  const [p] = await db.select({ username: spaceProfiles.username, status: spaceProfiles.status }).from(spaceProfiles).where(eq(spaceProfiles.userId, user.id));
+  if (p?.status === "disabled") throw new DomainError("chat_muted", "Tu cuenta está suspendida del chat.");
+  const fallback = user.name.replace(/[^\p{L}\p{N} _.-]/gu, "").replace(/^[^\p{L}\p{N}]+/u, "").trim().slice(0, 20);
+  const nick = p?.username ?? (fallback.length >= 2 ? fallback : "Oyente");
+  return { clientId: `u${user.id.replace(/-/g, "")}`, nickname: nick };
 }
 
 /* ───────────── Mensajes ───────────── */

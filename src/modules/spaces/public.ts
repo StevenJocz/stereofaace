@@ -197,3 +197,17 @@ export async function getNetwork(db: Db, limit = 9): Promise<Network> {
     .map((e) => ({ from: byId.get(e.from)!.p.username, to: byId.get(e.to)!.p.username }));
   return { nodes, edges, total: Number(c) };
 }
+
+export type SpaceStatus = { signedIn: false } | { signedIn: true; hasSpace: false } | { signedIn: true; hasSpace: true; username: string; avatarUrl: string | null; disabled: boolean };
+
+/** Estado mínimo para el menú del encabezado: ¿hay sesión y esa persona ya tiene Space? (sin datos privados). */
+export async function getSpaceStatus(db: Db, userId: string | null): Promise<SpaceStatus> {
+  if (!userId) return { signedIn: false };
+  const [r] = await db
+    .select({ username: spaceProfiles.username, status: spaceProfiles.status, avatarKey: spaceAssets.storageKey })
+    .from(spaceProfiles)
+    .leftJoin(spaceAssets, and(eq(spaceAssets.id, spaceProfiles.avatarAssetId), eq(spaceAssets.status, "ok")))
+    .where(eq(spaceProfiles.userId, userId));
+  if (!r) return { signedIn: true, hasSpace: false };
+  return { signedIn: true, hasSpace: true, username: r.username, avatarUrl: r.avatarKey ? assetUrl(r.avatarKey) : null, disabled: r.status === "disabled" };
+}

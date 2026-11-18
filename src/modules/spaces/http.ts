@@ -9,7 +9,7 @@ import { removeAsset, readSpaceAsset, uploadAsset } from "./assets";
 import type { Mailer } from "./mailer";
 import { getMySpace, publishSpace, saveDraft, searchCatalogArtists, setFavoriteArtists, setGenres, unpublishSpace, updateProfile, updateUsername } from "./profile";
 import { follow, unfollow } from "./follows";
-import { reportSpace } from "./public";
+import { getSpaceStatus, reportSpace } from "./public";
 
 const NO_STORE = { "cache-control": "no-store" } as const;
 const reply = (status: number, error: string) => Response.json({ error }, { status, headers: NO_STORE });
@@ -60,6 +60,15 @@ async function mutation(request: Request, actor: SessionUser | null, work: (user
     }
   }
   return guarded(actor, (u) => work(u, body));
+}
+
+/** Menú del encabezado: público (sin sesión responde `signedIn: false`) y nunca cacheable. */
+export async function statusHandler(db: Db, actor: SessionUser | null): Promise<Response> {
+  try {
+    return Response.json(await getSpaceStatus(db, actor?.id ?? null), { headers: NO_STORE });
+  } catch {
+    return Response.json({ signedIn: Boolean(actor) }, { headers: NO_STORE });
+  }
 }
 
 export const meGetHandler = (db: Db, actor: SessionUser | null) => guarded(actor, async (u) => Response.json(await getMySpace(db, u.id), { headers: NO_STORE }));

@@ -1,37 +1,5 @@
 import type { PublicMessage, PublicRequest } from "@/modules/chat/service";
 
-const ID_KEY = "sf-chat-id";
-const NICK_KEY = "sf-chat-nick";
-
-/** Identificador anónimo de este navegador (no es un dato personal). */
-export function getClientId(): string {
-  try {
-    let id = localStorage.getItem(ID_KEY);
-    if (!id || !/^[a-zA-Z0-9_-]{8,64}$/.test(id)) {
-      id = crypto.randomUUID();
-      localStorage.setItem(ID_KEY, id);
-    }
-    return id;
-  } catch {
-    return `tmp-${Math.random().toString(36).slice(2, 12)}`;
-  }
-}
-
-export const getNick = (): string => {
-  try {
-    return localStorage.getItem(NICK_KEY) ?? "";
-  } catch {
-    return "";
-  }
-};
-export const saveNick = (nick: string) => {
-  try {
-    localStorage.setItem(NICK_KEY, nick);
-  } catch {
-    /* solo vale para esta visita */
-  }
-};
-
 /** Suma los mensajes nuevos a los que ya hay, sin repetir y con un tope para que la lista no crezca sin fin. */
 export function mergeMessages(current: PublicMessage[], incoming: PublicMessage[], cap = 200): PublicMessage[] {
   if (incoming.length === 0) return current;
@@ -41,8 +9,10 @@ export function mergeMessages(current: PublicMessage[], incoming: PublicMessage[
 }
 
 export type ChatConfig = { enabled: boolean; requestsEnabled: boolean };
-export type MessagesResponse = { config: ChatConfig; messages: PublicMessage[]; last: number };
-export type RequestsResponse = { config: ChatConfig; requests: PublicRequest[] };
+/** Quién mira: ¿tiene cuenta? y, si puede escribir, con qué apodo (su @usuario). `nickname: null` con cuenta = suspendida del chat. */
+export type Viewer = { signedIn: boolean; nickname: string | null };
+export type MessagesResponse = { config: ChatConfig; messages: PublicMessage[]; last: number; viewer: Viewer };
+export type RequestsResponse = { config: ChatConfig; requests: PublicRequest[]; viewer: Viewer };
 
 export async function postJson<T>(url: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   try {

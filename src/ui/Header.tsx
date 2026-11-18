@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { RadioHeaderButton } from "@/ui/radio/RadioHeaderButton";
+import { SpacesMenu } from "@/ui/SpacesMenu";
 
 const NAV = [
   { href: "/", label: "Inicio" },
@@ -11,7 +12,6 @@ const NAV = [
   { href: "/#lanzamientos", label: "Lanzamientos" },
   { href: "/#artistas", label: "Artistas" },
   { href: "/programas", label: "Programas" },
-  { href: "/spaces", label: "Spaces" },
   { href: "/#agenda", label: "Eventos" },
   { href: "/#cultura", label: "Cultura" },
 ];
@@ -103,6 +103,7 @@ export function Header() {
           </nav>
 
           <div className="flex items-center justify-end gap-2">
+            <SpacesMenu />
             <RadioHeaderButton />
             <button
               type="button"

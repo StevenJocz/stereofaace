@@ -4,8 +4,10 @@ import { DomainError } from "@/lib/errors";
 import { rateLimit } from "@/lib/rate-limit";
 import type { Actor } from "@/lib/rbac";
 import { guarded, reply } from "@/modules/studio/http";
+import type { SessionUser } from "@/modules/users/auth";
 import {
   createRequest,
+  chatIdentity,
   deleteMessage,
   getChatConfig,
   listMessages,
@@ -19,7 +21,6 @@ import {
   type RequestStatus,
 } from "./service";
 
-const CLIENT_ID = /^[a-zA-Z0-9_-]{8,64}$/;
 const NO_STORE = { "cache-control": "no-store" };
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: NO_STORE });
 
@@ -42,28 +43,38 @@ async function publicGuard(work: () => Promise<Response>): Promise<Response> {
 const asObj = (b: unknown): Record<string, unknown> | null => (b && typeof b === "object" && !Array.isArray(b) ? (b as Record<string, unknown>) : null);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
-function identity(b: Record<string, unknown>): { clientId: string; nickname: string } | null {
-  const clientId = str(b.clientId);
-  return CLIENT_ID.test(clientId) ? { clientId, nickname: str(b.nickname) } : null;
+const AUTH_REQUIRED = { error: "Regístrate gratis o entra a tu cuenta para participar.", code: "auth_required" };
+const authRequired = () => json(AUTH_REQUIRED, 401);
+
+/** Lo que el panel necesita saber de quien mira: si tiene cuenta y con qué apodo escribiría. */
+async function viewerOf(db: Db, user: SessionUser | null): Promise<{ signedIn: boolean; nickname: string | null; clientId: string | null }> {
+  if (!user) return { signedIn: false, nickname: null, clientId: null };
+  try {
+    const id = await chatIdentity(db, user);
+    return { signedIn: true, nickname: id.nickname, clientId: id.clientId };
+  } catch {
+    return { signedIn: true, nickname: null, clientId: null }; // cuenta suspendida del chat
+  }
 }
 
 const cursor = (v: string | null) => (v !== null && /^\d{1,15}$/.test(v) ? Number(v) : undefined);
-const clientOf = (v: string | null) => (v && CLIENT_ID.test(v) ? v : undefined);
 
 /* ───────────── Público ───────────── */
 
-export function publicChatGet(db: Db, q: { after: string | null; clientId?: string | null }): Promise<Response> {
+export function publicChatGet(db: Db, q: { after: string | null; user: SessionUser | null }): Promise<Response> {
   return publicGuard(async () => {
-    const [config, list] = await Promise.all([getChatConfig(db), listMessages(db, { after: cursor(q.after), clientId: clientOf(q.clientId ?? null) })]);
-    return json({ config, ...list });
+    const viewer = await viewerOf(db, q.user);
+    const [config, list] = await Promise.all([getChatConfig(db), listMessages(db, { after: cursor(q.after), clientId: viewer.clientId ?? undefined })]);
+    return json({ config, ...list, viewer: { signedIn: viewer.signedIn, nickname: viewer.nickname } });
   });
 }
 
-export function publicChatPost(db: Db, body: unknown, ip: string): Promise<Response> {
+export function publicChatPost(db: Db, body: unknown, ip: string, user: SessionUser | null): Promise<Response> {
   return publicGuard(async () => {
+    if (!user) return authRequired();
     const b = asObj(body);
-    const id = b && identity(b);
-    if (!b || !id) return json({ error: "Petición no válida." }, 400);
+    if (!b) return json({ error: "Petición no válida." }, 400);
+    const id = await chatIdentity(db, user);
     const byClient = rateLimit(`chat:c:${id.clientId}`, 1, 2000);
     if (!byClient.ok) return tooFast(byClient.retryAfterMs, "Vas muy rápido: espera un par de segundos.");
     const byIp = rateLimit(`chat:ip:${ip}`, 15, 30_000);
@@ -73,18 +84,20 @@ export function publicChatPost(db: Db, body: unknown, ip: string): Promise<Respo
   });
 }
 
-export function publicRequestsGet(db: Db, q: { clientId?: string | null }): Promise<Response> {
+export function publicRequestsGet(db: Db, q: { user: SessionUser | null }): Promise<Response> {
   return publicGuard(async () => {
-    const [config, requests] = await Promise.all([getChatConfig(db), listRequestsPublic(db, { clientId: clientOf(q.clientId ?? null) })]);
-    return json({ config, requests });
+    const viewer = await viewerOf(db, q.user);
+    const [config, requests] = await Promise.all([getChatConfig(db), listRequestsPublic(db, { clientId: viewer.clientId ?? undefined })]);
+    return json({ config, requests, viewer: { signedIn: viewer.signedIn, nickname: viewer.nickname } });
   });
 }
 
-export function publicRequestPost(db: Db, body: unknown, ip: string): Promise<Response> {
+export function publicRequestPost(db: Db, body: unknown, ip: string, user: SessionUser | null): Promise<Response> {
   return publicGuard(async () => {
+    if (!user) return authRequired();
     const b = asObj(body);
-    const id = b && identity(b);
-    if (!b || !id) return json({ error: "Petición no válida." }, 400);
+    if (!b) return json({ error: "Petición no válida." }, 400);
+    const id = await chatIdentity(db, user);
     const byClient = rateLimit(`req:c:${id.clientId}`, 1, 20_000);
     if (!byClient.ok) return tooFast(byClient.retryAfterMs, "Espera unos segundos antes de pedir otra canción.");
     const byIp = rateLimit(`req:ip:${ip}`, 6, 60_000);
