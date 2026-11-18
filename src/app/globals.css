@@ -3660,10 +3660,68 @@ body[data-radio="on"] .adm-shell {
     gap: 4rem;
   }
 }
+.spx-art {
+  position: relative;
+  isolation: isolate;
+  margin-top: 0.8rem;
+  padding: 7.5rem 0.2rem 0.2rem;
+  max-width: 30rem;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #050507;
+  border: 1px solid var(--line);
+}
 .spx-title {
-  margin-top: 0.4rem;
-  font-size: clamp(2.6rem, 6.4vw, 5.2rem);
-  line-height: 0.9;
+  position: relative;
+  z-index: 1;
+  padding: 0 1.1rem 1.2rem;
+  font-family: var(--font-jetbrains, ui-monospace, monospace);
+  font-weight: 500;
+  font-size: clamp(1.25rem, 3.4vw, 1.9rem);
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f2f2f0;
+}
+.topo {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: -1;
+  width: 100%;
+  height: 9.5rem;
+  fill: none;
+  stroke: #f2f2f0;
+  stroke-width: 0.7;
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+.topo path {
+  vector-effect: non-scaling-stroke;
+}
+.topo-drift {
+  animation: topo-drift 14s ease-in-out infinite alternate;
+}
+.topo-cross {
+  position: absolute;
+  right: 1.4rem;
+  bottom: 2.4rem;
+  width: 1.7rem;
+  fill: none;
+  stroke: #f2f2f0;
+  stroke-width: 1;
+  opacity: 0.85;
+}
+@keyframes topo-drift {
+  from {
+    transform: translate(-6px, 3px);
+  }
+  to {
+    transform: translate(6px, -3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topo-drift {
+    animation: none;
+  }
 }
 .spx-lead {
   margin-top: 1.2rem;

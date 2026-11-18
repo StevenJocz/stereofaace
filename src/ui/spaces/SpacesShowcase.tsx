@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Network } from "@/modules/spaces/public";
 import { SpacesNetwork } from "./SpacesNetwork";
+import { Crosshair, TopoLines } from "./TopoLines";
 
 const STEPS: [string, string][] = [
   ["01", "Elige tu nombre"],
@@ -22,13 +23,17 @@ export function SpacesShowcase({ network, signedIn }: { network: Network; signed
       <div className="wrap spx-inner">
         <div className="spx-copy" data-reveal>
           <p className="mono text-accent-ink">StereoFace Spaces</p>
-          <h2 id="spaces-h" className="display-up spx-title">
-            Tu espacio.
-            <br />
-            Tu sonido.
-            <br />
-            <span className="text-accent-ink">Tu identidad.</span>
-          </h2>
+          <div className="spx-art">
+            <TopoLines />
+            <Crosshair />
+            <h2 id="spaces-h" className="spx-title">
+              Tu espacio.
+              <br />
+              Tu sonido.
+              <br />
+              Tu identidad.
+            </h2>
+          </div>
           <p className="spx-lead">Un perfil propio dentro de StereoFace: tus géneros, tus artistas, tu estilo y la radio como banda sonora. Personalízalo a tu manera y deja que la comunidad te encuentre.</p>
           <ol className="spx-steps" aria-label="Cómo se crea un Space">
             {STEPS.map(([n, label]) => (
