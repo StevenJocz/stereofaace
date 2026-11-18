@@ -1,4 +1,6 @@
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+/** Canciones de la biblioteca de la radio: más grandes que un jingle. */
+export const MAX_SONG_BYTES = 60 * 1024 * 1024;
 
 export type AudioValidation =
   | { ok: true; mime: string; extension: string; bytes: Uint8Array }
@@ -18,9 +20,9 @@ function sniff(b: Uint8Array): { mime: string; extension: string } | null {
   return null;
 }
 
-export async function validateAudioUpload(file: File): Promise<AudioValidation> {
+export async function validateAudioUpload(file: File, maxBytes: number = MAX_AUDIO_BYTES): Promise<AudioValidation> {
   if (file.size === 0) return { ok: false, message: "El archivo está vacío." };
-  if (file.size > MAX_AUDIO_BYTES) return { ok: false, message: "El audio supera el máximo de 25 MB." };
+  if (file.size > maxBytes) return { ok: false, message: `El audio supera el máximo de ${Math.round(maxBytes / 1048576)} MB.` };
   const bytes = new Uint8Array(await file.arrayBuffer());
   const kind = sniff(bytes);
   if (!kind) return { ok: false, message: "El archivo no es un audio válido (MP3, WAV, OGG, M4A o FLAC)." };

@@ -1,6 +1,7 @@
 import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { ForbiddenError, type Actor } from "@/lib/rbac";
+import { sameOrigin } from "@/lib/csrf";
 import { rateLimit } from "@/lib/rate-limit";
 import { beginYouTubeConnect, defaultDeps, finishYouTubeConnect, getVideoAdmin, pollVideo, issuePublishToken, prepareBroadcast, publicVideo, stopBroadcast, type VideoDeps } from "./service";
 
@@ -25,18 +26,7 @@ const STATUS_BY_CODE: Record<string, number> = {
   youtube_not_enabled: 502,
 };
 
-/**
- * Defensa CSRF de las rutas que cambian estado: además de la cookie SameSite=Lax, el `Origin` debe ser el propio sitio.
- * (`allowed` son los orígenes aceptados: el de `NEXT_PUBLIC_SITE_URL` y el del `Host` de la petición.)
- */
-export function sameOrigin(request: Request, siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  const allowed = new Set<string>([new URL(siteUrl).origin]);
-  if (host) for (const proto of ["https", "http"]) allowed.add(`${proto}://${host}`);
-  return allowed.has(origin);
-}
+export { sameOrigin };
 
 /** Traduce la sesión y los errores esperables a respuestas HTTP. Nunca devuelve secretos ni detalles internos. */
 async function guarded(actor: Actor | null, work: () => Promise<Response>): Promise<Response> {

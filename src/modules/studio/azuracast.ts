@@ -15,6 +15,23 @@ export type AzStreamerBody = {
   enforce_schedule: boolean;
   schedule_items: AzScheduleItem[];
 };
+export type AzPlaylistRaw = {
+  id: number;
+  name: string;
+  source?: string;
+  type?: string;
+  order?: string;
+  weight?: number;
+  remote_url?: string | null;
+  is_enabled?: boolean;
+  is_jingle?: boolean;
+  num_songs?: number;
+  schedule_items?: AzScheduleItem[];
+};
+export type AzBatch =
+  | { do: "delete"; files: string[]; dirs: string[] }
+  | { do: "move"; files: string[]; dirs: string[]; currentDirectory: string; directory: string }
+  | { do: "playlist"; files: string[]; dirs: string[]; playlists: number[] };
 export type AzuraConfig = { baseUrl: string; stationId: string; apiKey: string };
 
 type RawMedia = {
@@ -114,9 +131,28 @@ export class AzuraClient {
     await this.request("/backend/skip", {}, [], { method: "POST" });
   }
 
-  /** Listas de reproducción tal como las entrega AzuraCast (incluye el origen y la dirección remota). */
-  async listPlaylistsRaw(): Promise<{ id: number; name: string; source?: string; type?: string; remote_url?: string | null; is_enabled?: boolean }[]> {
+  /** Listas de reproducción tal como las entrega AzuraCast (incluye el origen, la dirección remota y su horario). */
+  async listPlaylistsRaw(): Promise<AzPlaylistRaw[]> {
     return this.json("/playlists");
+  }
+
+  async deletePlaylist(id: number): Promise<void> {
+    await this.request(`/playlist/${Math.trunc(id)}`, {}, [], { method: "DELETE" });
+  }
+
+  /** Crea una carpeta dentro de `parent` ("" = raíz de la biblioteca). */
+  async mkdir(parent: string, name: string): Promise<void> {
+    await this.request("/files/directory", { "Content-Type": "application/json" }, [], { method: "POST", body: JSON.stringify({ currentDirectory: parent, newDirectory: name }) });
+  }
+
+  /** Sube un audio a `path` (carpeta/archivo.ext). AzuraCast lo analiza y lo añade a la biblioteca. */
+  async uploadFile(path: string, bytes: Uint8Array): Promise<void> {
+    await this.request("/files", { "Content-Type": "application/json" }, [], { method: "POST", body: JSON.stringify({ path, file: Buffer.from(bytes).toString("base64") }) });
+  }
+
+  /** Acción por lote sobre archivos y carpetas: eliminar, mover o agregar a listas. */
+  async batch(body: AzBatch): Promise<void> {
+    await this.request("/files/batch", { "Content-Type": "application/json" }, [], { method: "PUT", body: JSON.stringify(body) });
   }
 
   async createPlaylist(body: Record<string, unknown>): Promise<void> {
