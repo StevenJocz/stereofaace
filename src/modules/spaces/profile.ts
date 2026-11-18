@@ -56,7 +56,7 @@ async function profileOf(db: Db, userId: string) {
 }
 
 export type MySpace = {
-  profile: { username: string; displayName: string; bio: string | null; location: string | null; tagline: string | null; links: SpaceLinks; privacy: SpacePrivacy; status: string; featured: boolean; publishedAt: string | null; joinedAt: string; verified: boolean };
+  profile: { username: string; displayName: string; bio: string | null; location: string | null; tagline: string | null; links: SpaceLinks; privacy: SpacePrivacy; status: string; featured: boolean; verifiedBadge: boolean; publishedAt: string | null; joinedAt: string; verified: boolean };
   design: SpaceDesign;
   follows: { followers: number; following: number };
   dirty: boolean;
@@ -95,6 +95,7 @@ export async function getMySpace(db: Db, userId: string): Promise<MySpace> {
       privacy: { ...DEFAULT_PRIVACY, ...p.privacy },
       status: p.status,
       featured: p.featured,
+      verifiedBadge: p.badgeVerifiedAt !== null,
       publishedAt: p.publishedAt?.toISOString() ?? null,
       joinedAt: (u[0]?.createdAt ?? p.createdAt).toISOString(),
       verified: Boolean(u[0]?.verified) || u[0]?.role !== "oyente",

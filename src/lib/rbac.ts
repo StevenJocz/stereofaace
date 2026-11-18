@@ -24,7 +24,7 @@ export type Resource =
   | "audit"
   | "dashboard";
 
-export type Action = "read" | "create" | "update" | "delete" | "publish" | "review" | "manage";
+export type Action = "read" | "create" | "update" | "delete" | "publish" | "review" | "manage" | "verify";
 export type Permission = `${Resource}:${Action}`;
 
 const ALL_RESOURCES: Resource[] = [
@@ -47,7 +47,7 @@ const ALL_RESOURCES: Resource[] = [
   "studio",
   "space",
 ];
-const ALL_ACTIONS: Action[] = ["read", "create", "update", "delete", "publish", "review", "manage"];
+const ALL_ACTIONS: Action[] = ["read", "create", "update", "delete", "publish", "review", "manage", "verify"];
 
 const all = (): Permission[] => ALL_RESOURCES.flatMap((r) => ALL_ACTIONS.map((a) => `${r}:${a}` as Permission));
 const rw = (r: Resource, extra: Action[] = []): Permission[] =>
@@ -74,6 +74,7 @@ const MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "dashboard:read",
     "subscriber:read",
     "user:read",
+    "space:verify",
   ]),
   redactor: new Set<Permission>([
     "article:read",
@@ -95,6 +96,7 @@ const MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "media:create",
     "dashboard:read",
     "station:read",
+    "space:verify",
   ]),
   colaborador: new Set<Permission>([
     "article:read",
@@ -107,9 +109,10 @@ const MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "event:read",
     "media:read",
     "media:create",
+    "space:verify",
   ]),
-  // Locutor: solo el estudio (consola, cart wall, pedidos y chat). Nada de contenido ni de ajustes.
-  locutor: new Set<Permission>(["studio:read", "studio:update"]),
+  // Locutor: el estudio (consola, cart wall, pedidos y chat) y dar el chulo de verificado a Spaces. Nada de contenido ni de ajustes.
+  locutor: new Set<Permission>(["studio:read", "studio:update", "space:verify"]),
   // Oyente: cuenta de StereoFace Spaces. Ningún permiso de administración; solo edita su propio perfil por las rutas de Spaces.
   oyente: new Set<Permission>(),
 };

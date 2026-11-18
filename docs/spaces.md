@@ -47,3 +47,8 @@
 ## Plantillas y portadas
 
 Hay **20 plantillas** (`DEFAULT_THEMES`), cada una con una **portada prediseñada** (`design.cover`, 15 opciones en `COVERS`). Las portadas son CSS fijo del código (`.space-cover[data-preset=...]`) que usa los colores del diseño; la persona solo elige el id (o sube su propia imagen, que tiene prioridad). `seedBase` inserta las plantillas nuevas y rellena la portada de las antiguas solo si su diseño no tiene la clave `cover` (si el administrador la puso en `null`, se respeta).
+
+## Chulo de verificado y lista de seguidores
+
+- **Chulo:** `space_profiles.badge_verified_at/by`. Lo dan o quitan todos los roles por encima de oyente (permiso `space:verify`) desde **Admin → Verificar Spaces** (lista sin correos) y, el administrador, también desde la tabla de Spaces. Queda en auditoría (`space.verify` / `space.unverify`). Se ve junto al @usuario en el perfil y en las tarjetas del listado.
+- **Seguidores/seguidos:** `GET /api/spaces/follows?username=&kind=followers|following&page=`. Solo lista Spaces públicos (los contadores también cuentan solo públicos); si la persona oculta sus números, solo ella ve sus listas.

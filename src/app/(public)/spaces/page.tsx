@@ -30,7 +30,18 @@ function Card({ s }: { s: SpaceCard }) {
             <span aria-hidden="true">{s.displayName.slice(0, 1).toUpperCase()}</span>
           )}
         </span>
-        <span className="display-up text-[1.1rem] leading-none">@{s.username}</span>
+        <span className="display-up text-[1.1rem] leading-none">
+          @{s.username}
+          {s.verifiedBadge && (
+            <span className="ml-1 inline-block align-middle text-accent" title="Cuenta verificada">
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10.5" fill="currentColor" />
+                <path d="m7.5 12.3 3 3 6-6.3" fill="none" stroke="#07080a" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="sr-only">Cuenta verificada</span>
+            </span>
+          )}
+        </span>
         <span className="muted truncate text-[0.88rem]">{s.displayName}</span>
         {s.tagline && <span className="mono muted line-clamp-2 text-[0.72rem]">{s.tagline}</span>}
         {s.genres.length > 0 && <span className="mono text-accent-ink text-[0.68rem]">{s.genres.join(" · ")}</span>}

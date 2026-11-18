@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { spaceFollows, spaceProfiles } from "./schema";
@@ -10,20 +10,20 @@ export const MAX_FOLLOWING = 500;
 export type FollowCounts = { followers: number; following: number };
 
 /**
- * Cuántas personas siguen a `userId` y a cuántas sigue. No cuentan las cuentas cuyo Space fue desactivado por la
- * administración (aunque la relación exista), para que un perfil retirado no infle ni reste números.
+ * Cuántas personas siguen a `userId` y a cuántas sigue. Solo cuentan las cuentas con Space público: un borrador o un perfil
+ * desactivado por la administración (aunque la relación exista) no infla ni resta números, y así el número coincide con la lista que se ve.
  */
 export async function followCounts(db: Db, userId: string): Promise<FollowCounts> {
   const [{ followers }] = await db
     .select({ followers: sql<number>`count(*)` })
     .from(spaceFollows)
     .innerJoin(spaceProfiles, eq(spaceProfiles.userId, spaceFollows.followerId))
-    .where(and(eq(spaceFollows.followedId, userId), ne(spaceProfiles.status, "disabled")));
+    .where(and(eq(spaceFollows.followedId, userId), eq(spaceProfiles.status, "published")));
   const [{ following }] = await db
     .select({ following: sql<number>`count(*)` })
     .from(spaceFollows)
     .innerJoin(spaceProfiles, eq(spaceProfiles.userId, spaceFollows.followedId))
-    .where(and(eq(spaceFollows.followerId, userId), ne(spaceProfiles.status, "disabled")));
+    .where(and(eq(spaceFollows.followerId, userId), eq(spaceProfiles.status, "published")));
   return { followers: Number(followers), following: Number(following) };
 }
 

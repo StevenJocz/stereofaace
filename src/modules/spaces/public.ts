@@ -27,6 +27,8 @@ export type PublicSpace = {
   backgroundUrl: string | null;
   design: SpaceDesign;
   featured: boolean;
+  /** Chulo de verificado dado por el equipo. */
+  verifiedBadge: boolean;
   /** Acepta aparecer en el listado y en buscadores. */
   listed: boolean;
   /** Seguidores y seguidos; `null` si la persona decidió no mostrarlos. */
@@ -92,6 +94,7 @@ export async function getPublicSpace(db: Db, usernameRaw: string, viewer: { id: 
     backgroundUrl: design.background.assetId ? url(design.background.assetId) : null,
     design,
     featured: p.featured,
+    verifiedBadge: p.badgeVerifiedAt !== null,
     listed: privacy.listed,
     follows: privacy.showFollows || isOwner ? counts : null,
     viewerFollows,
@@ -101,7 +104,7 @@ export async function getPublicSpace(db: Db, usernameRaw: string, viewer: { id: 
   };
 }
 
-export type SpaceCard = { username: string; displayName: string; tagline: string | null; avatarUrl: string | null; genres: string[]; featured: boolean };
+export type SpaceCard = { username: string; displayName: string; tagline: string | null; avatarUrl: string | null; genres: string[]; featured: boolean; verifiedBadge: boolean };
 const PAGE = 24;
 
 /** Descubrimiento: solo Spaces publicados, activos y que aceptan aparecer en el listado. */
@@ -133,6 +136,7 @@ export async function listSpaces(db: Db, q: { q?: string; genre?: string; page?:
     avatarUrl: avatarKey ? assetUrl(avatarKey) : null,
     genres: genreRows.filter((g) => g.userId === p.userId).slice(0, 3).map((g) => g.name),
     featured: p.featured,
+    verifiedBadge: p.badgeVerifiedAt !== null,
   }));
   return { recent: cards.filter((c) => !c.featured), featured: cards.filter((c) => c.featured), total: Number(c), page };
 }
@@ -180,7 +184,7 @@ export async function getNetwork(db: Db, limit = 9): Promise<Network> {
       .select({ id: spaceFollows.followedId, n: sql<number>`count(*)` })
       .from(spaceFollows)
       .innerJoin(spaceProfiles, eq(spaceProfiles.userId, spaceFollows.followerId))
-      .where(and(inArray(spaceFollows.followedId, ids), sql`${spaceProfiles.status} <> 'disabled'`))
+      .where(and(inArray(spaceFollows.followedId, ids), eq(spaceProfiles.status, "published")))
       .groupBy(spaceFollows.followedId),
   ]);
   const byId = new Map(rows.map((r) => [r.p.userId, r]));
@@ -210,4 +214,41 @@ export async function getSpaceStatus(db: Db, userId: string | null): Promise<Spa
     .where(eq(spaceProfiles.userId, userId));
   if (!r) return { signedIn: true, hasSpace: false };
   return { signedIn: true, hasSpace: true, username: r.username, avatarUrl: r.avatarKey ? assetUrl(r.avatarKey) : null, disabled: r.status === "disabled" };
+}
+
+export type FollowListItem = { username: string; displayName: string; avatarUrl: string | null };
+export const FOLLOW_PAGE_SIZE = 30;
+
+/**
+ * Lista de quienes siguen a un Space («followers») o a quienes sigue («following»), solo con Spaces públicos y del más reciente
+ * al más antiguo. Respeta la privacidad: si la persona ocultó sus números, solo ella puede ver sus listas.
+ */
+export async function listFollows(
+  db: Db,
+  q: { username: string; kind: "followers" | "following"; viewerId: string | null; page?: number },
+): Promise<{ items: FollowListItem[]; total: number; page: number; pageSize: number }> {
+  const username = normalizeUsername(q.username);
+  const [p] = await db.select().from(spaceProfiles).where(sql`lower(${spaceProfiles.username}) = ${username}`);
+  const isOwner = q.viewerId !== null && q.viewerId === p?.userId;
+  if (!p || p.status === "disabled" || (p.status !== "published" && !isOwner)) throw new DomainError("not_found", "Ese Space no existe.");
+  if (!isOwner && !{ ...DEFAULT_PRIVACY, ...p.privacy }.showFollows) throw new DomainError("private", "Esta persona no muestra sus seguidores.");
+  const page = Math.max(1, Math.floor(q.page ?? 1));
+  const other = q.kind === "followers" ? spaceFollows.followerId : spaceFollows.followedId;
+  const mine = q.kind === "followers" ? spaceFollows.followedId : spaceFollows.followerId;
+  const rows = await db
+    .select({ username: spaceProfiles.username, displayName: spaceProfiles.displayName, avatarKey: spaceAssets.storageKey })
+    .from(spaceFollows)
+    .innerJoin(spaceProfiles, and(eq(spaceProfiles.userId, other), eq(spaceProfiles.status, "published")))
+    .leftJoin(spaceAssets, and(eq(spaceAssets.id, spaceProfiles.avatarAssetId), eq(spaceAssets.status, "ok")))
+    .where(eq(mine, p.userId))
+    .orderBy(desc(spaceFollows.createdAt), asc(spaceProfiles.username))
+    .limit(FOLLOW_PAGE_SIZE)
+    .offset((page - 1) * FOLLOW_PAGE_SIZE);
+  const counts = await followCounts(db, p.userId);
+  return {
+    items: rows.map((r) => ({ username: r.username, displayName: r.displayName, avatarUrl: r.avatarKey ? assetUrl(r.avatarKey) : null })),
+    total: q.kind === "followers" ? counts.followers : counts.following,
+    page,
+    pageSize: FOLLOW_PAGE_SIZE,
+  };
 }

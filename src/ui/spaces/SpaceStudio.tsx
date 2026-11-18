@@ -151,6 +151,7 @@ export function SpaceStudio({ initial, mode, mailConfigured, logout, isStaff = f
       backgroundUrl: bg?.url ?? null,
       design: space.design,
       featured: p.featured,
+      verifiedBadge: p.verifiedBadge,
       listed: p.privacy.listed,
       follows: space.follows,
       viewerFollows: false,

@@ -9,7 +9,7 @@ import { removeAsset, readSpaceAsset, uploadAsset } from "./assets";
 import type { Mailer } from "./mailer";
 import { getMySpace, publishSpace, saveDraft, searchCatalogArtists, setFavoriteArtists, setGenres, unpublishSpace, updateProfile, updateUsername } from "./profile";
 import { follow, unfollow } from "./follows";
-import { getSpaceStatus, reportSpace } from "./public";
+import { getSpaceStatus, listFollows, reportSpace } from "./public";
 
 const NO_STORE = { "cache-control": "no-store" } as const;
 const reply = (status: number, error: string) => Response.json({ error }, { status, headers: NO_STORE });
@@ -29,6 +29,7 @@ const STATUS: Record<string, number> = {
   self_follow: 409,
   follow_limit: 409,
   token_invalid: 400,
+  private: 403,
 };
 
 /** Traduce sesión y errores esperables a respuestas HTTP. Nunca devuelve detalles internos. */
@@ -197,6 +198,22 @@ export async function spaceImageHandler(db: Db, actor: SessionUser | null, root:
 }
 
 /** Seguir (POST {username}) y dejar de seguir (DELETE ?username=). Siempre con la sesión: nadie sigue «en nombre de» otra persona. */
+/** Lista pública de seguidores o seguidos de un Space (paginada). Respeta la privacidad de la persona. */
+export async function followsListHandler(db: Db, actor: SessionUser | null, request: Request, ip: string): Promise<Response> {
+  if (!rateLimit(`spaces:flist:${ip}`, 60, 60_000).ok) return reply(429, "Demasiadas consultas. Espera un momento.");
+  const p = new URL(request.url).searchParams;
+  const kind = p.get("kind");
+  const page = Number(p.get("page") ?? "1");
+  if ((kind !== "followers" && kind !== "following") || !Number.isInteger(page) || page < 1 || page > 1000) return reply(400, "Consulta no válida.");
+  try {
+    return Response.json(await listFollows(db, { username: p.get("username") ?? "", kind, viewerId: actor?.id ?? null, page }), { headers: NO_STORE });
+  } catch (error) {
+    if (error instanceof DomainError) return reply(STATUS[error.code] ?? 400, error.message);
+    console.error("[spaces]", error instanceof Error ? error.name : "error");
+    return reply(500, "No se pudo completar la petición.");
+  }
+}
+
 export async function followHandler(db: Db, actor: SessionUser | null, request: Request): Promise<Response> {
   if (!actor) return reply(401, "Inicia sesión para seguir a otras personas.");
   if (!sameOrigin(request)) return reply(403, "Origen no permitido.");

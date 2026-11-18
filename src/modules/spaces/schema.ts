@@ -38,6 +38,9 @@ export const spaceProfiles = pgTable(
     privacy: jsonb("privacy").$type<SpacePrivacy>().notNull().default(DEFAULT_PRIVACY),
     status: text("status").notNull().default("draft"),
     featured: boolean("featured").notNull().default(false),
+    /** Chulo de verificado: lo da el equipo (cualquier rol por encima de oyente). `null` = sin chulo. */
+    badgeVerifiedAt: timestamp("badge_verified_at", { withTimezone: true }),
+    badgeVerifiedBy: uuid("badge_verified_by").references(() => users.id, { onDelete: "set null" }),
     avatarAssetId: uuid("avatar_asset_id"),
     coverAssetId: uuid("cover_asset_id"),
     /** Lo que se edita (autoguardado) y lo que ven los visitantes. */

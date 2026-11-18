@@ -6,7 +6,7 @@ import { listGenreOptionsAdmin, listReports, listSpacesAdmin, listThemesAdmin } 
 import { PageHead } from "@/ui/admin/fields";
 import { RowAction } from "@/ui/admin/RowAction";
 import { AddGenreForm } from "@/ui/admin/SpacesAdminForms";
-import { closeReportAction, disableAction, featureAction, genreActiveAction, themeActiveAction } from "./actions";
+import { closeReportAction, disableAction, featureAction, genreActiveAction, themeActiveAction, verifyBadgeAction } from "./actions";
 
 const STATUS: Record<string, string> = { draft: "Borrador", published: "Publicado", disabled: "Desactivado" };
 const day = new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "America/Bogota" });
@@ -86,10 +86,12 @@ export default async function SpacesAdminPage({ searchParams }: { searchParams: 
                   <td className="py-3 pr-4">
                     <span className="badge">{STATUS[r.status] ?? r.status}</span>
                     {r.featured && <span className="badge badge-ok ml-1">Destacado</span>}
+                    {r.badge && <span className="badge badge-ok ml-1">Verificado ✓</span>}
                   </td>
                   <td className="mono py-3 pr-4">{day.format(new Date(r.createdAt))}</td>
                   <td className="py-3">
                     <span className="flex flex-wrap gap-2">
+                      {r.status !== "disabled" && <RowAction action={verifyBadgeAction} fields={{ id: r.userId, value: r.badge ? "0" : "1" }} label={r.badge ? "Quitar verificado" : "Verificar ✓"} />}
                       {r.status === "published" && <RowAction action={featureAction} fields={{ id: r.userId, value: r.featured ? "0" : "1" }} label={r.featured ? "Quitar destacado" : "Destacar"} />}
                       {r.status === "disabled" ? (
                         <RowAction action={disableAction} fields={{ id: r.userId, value: "0" }} label="Reactivar" />

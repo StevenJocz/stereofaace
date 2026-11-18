@@ -3,11 +3,15 @@ import type { CSSProperties } from "react";
 import type { PublicSpace } from "@/modules/spaces/public";
 import { BLOCK_LABEL, designVars, orderedBlocks, parseSpotify, parseYouTube, safeUrl, spotifyEmbedSrc, spotifyHref, youtubeEmbedSrc, type BlockId } from "@/modules/spaces/design";
 import { SpaceEmbed } from "./SpaceEmbed";
+import { Crosshair, TopoLines } from "./TopoLines";
+import { Icon, linkIcon } from "./SpaceIcons";
 import { SpaceActions, SpaceFollow, SpaceRadio } from "./SpaceIslands";
 
 const LINK_LABEL: Record<string, string> = { instagram: "Instagram", x: "X", tiktok: "TikTok", facebook: "Facebook", youtube: "YouTube", spotify: "Spotify", soundcloud: "SoundCloud", bandcamp: "Bandcamp", web: "Sitio web" };
-const NAV: [BlockId, string][] = [["about", "Mi Space"], ["player", "Música"], ["gallery", "Galería"], ["artists", "Favoritos"], ["links", "Enlaces"]];
+const NAV: [BlockId, string, () => React.ReactNode][] = [["about", "Mi Space", Icon.home], ["player", "Música", Icon.music], ["gallery", "Galería", Icon.image], ["artists", "Favoritos", Icon.heart], ["links", "Enlaces", Icon.link]];
 
+/** Alturas (%) de la onda decorativa del reproductor. */
+const WAVE = [30, 55, 40, 75, 60, 90, 45, 70, 35, 80, 50, 95, 65, 40, 72, 55, 85, 38, 60, 48];
 const joined = (iso: string) => new Intl.DateTimeFormat("es-CO", { month: "long", year: "numeric", timeZone: "America/Bogota" }).format(new Date(iso));
 
 function Card({ id, title, children }: { id: BlockId; title: string; children: React.ReactNode }) {
@@ -81,8 +85,14 @@ export function SpaceView({ space, preview = false, viewerIsStaff = false }: { s
                   ) : (
                     <span aria-hidden="true">{a.name.slice(0, 1)}</span>
                   )}
+                  {a.slug ? (
+                    <Link href={`/artistas/${a.slug}`} className="space-artist-name">
+                      {a.name}
+                    </Link>
+                  ) : (
+                    <span className="space-artist-name">{a.name}</span>
+                  )}
                 </div>
-                {a.slug ? <Link href={`/artistas/${a.slug}`}>{a.name}</Link> : <span>{a.name}</span>}
               </li>
             ))}
           </ul>
@@ -111,20 +121,38 @@ export function SpaceView({ space, preview = false, viewerIsStaff = false }: { s
       </Card>
     ),
     player: () => (
-      <Card id="player" title="Música">
-        {d.player.showRadio && <SpaceRadio />}
-        {d.player.song && (
-          <div className="space-track">
-            <p className="space-track-label">Mi track del momento</p>
-            <p className="space-track-title">{d.player.song.title}</p>
-            <p className="space-track-artist">{d.player.song.artist}</p>
-            {d.player.song.url && safeUrl(d.player.song.url, null) && (
-              <a href={d.player.song.url} target="_blank" rel="noopener noreferrer nofollow ugc" className="space-btn">
-                Escuchar ↗
-              </a>
-            )}
-          </div>
+      <div id="sp-player" className="space-stack">
+        {d.player.showRadio && (
+          <section className="space-card space-radio-card" aria-label="StereoFace Radio">
+            <SpaceRadio />
+          </section>
         )}
+        {d.player.song && (
+          <section className="space-card space-track-card" aria-label="Mi track del momento">
+            <h2 className="space-h">Mi track del momento</h2>
+            <div className="space-track-row">
+              <span className="space-track-thumb" aria-hidden="true">
+                {Icon.note()}
+              </span>
+              <div className="space-track-info">
+                <p className="space-track-title">{d.player.song.title}</p>
+                <p className="space-track-artist">{d.player.song.artist}</p>
+                <span className="space-wave space-wave-sm" aria-hidden="true">
+                  {WAVE.map((h, i) => (
+                    <i key={i} style={{ ["--h" as string]: `${h}%` }} />
+                  ))}
+                </span>
+              </div>
+              {d.player.song.url && safeUrl(d.player.song.url, null) && (
+                <a href={d.player.song.url} target="_blank" rel="noopener noreferrer nofollow ugc" className="space-play space-play-ring" aria-label={`Escuchar ${d.player.song.title}`}>
+                  ▶
+                </a>
+              )}
+            </div>
+          </section>
+        )}
+        {(spotifyProfile || spotifyPlaylist?.src || videoIds.length > 0 || d.player.links.length > 0) && (
+        <section className="space-card" aria-label="Más música">
         {spotifyProfile && (
           <>
             {spotifyProfile.src ? (
@@ -151,7 +179,9 @@ export function SpaceView({ space, preview = false, viewerIsStaff = false }: { s
             ))}
           </ul>
         )}
-      </Card>
+        </section>
+        )}
+      </div>
     ),
     gallery: () => (
       <Card id="gallery" title="Galería">
@@ -172,11 +202,11 @@ export function SpaceView({ space, preview = false, viewerIsStaff = false }: { s
     links: () => (
       <Card id="links" title="Enlaces">
         {Object.keys(space.links).length ? (
-          <ul className="space-links">
+          <ul className="space-icon-links">
             {Object.entries(space.links).map(([k, u]) => (
               <li key={k}>
-                <a href={u} target="_blank" rel="noopener noreferrer nofollow ugc">
-                  {LINK_LABEL[k] ?? k} ↗
+                <a href={u} target="_blank" rel="noopener noreferrer nofollow ugc" className="space-icon-link" aria-label={LINK_LABEL[k] ?? k} title={LINK_LABEL[k] ?? k}>
+                  {linkIcon(k)}
                 </a>
               </li>
             ))}
@@ -207,36 +237,61 @@ export function SpaceView({ space, preview = false, viewerIsStaff = false }: { s
               <span aria-hidden="true">{space.displayName.slice(0, 1).toUpperCase()}</span>
             )}
           </div>
-          <div className="space-id">
-            <h1 className="space-name">@{space.username}</h1>
-            <p className="space-display">{space.displayName}</p>
-            <ul className="space-meta">
-              {space.location && <li>📍 {space.location}</li>}
-              {space.joinedAt && <li>En StereoFace desde {joined(space.joinedAt)}</li>}
-              {space.featured && <li>★ Destacado</li>}
-            </ul>
-            {space.follows && <SpaceFollow username={space.username} initial={space.follows} viewerFollows={space.viewerFollows} viewerSignedIn={space.viewerSignedIn} isOwner={space.isOwner} interactive={!preview} />}
+          <div className="space-head-panel">
+            <div className="space-id">
+              <h1 className="space-name">
+                @{space.username}
+                {space.verifiedBadge && (
+                  <span className="space-verified" title="Cuenta verificada por StereoFace">
+                    {Icon.verified()}
+                    <span className="sr-only">Cuenta verificada</span>
+                  </span>
+                )}
+              </h1>
+              <p className="space-display">{space.displayName}</p>
+              <ul className="space-meta">
+                {space.location && (
+                  <li>
+                    {Icon.pin()} {space.location}
+                  </li>
+                )}
+                {space.joinedAt && (
+                  <li>
+                    {Icon.clock()} En StereoFace desde {joined(space.joinedAt)}
+                  </li>
+                )}
+                {space.featured && <li>★ Destacado</li>}
+              </ul>
+              {space.follows && <SpaceFollow username={space.username} initial={space.follows} viewerFollows={space.viewerFollows} viewerSignedIn={space.viewerSignedIn} isOwner={space.isOwner} interactive={!preview} />}
+            </div>
+            {!preview && <SpaceActions username={space.username} isOwner={space.isOwner} isDraft={space.isDraftPreview} staffAdmin={space.isOwner && viewerIsStaff} />}
           </div>
-          {!preview && <SpaceActions username={space.username} isOwner={space.isOwner} isDraft={space.isDraftPreview} staffAdmin={space.isOwner && viewerIsStaff} />}
         </div>
 
         <div className="space-body">
-          {nav.length > 0 && (
-            <nav className="space-nav" aria-label="Secciones del Space">
-              {nav.map(([id, label]) => (
-                <a key={id} href={`#sp-${id}`}>
-                  {label}
-                </a>
-              ))}
-              <p className="space-motto" aria-hidden="true">
+          <div className="space-left">
+            {nav.length > 0 && (
+              <nav className="space-nav" aria-label="Secciones del Space">
+                {nav.map(([id, label, icon], i) => (
+                  <a key={id} href={`#sp-${id}`} data-active={i === 0 || undefined}>
+                    {icon()}
+                    <span>{label}</span>
+                  </a>
+                ))}
+              </nav>
+            )}
+            <div className="space-motto-card" aria-hidden="true">
+              <TopoLines />
+              <p className="space-motto">
                 TU ESPACIO.
                 <br />
                 TU SONIDO.
                 <br />
                 TU IDENTIDAD.
               </p>
-            </nav>
-          )}
+              <Crosshair />
+            </div>
+          </div>
           <div className="space-main">
             {col("main").map((id) => (
               <div key={id}>{render[id]()}</div>

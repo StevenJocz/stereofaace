@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
@@ -10,7 +10,7 @@ import { spaceAssets, spaceGenreOptions, spaceProfiles, spaceReports, spaceTheme
 
 /* Administración de Spaces: todo exige `space:*` (administrador y superadministrador). */
 
-export type AdminSpaceRow = { userId: string; username: string; displayName: string; email: string; status: string; featured: boolean; verified: boolean; active: boolean; createdAt: string; openReports: number };
+export type AdminSpaceRow = { userId: string; username: string; displayName: string; email: string; status: string; featured: boolean; badge: boolean; verified: boolean; active: boolean; createdAt: string; openReports: number };
 
 export async function listSpacesAdmin(db: Db, actor: Actor | null, q: { q?: string; status?: string; page?: number } = {}): Promise<{ rows: AdminSpaceRow[]; total: number }> {
   assertCan(actor, "space:read");
@@ -27,6 +27,7 @@ export async function listSpacesAdmin(db: Db, actor: Actor | null, q: { q?: stri
       email: users.email,
       status: spaceProfiles.status,
       featured: spaceProfiles.featured,
+      badge: sql<boolean>`${spaceProfiles.badgeVerifiedAt} is not null`.mapWith(Boolean),
       verified: users.emailVerifiedAt,
       active: users.active,
       createdAt: users.createdAt,
@@ -40,6 +41,39 @@ export async function listSpacesAdmin(db: Db, actor: Actor | null, q: { q?: stri
     .offset((Math.max(1, q.page ?? 1) - 1) * 50);
   const [{ c }] = await db.select({ c: sql<number>`count(*)` }).from(spaceProfiles).innerJoin(users, eq(users.id, spaceProfiles.userId)).where(where);
   return { rows: rows.map((r) => ({ ...r, verified: Boolean(r.verified), createdAt: r.createdAt.toISOString() })), total: Number(c) };
+}
+
+/** Chulo de verificado: lo pueden dar o quitar todos los roles del equipo (cualquiera por encima de oyente). Queda en el registro de auditoría. */
+export async function setVerifiedBadge(db: Db, actor: Actor | null, userId: string, verified: boolean): Promise<void> {
+  assertCan(actor, "space:verify");
+  const [p] = await db
+    .update(spaceProfiles)
+    .set(verified ? { badgeVerifiedAt: new Date(), badgeVerifiedBy: actor.id } : { badgeVerifiedAt: null, badgeVerifiedBy: null })
+    .where(and(eq(spaceProfiles.userId, userId), ne(spaceProfiles.status, "disabled")))
+    .returning({ id: spaceProfiles.userId });
+  if (!p) throw new DomainError("not_found", "Ese Space no existe o está desactivado.");
+  await recordAudit(db, { userId: actor.id, action: verified ? "space.verify" : "space.unverify", entity: "space_profile", entityId: userId });
+}
+
+export type VerifyRow = { userId: string; username: string; displayName: string; status: string; badge: boolean };
+
+/** Lista mínima para dar el chulo: sin correos ni datos privados, para que la vea cualquier rol del equipo. */
+export async function listSpacesForVerify(db: Db, actor: Actor | null, q: { q?: string } = {}): Promise<VerifyRow[]> {
+  assertCan(actor, "space:verify");
+  const term = (q.q ?? "").trim().slice(0, 40).replace(/^@/, "").replace(/[%_\\]/g, "\\$&");
+  const rows = await db
+    .select({
+      userId: spaceProfiles.userId,
+      username: spaceProfiles.username,
+      displayName: spaceProfiles.displayName,
+      status: spaceProfiles.status,
+      badge: sql<boolean>`${spaceProfiles.badgeVerifiedAt} is not null`.mapWith(Boolean),
+    })
+    .from(spaceProfiles)
+    .where(and(ne(spaceProfiles.status, "disabled"), term ? or(ilike(spaceProfiles.username, `%${term}%`), ilike(spaceProfiles.displayName, `%${term}%`)) : undefined))
+    .orderBy(desc(sql`${spaceProfiles.badgeVerifiedAt} is not null`), asc(spaceProfiles.username))
+    .limit(50);
+  return rows;
 }
 
 export async function setFeatured(db: Db, actor: Actor | null, userId: string, featured: boolean): Promise<void> {

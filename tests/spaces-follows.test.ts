@@ -7,10 +7,10 @@ import { spaceFollows, spaceProfiles, users } from "@/db/schema";
 import { seedBase } from "@/db/seed-base";
 import { registerListener } from "@/modules/spaces/accounts";
 import { MAX_FOLLOWING, follow, followCounts, followingAmong, isFollowing, unfollow } from "@/modules/spaces/follows";
-import { followHandler } from "@/modules/spaces/http";
+import { followHandler, followsListHandler } from "@/modules/spaces/http";
 import { setDisabled } from "@/modules/spaces/moderation";
 import { getMySpace, publishSpace, updateProfile } from "@/modules/spaces/profile";
-import { getPublicSpace } from "@/modules/spaces/public";
+import { getPublicSpace, listFollows } from "@/modules/spaces/public";
 import { makeDb } from "./helpers";
 
 let h: DbHandle;
@@ -85,7 +85,7 @@ describe("seguir y dejar de seguir", () => {
 });
 
 describe("contadores", () => {
-  it("no cuentan a quienes tienen el Space desactivado, en ninguno de los dos sentidos", async () => {
+  it("solo cuentan los Spaces públicos: ni desactivados ni borradores, en ninguno de los dos sentidos", async () => {
     const ana = await person();
     const beto = await person();
     const caro = await person();
@@ -96,8 +96,12 @@ describe("contadores", () => {
     await setDisabled(h.db, admin, caro.id, true);
     await setDisabled(h.db, admin, beto.id, true);
     expect(await followCounts(h.db, ana.id)).toEqual({ followers: 0, following: 0 });
+    // Al reactivarlos vuelven como borrador (no públicos): siguen sin contar hasta que se publiquen otra vez.
     await setDisabled(h.db, admin, caro.id, false);
     await setDisabled(h.db, admin, beto.id, false);
+    expect(await followCounts(h.db, ana.id)).toEqual({ followers: 0, following: 0 });
+    await publishSpace(h.db, caro.id, { requireVerified: false });
+    await publishSpace(h.db, beto.id, { requireVerified: false });
     expect(await followCounts(h.db, ana.id)).toEqual({ followers: 2, following: 1 });
   });
   it("al borrar una cuenta, sus relaciones desaparecen", async () => {
@@ -184,5 +188,57 @@ describe("ruta /api/spaces/follow", () => {
     for (let i = 0; i < 31; i++) codes.push((await followHandler(h.db, ana.session, req("POST", { username: beto.username }))).status);
     expect(codes.slice(0, 30)).not.toContain(429);
     expect(codes[30]).toBe(429);
+  });
+});
+
+describe("lista de seguidores y seguidos", () => {
+  it("muestra quién la sigue y a quién sigue, del más reciente al más antiguo, solo con Spaces públicos", async () => {
+    const ana = await person();
+    const beto = await person();
+    const caro = await person();
+    const borrador = await person(false);
+    await follow(h.db, beto.id, ana.username);
+    await follow(h.db, caro.id, ana.username);
+    await follow(h.db, ana.id, beto.username);
+    const seg = await listFollows(h.db, { username: ana.username, kind: "followers", viewerId: null });
+    expect(seg.items.map((i) => i.username)).toEqual([caro.username, beto.username]);
+    expect(seg.total).toBe(2);
+    const sig = await listFollows(h.db, { username: ana.username, kind: "following", viewerId: null });
+    expect(sig.items.map((i) => i.username)).toEqual([beto.username]);
+    expect(JSON.stringify(seg)).not.toContain("example.com");
+    // Un borrador que sigue a alguien no aparece ni cuenta: el número coincide con la lista.
+    await h.db.insert(spaceFollows).values({ followerId: borrador.id, followedId: ana.id });
+    const otra = await listFollows(h.db, { username: ana.username, kind: "followers", viewerId: null });
+    expect(otra.items.map((i) => i.username)).not.toContain(borrador.username);
+    expect(otra.total).toBe(otra.items.length);
+  });
+  it("respeta la privacidad: si oculta sus números, solo ella ve sus listas", async () => {
+    const ana = await person();
+    const beto = await person();
+    await follow(h.db, beto.id, ana.username);
+    const [p] = await h.db.select().from(spaceProfiles).where(eq(spaceProfiles.userId, ana.id));
+    await updateProfile(h.db, ana.id, { displayName: "Ana", privacy: { ...p.privacy, showFollows: false } });
+    await expect(listFollows(h.db, { username: ana.username, kind: "followers", viewerId: null })).rejects.toMatchObject({ code: "private" });
+    await expect(listFollows(h.db, { username: ana.username, kind: "followers", viewerId: beto.id })).rejects.toMatchObject({ code: "private" });
+    expect((await listFollows(h.db, { username: ana.username, kind: "followers", viewerId: ana.id })).items).toHaveLength(1);
+  });
+  it("un Space desactivado, en borrador o inexistente no tiene lista pública", async () => {
+    const off = await person();
+    const draft = await person(false);
+    await setDisabled(h.db, admin, off.id, true);
+    for (const u of [off.username, draft.username, "no_existe", "../x"]) {
+      await expect(listFollows(h.db, { username: u, kind: "followers", viewerId: null })).rejects.toMatchObject({ code: "not_found" });
+    }
+    expect((await listFollows(h.db, { username: draft.username, kind: "followers", viewerId: draft.id })).items).toEqual([]);
+  });
+  it("la ruta HTTP valida el tipo y la página y responde 403 si es privada", async () => {
+    const ana = await person();
+    const ok = await followsListHandler(h.db, null, new Request(`${ORIGIN}/api/spaces/follows?username=${ana.username}&kind=followers`), "9.9.9.9");
+    expect(ok.status).toBe(200);
+    expect((await followsListHandler(h.db, null, new Request(`${ORIGIN}/x?username=${ana.username}&kind=otro`), "9.9.9.9")).status).toBe(400);
+    expect((await followsListHandler(h.db, null, new Request(`${ORIGIN}/x?username=${ana.username}&kind=followers&page=0`), "9.9.9.9")).status).toBe(400);
+    const [p] = await h.db.select().from(spaceProfiles).where(eq(spaceProfiles.userId, ana.id));
+    await updateProfile(h.db, ana.id, { displayName: "Ana", privacy: { ...p.privacy, showFollows: false } });
+    expect((await followsListHandler(h.db, null, new Request(`${ORIGIN}/x?username=${ana.username}&kind=followers`), "9.9.9.9")).status).toBe(403);
   });
 });
