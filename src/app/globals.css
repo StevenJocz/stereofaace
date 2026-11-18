@@ -3055,3 +3055,545 @@ body[data-radio="on"] .adm-shell {
   background: var(--accent);
   color: #07080a;
 }
+
+/* ───────────── StereoFace Spaces ───────────── */
+/* Todo el estilo de un Space vive bajo .space y llega por variables validadas (--sp-*): no afecta al resto del sitio. */
+.space {
+  --sp-w: 78rem;
+  position: relative;
+  color: var(--sp-text, #efefea);
+  font-family: var(--sp-font-body, inherit);
+  font-size: calc(1rem * var(--sp-scale, 1));
+  background-color: var(--sp-bg, #0a0a0c);
+  background-image: var(--sp-bg-image, none);
+  background-size: var(--sp-bg-size, cover);
+  background-position: var(--sp-bg-pos, center);
+  background-attachment: var(--sp-bg-attach, scroll);
+  background-repeat: no-repeat;
+  min-height: 70vh;
+  isolation: isolate;
+  padding-bottom: 4rem;
+}
+.space a {
+  color: var(--sp-link, inherit);
+}
+.space-cover {
+  height: clamp(9rem, 26vw, 16rem);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 35%, var(--sp-bg)), var(--sp-bg));
+  background-image: var(--sp-cover, none);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+.space-cover[data-has-cover="false"] {
+  background-image: repeating-linear-gradient(135deg, transparent 0 14px, color-mix(in srgb, var(--sp-primary) 12%, transparent) 14px 16px), linear-gradient(135deg, color-mix(in srgb, var(--sp-primary) 30%, var(--sp-bg)), var(--sp-bg));
+}
+.space-cover-fade {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 60%;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--sp-bg) 90%, transparent));
+}
+.space-wrap {
+  max-width: var(--sp-w);
+  margin-inline: auto;
+  padding-inline: var(--gutter, 1.25rem);
+}
+.space-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1.25rem;
+  margin-top: -3.2rem;
+  position: relative;
+  z-index: 1;
+}
+.space-avatar {
+  width: clamp(6rem, 18vw, 8.5rem);
+  aspect-ratio: 1;
+  border-radius: var(--sp-radius, 14px);
+  border: 2px solid var(--sp-primary);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--sp-card, #141416);
+  box-shadow: 0 0 28px -6px var(--sp-primary);
+  flex: none;
+}
+.space-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.space-avatar span {
+  font-family: var(--sp-font-head);
+  font-size: 3rem;
+  color: var(--sp-primary);
+}
+.space-id {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding-bottom: 0.3rem;
+}
+.space-name {
+  font-family: var(--sp-font-head, inherit);
+  font-stretch: var(--sp-head-stretch, 100%);
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  line-height: 1;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.space-display {
+  margin-top: 0.3rem;
+  font-size: 1.1rem;
+  opacity: 0.85;
+}
+.space-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+.space-actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.space-btn,
+.space a.space-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  border: 1px solid var(--sp-border, #2e2e36);
+  border-radius: calc(var(--sp-radius, 12px) * 0.7);
+  background: var(--sp-card);
+  color: var(--sp-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, transform 0.2s;
+}
+.space-btn:hover {
+  border-color: var(--sp-primary);
+  transform: translateY(-1px);
+}
+.space-pill {
+  padding: 0.3rem 0.7rem;
+  border: 1px dashed var(--sp-primary);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--sp-primary);
+}
+.space-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 5;
+  min-width: 12rem;
+  padding: 0.3rem;
+  background: var(--sp-bg);
+  border: 1px solid var(--sp-border);
+  border-radius: 10px;
+}
+.space-menu button {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  font-size: 0.85rem;
+}
+.space-report {
+  display: grid;
+  gap: 0.6rem;
+  width: min(100%, 22rem);
+  padding: 0.9rem;
+  background: var(--sp-bg);
+  border: 1px solid var(--sp-border);
+  border-radius: 12px;
+}
+.space-report select,
+.space-report textarea {
+  width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.4rem;
+  background: var(--sp-card);
+  color: var(--sp-text);
+  border: 1px solid var(--sp-border);
+  border-radius: 6px;
+}
+.space-msg {
+  font-size: 0.8rem;
+  color: var(--sp-primary);
+}
+.space-body {
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 1.8rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .space-body {
+    grid-template-columns: 13rem minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+}
+.space-nav {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+}
+@media (min-width: 1024px) {
+  .space-nav {
+    position: sticky;
+    top: 5.5rem;
+    flex-direction: column;
+    overflow: visible;
+    padding: 0.5rem;
+    background: var(--sp-card);
+    border: var(--sp-border-w) solid var(--sp-border);
+    border-radius: var(--sp-radius);
+  }
+}
+.space-nav a {
+  flex: none;
+  padding: 0.6rem 0.9rem;
+  border-radius: calc(var(--sp-radius, 12px) * 0.7);
+  color: var(--sp-text);
+  text-decoration: none;
+  font-size: 0.92rem;
+  border: 1px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
+}
+.space-nav a:hover,
+.space-nav a:focus-visible {
+  border-color: var(--sp-primary);
+  background: color-mix(in srgb, var(--sp-primary) 14%, transparent);
+}
+.space-motto {
+  display: none;
+  margin-top: 1.4rem;
+  padding: 0.9rem 0.6rem 0.4rem;
+  font-family: var(--font-jetbrains, monospace);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  opacity: 0.7;
+}
+@media (min-width: 1024px) {
+  .space-motto {
+    display: block;
+  }
+}
+.space-main,
+.space-side {
+  display: grid;
+  gap: 1.1rem;
+  min-width: 0;
+}
+.space-card {
+  padding: 1.15rem 1.25rem;
+  background: var(--sp-card);
+  border: var(--sp-border-w) solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  backdrop-filter: blur(10px);
+  animation: space-in 0.5s ease both;
+  scroll-margin-top: 5.5rem;
+}
+@keyframes space-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.space-h {
+  margin-bottom: 0.7rem;
+  font-family: var(--sp-font-head);
+  font-stretch: var(--sp-head-stretch, 100%);
+  font-size: 1.25rem;
+  color: var(--sp-primary);
+}
+.space-tagline {
+  margin-bottom: 0.6rem;
+  font-family: var(--font-jetbrains, monospace);
+  font-size: 0.92rem;
+  color: var(--sp-secondary);
+}
+.space-bio {
+  white-space: pre-line;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.space-empty {
+  opacity: 0.55;
+  font-size: 0.9rem;
+}
+.space-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.space-chips li {
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--sp-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sp-text) 6%, transparent);
+  font-size: 0.88rem;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.space-chips li:hover {
+  transform: translateY(-2px);
+  border-color: var(--sp-primary);
+}
+.space-chips li[data-top="true"] {
+  border-color: var(--sp-primary);
+  color: var(--sp-primary);
+}
+.space-artists {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+}
+.space-artists li {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.space-artist-img {
+  aspect-ratio: 1;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--sp-border);
+  border-radius: calc(var(--sp-radius, 12px) * 0.6);
+  background: color-mix(in srgb, var(--sp-primary) 12%, var(--sp-bg));
+  filter: grayscale(0.5);
+  transition: filter 0.3s;
+}
+.space-artists li:hover .space-artist-img {
+  filter: none;
+}
+.space-artist-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.space-artist-img span {
+  font-family: var(--sp-font-head);
+  font-size: 2rem;
+  color: var(--sp-primary);
+}
+.space-quote blockquote {
+  font-family: var(--sp-font-head);
+  font-size: clamp(1.2rem, 2.4vw, 1.7rem);
+  line-height: 1.25;
+  color: var(--sp-secondary);
+}
+.space-info {
+  display: grid;
+  gap: 0.5rem;
+}
+.space-info div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px dashed var(--sp-border);
+}
+.space-info dt {
+  opacity: 0.65;
+  font-size: 0.85rem;
+}
+.space-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.8rem;
+  border: 1px solid var(--sp-primary);
+  border-radius: calc(var(--sp-radius, 12px) * 0.8);
+  background: color-mix(in srgb, var(--sp-primary) 10%, transparent);
+}
+.space-play {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: var(--sp-primary);
+  color: var(--sp-bg);
+  font-size: 1rem;
+  box-shadow: 0 0 22px -4px var(--sp-primary);
+  transition: transform 0.2s;
+}
+.space-play:hover {
+  transform: scale(1.07);
+}
+.space-radio-name {
+  font-weight: 700;
+}
+.space-radio-sub {
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+.space-live {
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: var(--sp-primary);
+  color: var(--sp-bg);
+  font-size: 0.65rem;
+}
+.space-track {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--sp-border);
+}
+.space-track-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.space-track-title {
+  margin-top: 0.3rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.space-track-artist {
+  opacity: 0.75;
+  margin-bottom: 0.6rem;
+}
+.space-links {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+.space-links a {
+  display: block;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--sp-border);
+  border-radius: calc(var(--sp-radius, 12px) * 0.7);
+  text-decoration: none;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.space-links a:hover {
+  border-color: var(--sp-primary);
+  transform: translateX(3px);
+}
+.space-gallery {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, 1fr);
+}
+.space-gallery img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: calc(var(--sp-radius, 12px) * 0.5);
+  border: 1px solid var(--sp-border);
+  transition: transform 0.3s;
+}
+.space-gallery li:hover img {
+  transform: scale(1.04);
+}
+@media (prefers-reduced-motion: reduce) {
+  .space-card {
+    animation: none;
+  }
+  .space-btn,
+  .space-chips li,
+  .space-links a,
+  .space-play,
+  .space-gallery img {
+    transition: none;
+  }
+}
+/* Descubrimiento y formularios de Spaces */
+.spaces-hero {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(2.5rem, 8vw, 6rem);
+}
+.spaces-hero::before {
+  content: "";
+  position: absolute;
+  inset: -20% -10% auto auto;
+  width: 60%;
+  aspect-ratio: 1;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--violet) 32%, transparent), transparent);
+  z-index: -1;
+}
+.spaces-card {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  transition: border-color 0.2s, transform 0.2s;
+}
+.spaces-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+}
+.spaces-avatar {
+  width: 4rem;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--violet), #0a0a0c);
+  font-weight: 800;
+  font-size: 1.6rem;
+}
+.spaces-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Editor de Spaces */
+.studio-editor {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  .studio-editor {
+    grid-template-columns: 26rem minmax(0, 1fr);
+    align-items: start;
+  }
+  .studio-controls {
+    max-height: calc(100dvh - 9rem);
+    overflow-y: auto;
+    padding-right: 0.5rem;
+  }
+  .studio-editor .space-frame {
+    max-height: calc(100dvh - 9rem);
+    overflow-y: auto;
+  }
+}
+.space-frame {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+/* En el editor y en el asistente la vista previa va siempre en una columna: su ancho no es el de la pantalla. */
+.space-frame .space-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.space-frame .space-nav {
+  position: static;
+  flex-direction: row;
+  overflow-x: auto;
+}
+.space-frame .space-motto {
+  display: none;
+}

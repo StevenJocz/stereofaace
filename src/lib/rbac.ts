@@ -20,6 +20,7 @@ export type Resource =
   | "subscriber"
   | "station"
   | "studio"
+  | "space"
   | "audit"
   | "dashboard";
 
@@ -44,6 +45,7 @@ const ALL_RESOURCES: Resource[] = [
   "dashboard",
   "station",
   "studio",
+  "space",
 ];
 const ALL_ACTIONS: Action[] = ["read", "create", "update", "delete", "publish", "review", "manage"];
 
@@ -108,6 +110,8 @@ const MATRIX: Record<Role, ReadonlySet<Permission>> = {
   ]),
   // Locutor: solo el estudio (consola, cart wall, pedidos y chat). Nada de contenido ni de ajustes.
   locutor: new Set<Permission>(["studio:read", "studio:update"]),
+  // Oyente: cuenta de StereoFace Spaces. Ningún permiso de administración; solo edita su propio perfil por las rutas de Spaces.
+  oyente: new Set<Permission>(),
 };
 
 export class ForbiddenError extends Error {
@@ -140,11 +144,12 @@ export function canSetArticleStatus(actor: Actor, next: string): boolean {
   return can(actor.role, "article:update");
 }
 
-const RANK: Record<Role, number> = { superadmin: 5, admin: 4, editor: 3, redactor: 2, colaborador: 1, locutor: 1 };
+const RANK: Record<Role, number> = { superadmin: 5, admin: 4, editor: 3, redactor: 2, colaborador: 1, locutor: 1, oyente: 0 };
 
 /** Nadie asigna un rol igual o superior al propio, salvo el superadministrador. */
 export function canAssignRole(actor: Actor, target: Role): boolean {
   if (!can(actor.role, "user:manage")) return false;
+  if (target === "oyente") return false; // las cuentas de oyentes nacen del registro público
   if (actor.role === "superadmin") return true;
   return RANK[target] < RANK[actor.role];
 }

@@ -32,6 +32,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     group: "Audiencia",
     items: [
       { href: "/admin/suscriptores", label: "Suscriptores", permission: "subscriber:read" },
+      { href: "/admin/spaces", label: "Spaces", permission: "space:read" },
       { href: "/admin/radio", label: "Radio", permission: "station:read" },
       { href: "/admin/radio/studio", label: "Estudio", permission: "studio:update" },
       { href: "/admin/radio/biblioteca", label: "Biblioteca", permission: "studio:update" },

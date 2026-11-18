@@ -24,6 +24,7 @@ const ICONS: Record<string, React.ReactNode> = {
   "/admin/agenda": I("M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"),
   "/admin/taxonomia": I("M20 12.5 12.5 20a1.5 1.5 0 0 1-2.1 0L3 12.6V3h9.6l7.4 7.4a1.5 1.5 0 0 1 0 2.1zM7.5 7.5h.01"),
   "/admin/medios": I("M3 5h18v14H3zM8.5 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 16l-5-5-8 8"),
+  "/admin/spaces": I("M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4.4 3.6-7 8-7s8 2.6 8 7M18.5 5.5l1.2 1.2 2.3-2.4"),
   "/admin/suscriptores": I("M3 6h18v12H3zM3 7l9 6 9-6"),
   "/admin/radio": I("M5 8h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM7 8l10-4M8 14h5M16.5 14h.01"),
   "/admin/radio/studio": I("M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zM6 11.5a6 6 0 0 0 12 0M12 17.5V21M9 21h6"),

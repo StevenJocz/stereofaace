@@ -11,6 +11,7 @@ const NAV = [
   { href: "/#lanzamientos", label: "Lanzamientos" },
   { href: "/#artistas", label: "Artistas" },
   { href: "/programas", label: "Programas" },
+  { href: "/spaces", label: "Spaces" },
   { href: "/#agenda", label: "Eventos" },
   { href: "/#cultura", label: "Cultura" },
 ];

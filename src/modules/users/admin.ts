@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import type { Db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { DomainError } from "@/lib/errors";
@@ -36,6 +36,7 @@ export async function listUsers(db: Db, actor: Actor | null): Promise<UserRow[]>
       createdAt: users.createdAt,
     })
     .from(users)
+    .where(ne(users.role, "oyente")) // los oyentes se gestionan en Spaces
     .orderBy(asc(users.name));
 }
 

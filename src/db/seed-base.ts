@@ -10,6 +10,8 @@ import { siteSettings } from "@/modules/settings/schema";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 import { LEGAL_PAGES } from "./legal-pages";
 import { seedRadioDefaults } from "./seed-radio";
+import { spaceGenreOptions, spaceThemes } from "@/modules/spaces/schema";
+import { DEFAULT_GENRE_OPTIONS, DEFAULT_THEMES } from "@/modules/spaces/defaults";
 
 export const CATEGORIES = [
   ["noticias", "Noticias"],
@@ -65,5 +67,14 @@ export async function seedBase(db: Db): Promise<void> {
         seo: { title: p.title, description: p.description },
       })),
     )
+    .onConflictDoNothing();
+  // StereoFace Spaces: géneros elegibles y las cinco plantillas iniciales (el administrador puede cambiarlas después).
+  await db
+    .insert(spaceGenreOptions)
+    .values(DEFAULT_GENRE_OPTIONS.map(([slug, name], position) => ({ slug, name, position })))
+    .onConflictDoNothing();
+  await db
+    .insert(spaceThemes)
+    .values(DEFAULT_THEMES.map((t, position) => ({ slug: t.slug, name: t.name, description: t.description, design: t.design, position })))
     .onConflictDoNothing();
 }

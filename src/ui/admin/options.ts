@@ -30,6 +30,7 @@ export const ROLE_LABEL: Record<string, string> = {
   redactor: "Redactor",
   colaborador: "Colaborador",
   locutor: "Locutor (solo estudio)",
+  oyente: "Oyente (Spaces)",
 };
 
 export const KIND_LABEL: Record<string, string> = { rss: "RSS", atom: "Atom", api: "API", ical: "iCal", manual: "Manual" };

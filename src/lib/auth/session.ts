@@ -44,6 +44,8 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/admin/login");
+  // Las cuentas de oyentes (StereoFace Spaces) no tienen panel: su lugar es su Space.
+  if (user.role === "oyente") redirect("/spaces/editar");
   return user;
 }
 

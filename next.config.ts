@@ -25,6 +25,10 @@ const nextConfig: NextConfig = {
   // Drivers de base de datos: se cargan desde node_modules en el servidor, no se empaquetan.
   serverExternalPackages: ["pg", "@electric-sql/pglite"],
   partialPrefetching: true,
+  // La dirección pública de un Space es /@usuario (en Next, una carpeta «@x» es una ranura paralela, por eso se reescribe).
+  async rewrites() {
+    return [{ source: "/@:username", destination: "/spaces/u/:username" }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -14,3 +14,4 @@ export * from "@/modules/schedule/schema";
 export * from "@/modules/social/schema";
 export * from "@/modules/chat/schema";
 export * from "@/modules/video/schema";
+export * from "@/modules/spaces/schema";
