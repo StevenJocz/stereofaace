@@ -13,6 +13,7 @@ import { Rail, type RailItem } from "@/ui/Rail";
 import { TodaySchedule } from "@/ui/radio/TodaySchedule";
 import { HomeSkeleton } from "@/ui/Skeleton";
 import { SpacesShowcase } from "@/ui/spaces/SpacesShowcase";
+import { FeaturedEvent } from "@/ui/FeaturedEvent";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getNetwork } from "@/modules/spaces/public";
 import { NewsletterForm } from "@/ui/NewsletterForm";
@@ -549,10 +550,12 @@ async function HomeContent() {
           <div className="order-2 col-span-12 lg:order-1 lg:col-span-7">
             <ul>
               {data.events.map((e, i) => (
-                <li key={e.id} className="spec-row" data-reveal>
+                <li key={e.id} className="spec-row hover-host relative" data-reveal>
                   <span className="mono muted">{String(i + 1).padStart(2, "0")}</span>
                   <span>
-                    <span className="display-up block text-[1.6rem]">{e.city}</span>
+                    <Link href={`/agenda/${e.slug}`} className="stretch" aria-label={`${e.name}: más información`}>
+                      <span className="display-up block text-[1.6rem]">{e.city}</span>
+                    </Link>
                     <span className="mono muted">
                       {e.country} · {e.name}
                       {e.genre ? ` · ${e.genre}` : ""}
@@ -567,10 +570,12 @@ async function HomeContent() {
                 Total <span data-count-to={data.events.length}>{String(data.events.length).padStart(2, "0")}</span>{" "}
                 fechas
               </span>
-              <span className="muted">Filtros por país, ciudad y género: ruta /agenda</span>
+              <Link href="/agenda" className="muted hover:text-accent-ink">
+                Ver toda la agenda y filtrar →
+              </Link>
             </p>
           </div>
-          <div className="order-1 col-span-12 lg:order-2 lg:col-span-5 lg:pl-10">
+          <div className="order-1 col-span-12 flex flex-col lg:order-2 lg:col-span-5 lg:pl-10">
             <h2 className="display text-[clamp(2rem,3.7vw,4.4rem)]">
               <Mask>Agenda</Mask>
               <Mask className="text-accent-ink">Col / Latam</Mask>
@@ -578,6 +583,11 @@ async function HomeContent() {
             <p className="muted mt-6 max-w-[38ch]">
               Festivales, conciertos, raves y fechas de gira con ubicación, artistas y enlace oficial de entradas.
             </p>
+            {data.events[0] && (
+              <div className="mt-8 lg:flex lg:min-h-[18rem] lg:flex-1" data-reveal>
+                <FeaturedEvent e={data.events[0]} />
+              </div>
+            )}
           </div>
         </div>
       </section>

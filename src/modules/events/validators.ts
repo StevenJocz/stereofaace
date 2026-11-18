@@ -18,6 +18,9 @@ export const eventInputSchema = z
     artistIds: z.array(z.uuid()).max(60).default([]),
     ticketUrl: httpsUrlSchema.optional(),
     coverArt: coverArtSchema.optional(),
+    /** Imagen principal y galería (hasta 12) de la biblioteca de medios. */
+    imageId: z.uuid().optional(),
+    galleryIds: z.array(z.uuid()).max(12).default([]),
     status: z.enum(["draft", "published", "cancelled"]).default("draft"),
   })
   .refine((v) => !v.endsAt || v.endsAt >= v.startsAt, {

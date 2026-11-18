@@ -5,8 +5,9 @@ import { assertCan, type Actor } from "@/lib/rbac";
 import { uniqueSlug } from "@/lib/admin/slug";
 import { slugify } from "@/lib/slug";
 import { artists } from "@/modules/artists/schema";
+import { media } from "@/modules/media/schema";
 import { recordAudit } from "@/modules/users/audit";
-import { eventArtists, events, type EVENT_STATES } from "./schema";
+import { eventArtists, eventImages, events, type EVENT_STATES } from "./schema";
 import { eventInputSchema } from "./validators";
 
 export const EVENT_PAGE_SIZE = 20;
@@ -20,6 +21,12 @@ async function setLineup(db: Db, eventId: string, artistIds: string[]) {
   const unique = [...new Set(artistIds)];
   if (unique.length)
     await db.insert(eventArtists).values(unique.map((artistId, position) => ({ eventId, artistId, position })));
+}
+
+async function setGallery(db: Db, eventId: string, mediaIds: string[]) {
+  await db.delete(eventImages).where(eq(eventImages.eventId, eventId));
+  const unique = [...new Set(mediaIds)];
+  if (unique.length) await db.insert(eventImages).values(unique.map((mediaId, position) => ({ eventId, mediaId, position })));
 }
 
 export async function listEventsAdmin(
@@ -67,7 +74,19 @@ export async function getEventAdmin(db: Db, actor: Actor | null, id: string) {
     .innerJoin(artists, eq(artists.id, eventArtists.artistId))
     .where(eq(eventArtists.eventId, id))
     .orderBy(asc(eventArtists.position));
-  return { ...row, artistIds: lineup.map((l) => l.artistId) };
+  const [img] = row.imageId ? await db.select({ key: media.storageKey }).from(media).where(eq(media.id, row.imageId)) : [];
+  const gallery = await db
+    .select({ id: media.id, key: media.storageKey })
+    .from(eventImages)
+    .innerJoin(media, eq(media.id, eventImages.mediaId))
+    .where(eq(eventImages.eventId, id))
+    .orderBy(asc(eventImages.position));
+  return {
+    ...row,
+    artistIds: lineup.map((l) => l.artistId),
+    image: row.imageId && img ? { id: row.imageId, url: `/media/${img.key}` } : null,
+    gallery: gallery.map((g) => ({ id: g.id, url: `/media/${g.key}` })),
+  };
 }
 
 export async function createEvent(db: Db, actor: Actor | null, raw: unknown): Promise<{ id: string; slug: string }> {
@@ -90,10 +109,12 @@ export async function createEvent(db: Db, actor: Actor | null, raw: unknown): Pr
       genreId: input.genreId,
       ticketUrl: input.ticketUrl,
       coverArt: input.coverArt,
+      imageId: input.imageId,
       status: input.status,
     })
     .returning({ id: events.id, slug: events.slug });
   await setLineup(db, row.id, input.artistIds);
+  await setGallery(db, row.id, input.galleryIds);
   await recordAudit(db, { userId: actor.id, action: "event.create", entity: "event", entityId: row.id });
   return row;
 }
@@ -119,10 +140,12 @@ export async function updateEvent(db: Db, actor: Actor | null, id: string, raw: 
       genreId: input.genreId ?? null,
       ticketUrl: input.ticketUrl ?? null,
       coverArt: input.coverArt ?? null,
+      imageId: input.imageId ?? null,
       status: input.status,
     })
     .where(eq(events.id, id));
   await setLineup(db, id, input.artistIds);
+  await setGallery(db, id, input.galleryIds);
   await recordAudit(db, { userId: actor.id, action: "event.update", entity: "event", entityId: id });
 }
 

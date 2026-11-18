@@ -5,6 +5,7 @@ import { saveEventAction } from "@/app/(admin)/admin/(panel)/agenda/actions";
 import type { FormState } from "@/lib/admin/form";
 import { SCENES, TONES } from "@/modules/media/cover-art";
 import { ArtistPicker } from "./ArtistPicker";
+import { MediaPicker } from "./MediaPicker";
 import { COUNTRIES } from "./countries";
 import { EVENT_KIND_OPTIONS } from "./options";
 import { Field, Message } from "./fields";
@@ -25,6 +26,8 @@ export type EventFormValues = {
   artistIds?: string[];
   ticketUrl?: string;
   coverArt?: { scene: string; tone: string; seed: number } | null;
+  image?: { id: string; url: string } | null;
+  gallery?: { id: string; url: string }[];
   status?: string;
   canPublish: boolean;
 };
@@ -108,8 +111,19 @@ export function EventForm({
         <ArtistPicker artists={artists} initial={sentArtists} max={60} label="Cartel (opcional, el orden se respeta)" />
       </div>
 
+      <fieldset className="grid gap-4 md:col-span-2">
+        <legend className="mono mb-2 text-muted">Imágenes del evento</legend>
+        <MediaPicker name="imageId" label="Imagen principal (cartel o foto): sale en la portada y en la ficha del evento" initial={initial.image ?? null} />
+        <p className="mono text-muted">Galería (opcional, hasta 6 imágenes)</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <MediaPicker key={i} name="galleryIds" label={`Imagen ${i + 1}`} initial={initial.gallery?.[i] ?? null} />
+          ))}
+        </div>
+      </fieldset>
+
       <fieldset className="md:col-span-2">
-        <legend className="mono mb-2 text-muted">Ilustración generativa (opcional)</legend>
+        <legend className="mono mb-2 text-muted">Ilustración generativa (opcional; se usa si no hay imagen)</legend>
         <div className="grid gap-3 sm:grid-cols-3">
           <select name="scene" aria-label="Escena" className="input" defaultValue={v("scene", initial.coverArt?.scene)}>
             <option value="">Sin ilustración</option>

@@ -13,6 +13,7 @@ import {
 import { pk, timestamps } from "@/lib/db/columns";
 import { artists } from "@/modules/artists/schema";
 import { genres } from "@/modules/taxonomy/schema";
+import { media } from "@/modules/media/schema";
 import type { CoverArt } from "@/modules/media/cover-art";
 
 export const EVENT_KINDS = ["festival", "concierto", "rave", "presentacion", "underground", "gira"] as const;
@@ -40,6 +41,8 @@ export const events = pgTable(
     /** Enlace oficial de entradas: siempre del organizador, nunca vendemos entradas. */
     ticketUrl: text("ticket_url"),
     coverArt: jsonb("cover_art").$type<CoverArt>(),
+    /** Imagen principal del evento (cartel o foto) de la biblioteca; si falta se usa la ilustración generativa. */
+    imageId: uuid("image_id").references(() => media.id, { onDelete: "set null" }),
     status: eventStateEnum("status").notNull().default("draft"),
     isDemo: boolean("is_demo").notNull().default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -60,4 +63,19 @@ export const eventArtists = pgTable(
     position: integer("position").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.eventId, t.artistId] })],
+);
+
+/** Galería de imágenes del evento (hasta 12), en orden. */
+export const eventImages = pgTable(
+  "event_images",
+  {
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.mediaId] })],
 );

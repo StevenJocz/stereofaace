@@ -23,6 +23,8 @@ function eventRaw(fd: FormData) {
     genreId: str(fd, "genreId"),
     artistIds: strs(fd, "artistIds"),
     ticketUrl: str(fd, "ticketUrl"),
+    imageId: str(fd, "imageId"),
+    galleryIds: strs(fd, "galleryIds"),
     coverArt: scene ? { scene, tone: str(fd, "tone"), seed: Number(str(fd, "seed") ?? 0) } : undefined,
     status: str(fd, "status") ?? "draft",
   };

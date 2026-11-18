@@ -59,6 +59,8 @@ export default async function EditEventPage({
             artistIds: event.artistIds,
             ticketUrl: event.ticketUrl ?? "",
             coverArt: event.coverArt,
+            image: event.image,
+            gallery: event.gallery,
             status: event.status,
             canPublish: can(user.role, "event:publish"),
           }}
