@@ -228,7 +228,6 @@ export function RadioBar() {
         ? "Reintentar conexión"
         : "Reproducir";
   const onPlay = r.status === "error" ? r.retry : r.toggle;
-  const playIcon = isEmbed ? "list" : playing ? "pause" : "play";
 
   return (
     <>
@@ -332,8 +331,21 @@ export function RadioBar() {
                     <Ico name="prev" size={17} />
                   </button>
                 )}
-                <button type="button" onClick={onPlay} className="rb-play" aria-label={playLabel}>
-                  <Ico name={playIcon} size={20} />
+                <button type="button" onClick={onPlay} className="rb-play" data-playing={playing || undefined} aria-label={playLabel}>
+                  <span className="rb-play-ring" aria-hidden="true" />
+                  <span className="rb-play-ring rb-play-ring-2" aria-hidden="true" />
+                  {isEmbed ? (
+                    <Ico name="list" size={20} />
+                  ) : playing ? (
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true" className="rb-ico">
+                      <rect className="rb-pause-bar" x="6" y="5" width="4.2" height="14" rx="1.3" />
+                      <rect className="rb-pause-bar rb-pause-bar-2" x="13.8" y="5" width="4.2" height="14" rx="1.3" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true" className="rb-ico rb-ico-play">
+                      <path d="M7.2 4.8v14.4a.9.9 0 0 0 1.4.8l11.2-7.2a.9.9 0 0 0 0-1.6L8.6 4a.9.9 0 0 0-1.4.8Z" />
+                    </svg>
+                  )}
                 </button>
                 {r.stations.length > 1 && (
                   <button type="button" className="rb-ghost" onClick={() => r.step(1)} aria-label="Emisora siguiente">

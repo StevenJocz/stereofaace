@@ -26,14 +26,16 @@ const LABEL: Record<VizState, string> = {
 };
 
 const BARS = 72;
+/** En la variante tarjeta las barras son más finas y numerosas. */
+const DECK_BARS = 120;
 
 /**
  * Visualizador con datos REALES del AnalyserNode. Si la emisora no permite leer el audio (sin CORS) o el
  * analizador no recibe señal, lo dice con claridad en vez de dibujar una animación decorativa.
  */
 /** Envolvente fija de las barras en reposo (decorativa y estática: no simula audio). */
-const IDLE = Array.from({ length: 72 }, (_, i) => {
-  const x = i / 71;
+const IDLE = Array.from({ length: DECK_BARS }, (_, i) => {
+  const x = i / (DECK_BARS - 1);
   return 18 + 42 * Math.exp(-(((x - 0.38) / 0.28) ** 2)) + 10 * Math.sin(i * 1.7) ** 2;
 });
 
@@ -67,6 +69,7 @@ export function Visualizer({ active, analysable, silenced, getAnalyser, deck = f
     const analyser = getAnalyser();
     if (!analyser) return;
 
+    const nBars = deck ? DECK_BARS : BARS;
     const data = new Uint8Array(analyser.frequencyBinCount);
     const startedAt = performance.now();
     let seen = false;
@@ -109,15 +112,15 @@ export function Visualizer({ active, analysable, silenced, getAnalyser, deck = f
       g.addColorStop(0, "#9b6bff");
       g.addColorStop(1, "#c6ff00");
       ctx2d.fillStyle = g;
-      const gap = Math.max(2, W / BARS / 4);
-      const bw = (W - gap * (BARS - 1)) / BARS;
-      for (let i = 0; i < BARS; i++) {
-        const a = Math.floor(Math.pow(i / BARS, 1.7) * data.length * 0.8);
-        const b = Math.max(a + 1, Math.floor(Math.pow((i + 1) / BARS, 1.7) * data.length * 0.8));
+      const gap = Math.max(deck ? 1.5 : 2, W / nBars / 4);
+      const bw = (W - gap * (nBars - 1)) / nBars;
+      for (let i = 0; i < nBars; i++) {
+        const a = Math.floor(Math.pow(i / nBars, 1.7) * data.length * 0.8);
+        const b = Math.max(a + 1, Math.floor(Math.pow((i + 1) / nBars, 1.7) * data.length * 0.8));
         let sum = 0;
         for (let k = a; k < b; k++) sum += data[k];
         const v = sum / (b - a) / 255;
-        const h = Math.max(2, v * H);
+        const h = Math.max(2, v * H * (deck ? 0.8 : 1));
         ctx2d.fillRect(i * (bw + gap), H - h, bw, h);
       }
     };
@@ -128,7 +131,7 @@ export function Visualizer({ active, analysable, silenced, getAnalyser, deck = f
       ro.disconnect();
       setMeasured(null);
     };
-  }, [active, analysable, silenced, reduced, getAnalyser]);
+  }, [active, analysable, silenced, reduced, getAnalyser, deck]);
 
   const state: VizState = !analysable
     ? "none"
