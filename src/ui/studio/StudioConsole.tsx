@@ -656,6 +656,18 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const stopCarts = useCallback(() => engineRef.current?.stopAllCarts(), []);
   const readCartRemaining = useCallback((id: string) => engineRef.current?.cartRemaining(id) ?? 0, []);
 
+  /** Al terminar un video de YouTube del DJ: si ningún deck suena y «siguiente automática» está activa, arranca la siguiente pista de la cola. */
+  const resumeQueueAfterVideo = useCallback(async () => {
+    const e = engineRef.current;
+    if (!e || !autoRef.current) return;
+    if (e.isPlaying("A") || e.isPlaying("B")) return; // el aire ya tiene música: no se pisa
+    const next = queueRef.current[0];
+    if (!next) return;
+    const id = activeRef.current;
+    await loadToDeck(next, id);
+    await play(id);
+  }, [loadToDeck, play]);
+
   // Atajos de los carts (1 tecla) y Esc para detenerlos todos.
   useEffect(() => {
     const keys = hotkeyMap(carts);
@@ -935,7 +947,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
           </div>
           {/* Siempre montado (solo se oculta): cambiar de pestaña no corta el video que se está escuchando. */}
           <div id="tool-youtube" role="tabpanel" aria-labelledby="tool-tab-youtube" className="studio-tool-body" hidden={tool !== "youtube"}>
-            <YouTubePanel seed={ytSeed} />
+            <YouTubePanel seed={ytSeed} onEnded={resumeQueueAfterVideo} />
           </div>
           <div id="tool-chat" role="tabpanel" aria-labelledby="tool-tab-chat" className="studio-tool-body" hidden={tool !== "chat"}>
             <ChatModPanel feed={desk.feed} refresh={desk.refresh} dropMessage={desk.dropMessage} />

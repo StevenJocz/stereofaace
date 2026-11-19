@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseYouTube } from "@/modules/spaces/design";
+import { playerStateOf, YT_ENDED, YT_PLAYING } from "./youtube-events";
 
 const KEY = "sf-studio-yt";
 type Recent = { id: string; at: number };
@@ -20,12 +21,37 @@ const readRecent = (): Recent[] => {
  * Suena solo en este equipo (para comprobar el pedido); no se mezcla ni sale al aire, y los anuncios los decide YouTube
  * (sin anuncios con YouTube Premium en este navegador). El iframe se construye solo desde el id validado del video.
  */
-export function YouTubePanel({ seed }: { seed?: { text: string; n: number } | null }) {
+export function YouTubePanel({ seed, onEnded }: { seed?: { text: string; n: number } | null; onEnded?: () => void }) {
   const [input, setInput] = useState("");
   const [search, setSearch] = useState("");
   const [videoId, setVideoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<Recent[]>([]);
+  const [follow, setFollow] = useState(true);
+  const frame = useRef<HTMLIFrameElement>(null);
+  const followRef = useRef(follow);
+  const endedRef = useRef(onEnded);
+  useEffect(() => {
+    followRef.current = follow;
+    endedRef.current = onEnded;
+  });
+
+  // Avisa cuando el video termina (API de mensajes del reproductor oficial) para seguir con la cola del estudio.
+  useEffect(() => {
+    if (!videoId) return;
+    let fired = false;
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== "https://www.youtube.com" || e.source !== frame.current?.contentWindow || typeof e.data !== "string") return;
+      const state = playerStateOf(e.data);
+      if (state === YT_PLAYING) fired = false; // volvió a sonar
+      if (state === YT_ENDED && !fired) {
+        fired = true;
+        if (followRef.current) endedRef.current?.();
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [videoId]);
 
   useEffect(() => {
     setRecent(readRecent()); // eslint-disable-line react-hooks/set-state-in-effect -- el historial solo existe en el navegador
@@ -76,7 +102,9 @@ export function YouTubePanel({ seed }: { seed?: { text: string; n: number } | nu
         <div className="mt-3">
           <iframe
             key={videoId}
-            src={`https://www.youtube.com/embed/${videoId}?rel=0&playsinline=1`}
+            ref={frame}
+            src={`https://www.youtube.com/embed/${videoId}?rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(typeof window === "undefined" ? "" : window.location.origin)}`}
+            onLoad={() => frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "https://www.youtube.com")}
             title="Reproductor de YouTube"
             className="aspect-video w-full rounded-[10px] border border-line bg-black"
             sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
@@ -84,6 +112,10 @@ export function YouTubePanel({ seed }: { seed?: { text: string; n: number } | nu
             referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
           />
+          <label className="mt-2 flex items-center gap-2 text-[0.8rem]">
+            <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
+            Al terminar el video, seguir con la cola
+          </label>
           <div className="mt-1.5 flex flex-wrap gap-3">
             <a href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer" className="mono text-[0.66rem] text-accent-ink underline">
               Abrir en YouTube ↗
