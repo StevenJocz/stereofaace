@@ -76,11 +76,11 @@ export function YouTubePanel({ seed }: { seed?: { text: string; n: number } | nu
         <div className="mt-3">
           <iframe
             key={videoId}
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&playsinline=1`}
+            src={`https://www.youtube.com/embed/${videoId}?rel=0&playsinline=1`}
             title="Reproductor de YouTube"
             className="aspect-video w-full rounded-[10px] border border-line bg-black"
             sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+            allow="encrypted-media; fullscreen; picture-in-picture"
             referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
           />
@@ -94,7 +94,7 @@ export function YouTubePanel({ seed }: { seed?: { text: string; n: number } | nu
           </div>
         </div>
       ) : (
-        <p className="studio-empty !mt-3 !py-3">Pega un enlace y pulsa Cargar.</p>
+        <p className="studio-empty !mt-3 !py-3">Pega un enlace y pulsa Cargar. El video no arranca solo: pulsa play cuando quieras.</p>
       )}
 
       <div className="mt-4 border-t border-line pt-3">
