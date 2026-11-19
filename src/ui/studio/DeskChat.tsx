@@ -65,7 +65,7 @@ function Switches({ config, onChange }: { config: ChatConfig | null; onChange: (
   );
 }
 
-export function RequestsPanel({ feed, refresh, onSearch }: { feed: DeskFeed; refresh: () => void; onSearch: (text: string) => void }) {
+export function RequestsPanel({ feed, refresh, onSearch, onYouTube }: { feed: DeskFeed; refresh: () => void; onSearch: (text: string) => void; onYouTube?: (text: string) => void }) {
   const setStatus = async (id: string, status: "played" | "rejected") => {
     await act({ action: "request", id, status });
     refresh();
@@ -99,6 +99,11 @@ export function RequestsPanel({ feed, refresh, onSearch }: { feed: DeskFeed; ref
                 <button type="button" className="btn !px-2.5 !py-0.5 !text-[0.7rem]" onClick={() => onSearch(`${r.title}${r.artist ? ` ${r.artist}` : ""}`)}>
                   Buscar en la biblioteca
                 </button>
+                {onYouTube && (
+                  <button type="button" className="btn !px-2.5 !py-0.5 !text-[0.7rem]" onClick={() => onYouTube(`${r.title}${r.artist ? ` ${r.artist}` : ""}`)}>
+                    Buscar en YouTube
+                  </button>
+                )}
                 <button type="button" className="btn btn-accent !px-2.5 !py-0.5 !text-[0.7rem]" onClick={() => void setStatus(r.id, "played")}>
                   Ya sonó
                 </button>
@@ -145,7 +150,7 @@ export function ChatModPanel({ feed, refresh, dropMessage }: { feed: DeskFeed; r
         {feed.messages.map((m) => (
           <div key={m.id} className="desk-chat-msg">
             <div className="min-w-0 flex-1">
-              <span className="font-bold">{m.nickname}</span> <time className="mono muted text-[0.6rem]">{hhmm(m.at)}</time>
+              <span className="font-bold">{m.nickname}</span>{m.verified && <span className="text-accent-ink" title="Cuenta verificada"> ✓</span>} <time className="mono muted text-[0.6rem]">{hhmm(m.at)}</time>
               {m.kind === "request" ? (
                 <p className="text-[0.86rem] leading-snug [overflow-wrap:anywhere]">
                   <span className="text-accent-ink">🎵 pidió</span> <strong>{m.body}</strong>
@@ -155,9 +160,9 @@ export function ChatModPanel({ feed, refresh, dropMessage }: { feed: DeskFeed; r
               ) : (
                 m.body && <p className="text-[0.86rem] leading-snug [overflow-wrap:anywhere]">{m.body}</p>
               )}
-              {m.gif && gifByKey(m.gif) && (
-                // eslint-disable-next-line @next/next/no-img-element -- GIF propio de /public
-                <img src={gifByKey(m.gif)!.src} alt={gifByKey(m.gif)!.label} width={56} height={56} className="mt-1 rounded-md" />
+              {(gifByKey(m.gif) || /^u:[0-9a-f-]{36}$/i.test(m.gif ?? "")) && (
+                // eslint-disable-next-line @next/next/no-img-element -- GIF de la bandeja (/public) o propio de alguien (servido por /s)
+                <img src={gifByKey(m.gif)?.src ?? `/s/${(m.gif ?? "").slice(2)}`} alt={gifByKey(m.gif)?.label ?? "GIF"} width={56} height={56} className="mt-1 rounded-md" />
               )}
             </div>
             <div className="flex shrink-0 gap-1">

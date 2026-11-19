@@ -5,6 +5,7 @@ import { DeckPanel, type DeckView } from "./DeckPanel";
 import { LibraryPanel } from "./LibraryPanel";
 import type { DjProgramInfo, StudioProgram } from "@/modules/schedule/dj";
 import type { CartView } from "@/modules/studio/carts";
+import { YouTubePanel } from "./YouTubePanel";
 import { CartWall } from "./CartWall";
 import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
@@ -103,9 +104,10 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
-  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay" | "requests" | "chat" | "camera">("carts");
+  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay" | "requests" | "chat" | "youtube" | "camera">("carts");
   const [cabinLive, setCabinLive] = useState(false);
   const [searchSeed, setSearchSeed] = useState<{ text: string; n: number } | null>(null);
+  const [ytSeed, setYtSeed] = useState<{ text: string; n: number } | null>(null);
   const desk = useDeskFeed(visible);
   const [relayState, setRelayState] = useState<RelayState>("idle");
   const [relayVolume, setRelayVolume] = useState(0.8);
@@ -863,6 +865,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
               ["voice", "Voz", micActive && !micMuted],
               ["requests", `Pedidos${desk.feed.requests.length > 0 ? ` (${desk.feed.requests.length})` : ""}`, desk.feed.requests.length > 0],
               ["chat", "Chat", false],
+              ["youtube", "YouTube", false],
               ["relay", "Señal", relayState === "playing" || relayState === "connecting"],
               ["camera", "Cámara", cabinLive],
               ["eq", "Ecualizador", false],
@@ -928,7 +931,11 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
             />
           </div>
           <div id="tool-requests" role="tabpanel" aria-labelledby="tool-tab-requests" className="studio-tool-body" hidden={tool !== "requests"}>
-            <RequestsPanel feed={desk.feed} refresh={desk.refresh} onSearch={(text) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }))} />
+            <RequestsPanel feed={desk.feed} refresh={desk.refresh} onSearch={(text) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }))} onYouTube={(text) => { setYtSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 })); setTool("youtube"); }} />
+          </div>
+          {/* Siempre montado (solo se oculta): cambiar de pestaña no corta el video que se está escuchando. */}
+          <div id="tool-youtube" role="tabpanel" aria-labelledby="tool-tab-youtube" className="studio-tool-body" hidden={tool !== "youtube"}>
+            <YouTubePanel seed={ytSeed} />
           </div>
           <div id="tool-chat" role="tabpanel" aria-labelledby="tool-tab-chat" className="studio-tool-body" hidden={tool !== "chat"}>
             <ChatModPanel feed={desk.feed} refresh={desk.refresh} dropMessage={desk.dropMessage} />
