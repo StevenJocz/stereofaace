@@ -24,7 +24,7 @@ const STATUS: Record<RadioStatus, { label: string; tone: "live" | "busy" | "idle
 };
 
 const Icon = {
-  play: <path d="M8 5v14l11-7z" fill="currentColor" stroke="none" />,
+  play: <path d="M7 5v14l11-7z" fill="currentColor" stroke="none" />,
   pause: <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor" stroke="none" />,
   prev: <path d="M6 5v14M19 5L9 12l10 7z" />,
   next: <path d="M18 5v14M5 5l10 7-10 7z" />,
@@ -327,15 +327,19 @@ export function RadioBar() {
                     </svg>
                   </button>
                 )}
-                <button type="button" className="rb-ghost" onClick={() => r.step(-1)} disabled={r.stations.length < 2} aria-label="Emisora anterior">
-                  <Ico name="prev" size={17} />
-                </button>
+                {r.stations.length > 1 && (
+                  <button type="button" className="rb-ghost" onClick={() => r.step(-1)} aria-label="Emisora anterior">
+                    <Ico name="prev" size={17} />
+                  </button>
+                )}
                 <button type="button" onClick={onPlay} className="rb-play" aria-label={playLabel}>
                   <Ico name={playIcon} size={20} />
                 </button>
-                <button type="button" className="rb-ghost" onClick={() => r.step(1)} disabled={r.stations.length < 2} aria-label="Emisora siguiente">
-                  <Ico name="next" size={17} />
-                </button>
+                {r.stations.length > 1 && (
+                  <button type="button" className="rb-ghost" onClick={() => r.step(1)} aria-label="Emisora siguiente">
+                    <Ico name="next" size={17} />
+                  </button>
+                )}
                 {own && (
                   <button type="button" className="rb-ghost" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen} aria-controls="chat-panel" aria-label="Chat y pedidos de canciones">
                     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

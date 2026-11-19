@@ -5227,3 +5227,27 @@ body[data-radio="on"] .adm-shell {
     display: none;
   }
 }
+
+/* Ajustes finos del reproductor: controles centrados y portada a la altura de todo el texto. */
+.rb-controls {
+  justify-content: center;
+}
+@media (min-width: 1024px) {
+  .rb-card {
+    grid-template-columns: 5.6rem minmax(0, 1fr) 12.5rem;
+    align-items: stretch;
+  }
+  .rb-cover {
+    width: 5.6rem;
+    height: auto;
+    align-self: stretch;
+  }
+  .rb-main {
+    align-content: center;
+  }
+}
+@media (min-width: 1280px) {
+  .rb-card {
+    grid-template-columns: 9.5rem 5.6rem minmax(0, 1fr) 12.5rem;
+  }
+}
