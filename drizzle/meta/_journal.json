@@ -120,6 +120,13 @@
       "when": 1795045474041,
       "tag": "0016_spaces_verificado",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795047027735,
+      "tag": "0017_chat_verificado",
+      "breakpoints": true
     }
   ]
 }

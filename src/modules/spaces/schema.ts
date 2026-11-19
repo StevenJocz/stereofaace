@@ -106,7 +106,7 @@ export const spaceThemes = pgTable("space_themes", {
   position: integer("position").notNull().default(0),
 });
 
-export const ASSET_KINDS = ["avatar", "cover", "background", "gallery"] as const;
+export const ASSET_KINDS = ["avatar", "cover", "background", "gallery", "chatgif"] as const;
 export type AssetKind = (typeof ASSET_KINDS)[number];
 
 /** Imágenes subidas por las personas. El archivo vive en el almacenamiento local bajo `storageKey` (uuid). */

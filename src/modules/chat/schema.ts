@@ -1,4 +1,4 @@
-import { bigserial, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigserial, boolean, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { pk, timestamps } from "@/lib/db/columns";
 import { users } from "@/modules/users/schema";
 
@@ -11,6 +11,8 @@ export const chatMessages = pgTable(
     /** Identificador anónimo del navegador (no es un dato personal); sirve para silenciar y para marcar «mis mensajes». */
     clientId: text("client_id").notNull(),
     nickname: text("nickname").notNull(),
+    /** Chulo de verificado de quien escribió (copia del momento del mensaje). */
+    verified: boolean("verified").notNull().default(false),
     body: text("body"),
     /** message = mensaje normal; request = tarjeta de pedido de canción (body = título, artist = artista). */
     kind: text("kind").notNull().default("message"),

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mergeMessages } from "@/ui/chat/chat-client";
 import { EMOJI_GROUPS } from "@/ui/chat/emojis";
 
-const m = (id: number) => ({ id, kind: "message" as const, nickname: "A", body: `m${id}`, artist: null, note: null, gif: null, at: "2026-11-17T00:00:00Z", mine: false });
+const m = (id: number) => ({ id, kind: "message" as const, nickname: "A", verified: false, body: `m${id}`, artist: null, note: null, gif: null, at: "2026-11-17T00:00:00Z", mine: false });
 
 describe("mergeMessages", () => {
   it("suma lo nuevo en orden y sin repetir", () => {

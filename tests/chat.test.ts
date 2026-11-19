@@ -38,8 +38,8 @@ describe("validateMessage", () => {
   it("limpia espacios y acepta emojis", () => {
     expect(validateMessage({ nickname: "  Ana  ", text: "  hola   🔥🔥  " })).toEqual({ nickname: "Ana", body: "hola 🔥🔥", gif: null });
   });
-  it("el apodo tiene de 2 a 20 caracteres sin símbolos raros", () => {
-    for (const nickname of ["A", "x".repeat(21), "<script>", "ana@mail.com"]) expect(() => validateMessage({ nickname, text: "hola" })).toThrow(ZodError);
+  it("el nombre tiene de 2 a 40 caracteres sin símbolos raros", () => {
+    for (const nickname of ["A", "x".repeat(41), "<script>", "ana@mail.com"]) expect(() => validateMessage({ nickname, text: "hola" })).toThrow(ZodError);
   });
   it("el texto no puede estar vacío ni pasar de 280 caracteres", () => {
     expect(() => validateMessage({ nickname: "Ana", text: "   " })).toThrow(ZodError);

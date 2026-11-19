@@ -24,6 +24,8 @@ export async function uploadAsset(
 ): Promise<{ id: string; kind: AssetKind; storageKey: string }> {
   if (typeof kindRaw !== "string" || !(ASSET_KINDS as readonly string[]).includes(kindRaw)) throw new DomainError("bad_kind", "Tipo de imagen no válido.");
   const kind = kindRaw as AssetKind;
+  // Los GIF del chat tienen su propia validación y subida (ver modules/chat/user-gifs.ts).
+  if (kind === "chatgif") throw new DomainError("bad_kind", "Tipo de imagen no válido.");
   if (file.size > MAX_IMAGE_BYTES) throw new DomainError("image_too_big", "La imagen supera el máximo de 5 MB.");
   const check = await validateImageUpload(file);
   if (!check.ok) throw new DomainError("bad_image", check.message);
@@ -76,7 +78,8 @@ export async function readSpaceAsset(db: Db, root: string, key: string, viewerId
   if (!row) return null;
   if (row.a.status !== "ok") return null; // una imagen marcada por la administración no se sirve a nadie
   const owner = viewerId !== null && viewerId === row.a.userId;
-  const visible = row.status === "published";
+  // Los GIF del chat se ven aunque el Space sea borrador (viven en el chat); solo se cortan si el Space fue desactivado.
+  const visible = row.a.kind === "chatgif" ? row.status !== "disabled" : row.status === "published";
   if (!visible && !owner) return null;
   const bytes = await readStoredMedia(root, key);
   return bytes ? { bytes, mime: row.a.mime, isPublic: visible && !owner } : null;

@@ -11,7 +11,9 @@ export function mergeMessages(current: PublicMessage[], incoming: PublicMessage[
 export type ChatConfig = { enabled: boolean; requestsEnabled: boolean };
 /** Quién mira: ¿tiene cuenta? y, si puede escribir, con qué apodo (su @usuario). `nickname: null` con cuenta = suspendida del chat. */
 export type Viewer = { signedIn: boolean; nickname: string | null };
-export type MessagesResponse = { config: ChatConfig; messages: PublicMessage[]; last: number; viewer: Viewer };
+/** Ventana actual del chat: se vacía cada 6 horas (a las 00:00, 06:00, 12:00 y 18:00, hora de Bogotá). */
+export type ChatReset = { startsAt: string; resetsAt: string };
+export type MessagesResponse = { config: ChatConfig; messages: PublicMessage[]; last: number; viewer: Viewer; reset: ChatReset };
 export type RequestsResponse = { config: ChatConfig; requests: PublicRequest[]; viewer: Viewer };
 
 export async function postJson<T>(url: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; error: string }> {

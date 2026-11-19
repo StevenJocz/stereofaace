@@ -1,13 +1,16 @@
 import { ZodError } from "zod";
 import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
+import { sameOrigin } from "@/lib/csrf";
 import { rateLimit } from "@/lib/rate-limit";
 import type { Actor } from "@/lib/rbac";
 import { guarded, reply } from "@/modules/studio/http";
 import type { SessionUser } from "@/modules/users/auth";
+import { listUserGifs, removeUserGif, uploadUserGif } from "./user-gifs";
 import {
   createRequest,
   chatIdentity,
+  chatWindow,
   deleteMessage,
   getChatConfig,
   listMessages,
@@ -65,7 +68,8 @@ export function publicChatGet(db: Db, q: { after: string | null; user: SessionUs
   return publicGuard(async () => {
     const viewer = await viewerOf(db, q.user);
     const [config, list] = await Promise.all([getChatConfig(db), listMessages(db, { after: cursor(q.after), clientId: viewer.clientId ?? undefined })]);
-    return json({ config, ...list, viewer: { signedIn: viewer.signedIn, nickname: viewer.nickname } });
+    const w = chatWindow();
+    return json({ config, ...list, viewer: { signedIn: viewer.signedIn, nickname: viewer.nickname }, reset: { startsAt: w.startsAt.toISOString(), resetsAt: w.resetsAt.toISOString() } });
   });
 }
 
@@ -79,7 +83,7 @@ export function publicChatPost(db: Db, body: unknown, ip: string, user: SessionU
     if (!byClient.ok) return tooFast(byClient.retryAfterMs, "Vas muy rápido: espera un par de segundos.");
     const byIp = rateLimit(`chat:ip:${ip}`, 15, 30_000);
     if (!byIp.ok) return tooFast(byIp.retryAfterMs, "Demasiados mensajes desde tu conexión. Espera un momento.");
-    const m = await postMessage(db, { ...id, text: str(b.text) || undefined, gif: str(b.gif) || undefined });
+    const m = await postMessage(db, { clientId: id.clientId, nickname: id.nickname, verified: id.verified, userId: user.id, text: str(b.text) || undefined, gif: str(b.gif) || undefined });
     return json({ message: m }, 201);
   });
 }
@@ -102,8 +106,38 @@ export function publicRequestPost(db: Db, body: unknown, ip: string, user: Sessi
     if (!byClient.ok) return tooFast(byClient.retryAfterMs, "Espera unos segundos antes de pedir otra canción.");
     const byIp = rateLimit(`req:ip:${ip}`, 6, 60_000);
     if (!byIp.ok) return tooFast(byIp.retryAfterMs, "Demasiados pedidos desde tu conexión. Espera un momento.");
-    const r = await createRequest(db, { ...id, title: str(b.title), artist: str(b.artist) || undefined, note: str(b.note) || undefined });
+    const r = await createRequest(db, { clientId: id.clientId, nickname: id.nickname, title: str(b.title), artist: str(b.artist) || undefined, note: str(b.note) || undefined });
     return json(r, r.duplicate ? 200 : 201);
+  });
+}
+
+/* ───────────── GIF propios ───────────── */
+
+/** Mis GIF: lista (GET), subir (POST multipart «file») y borrar (DELETE ?id=). Solo con sesión. */
+export function userGifsHandler(db: Db, user: SessionUser | null, request: Request, root: string): Promise<Response> {
+  return publicGuard(async () => {
+    if (!user) return authRequired();
+    if (request.method === "GET") return json({ gifs: await listUserGifs(db, user.id) });
+    if (!sameOrigin(request)) return json({ error: "Origen no permitido." }, 403);
+    if (request.method === "DELETE") {
+      const id = new URL(request.url).searchParams.get("id") ?? "";
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "GIF no válido." }, 400);
+      await removeUserGif(db, user.id, root, id);
+      return json({ ok: true });
+    }
+    const declared = Number(request.headers.get("content-length") ?? "NaN");
+    if (!Number.isFinite(declared)) return json({ error: "Falta el tamaño del contenido." }, 411);
+    if (declared > 2.5 * 1024 * 1024) return json({ error: "El GIF supera el máximo de 2 MB." }, 413);
+    if (!rateLimit(`chat:gif:${user.id}`, 10, 3600_000).ok) return json({ error: "Subiste muchos GIF seguidos. Espera un rato." }, 429);
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return json({ error: "Cuerpo no válido." }, 400);
+    }
+    const file = form.get("file");
+    if (!(file instanceof File)) return json({ error: "Elige un GIF." }, 400);
+    return json({ gif: await uploadUserGif(db, user.id, root, file) }, 201);
   });
 }
 

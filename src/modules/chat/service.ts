@@ -1,20 +1,31 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { assertCan, type Actor } from "@/lib/rbac";
 import { siteSettings } from "@/modules/settings/schema";
 import { gifByKey } from "./gifs";
+import { ownsUserGif } from "./user-gifs";
 import { spaceProfiles } from "@/modules/spaces/schema";
 import { chatMessages, chatMutes, songRequests } from "./schema";
 
 const KEY = "chat";
 const MAX_PENDING_PER_CLIENT = 3;
-const KEEP_DAYS = 7;
+const KEEP_DAYS = 2;
+
+/** El chat se reinicia cada 6 horas, en ventanas fijas de la hora de Bogotá (UTC−5): 00:00, 06:00, 12:00 y 18:00. */
+export const CHAT_RESET_HOURS = 6;
+const BOGOTA_OFFSET_MS = 5 * 3600_000;
+
+export function chatWindow(now: Date = new Date()): { startsAt: Date; resetsAt: Date } {
+  const span = CHAT_RESET_HOURS * 3600_000;
+  const start = Math.floor((now.getTime() - BOGOTA_OFFSET_MS) / span) * span + BOGOTA_OFFSET_MS;
+  return { startsAt: new Date(start), resetsAt: new Date(start + span) };
+}
 
 /* ───────────── Validación ───────────── */
 
-const nickname = z.string().trim().regex(/^[\p{L}\p{N}][\p{L}\p{N} _.-]{1,19}$/u, "El apodo tiene de 2 a 20 letras o números");
+const nickname = z.string().trim().regex(/^[\p{L}\p{N}][\p{L}\p{N}\p{M} _.'’-]{1,39}$/u, "El nombre tiene de 2 a 40 letras o números");
 /** Enlaces y atajos de enlace: el chat no los admite (anti-spam). */
 const LINK = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|co|io|me|ly|xyz|info|app|link|gl|cc|tv)\b|\bwa\.me\b|\bt\.me\b)/i;
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -27,7 +38,7 @@ const messageSchema = z
   })
   .transform((v) => ({ nickname: v.nickname, body: clean(v.text ?? ""), gif: v.gif ?? null }))
   .superRefine((v, ctx) => {
-    if (v.gif !== null && !gifByKey(v.gif)) ctx.addIssue({ code: "custom", path: ["gif"], message: "GIF no válido" });
+    if (v.gif !== null && !gifByKey(v.gif) && !/^u:[0-9a-f-]{36}$/i.test(v.gif)) ctx.addIssue({ code: "custom", path: ["gif"], message: "GIF no válido" });
     if (v.body === "" && v.gif === null) ctx.addIssue({ code: "custom", path: ["text"], message: "Escribe un mensaje" });
     if (v.body.length > 280) ctx.addIssue({ code: "custom", path: ["text"], message: "Máximo 280 caracteres" });
     if (LINK.test(v.body)) ctx.addIssue({ code: "custom", path: ["text"], message: "No se permiten enlaces en el chat" });
@@ -76,7 +87,7 @@ async function assertNotMuted(db: Db, clientId: string, now: Date) {
 
 /* ───────────── Identidad: solo con cuenta ───────────── */
 
-export type ChatIdentity = { clientId: string; nickname: string };
+export type ChatIdentity = { clientId: string; nickname: string; verified: boolean };
 
 /**
  * Escribir en el chat y pedir canciones exige tener cuenta. La identidad sale del servidor (nunca del navegador):
@@ -84,30 +95,34 @@ export type ChatIdentity = { clientId: string; nickname: string };
  * @usuario de su Space, o, si no tiene Space (personal del equipo), su nombre limpio. Un Space desactivado por moderación no puede escribir.
  */
 export async function chatIdentity(db: Db, user: { id: string; name: string }): Promise<ChatIdentity> {
-  const [p] = await db.select({ username: spaceProfiles.username, status: spaceProfiles.status }).from(spaceProfiles).where(eq(spaceProfiles.userId, user.id));
+  const [p] = await db.select({ username: spaceProfiles.username, displayName: spaceProfiles.displayName, status: spaceProfiles.status, badge: spaceProfiles.badgeVerifiedAt }).from(spaceProfiles).where(eq(spaceProfiles.userId, user.id));
   if (p?.status === "disabled") throw new DomainError("chat_muted", "Tu cuenta está suspendida del chat.");
-  const fallback = user.name.replace(/[^\p{L}\p{N} _.-]/gu, "").replace(/^[^\p{L}\p{N}]+/u, "").trim().slice(0, 20);
-  const nick = p?.username ?? (fallback.length >= 2 ? fallback : "Oyente");
-  return { clientId: `u${user.id.replace(/-/g, "")}`, nickname: nick };
+  // El nombre que se ve es el NOMBRE VISIBLE del Space (el que la persona eligió), sin caracteres raros; si no sirve, su @usuario.
+  const tidy = (raw: string) => raw.replace(/[^\p{L}\p{N}\p{M} _.'’-]/gu, "").replace(/^[^\p{L}\p{N}]+/u, "").replace(/\s+/g, " ").trim().slice(0, 40);
+  const shown = tidy(p?.displayName ?? "");
+  const fallback = tidy(user.name);
+  const nick = shown.length >= 2 ? shown : (p?.username ?? (fallback.length >= 2 ? fallback : "Oyente"));
+  return { clientId: `u${user.id.replace(/-/g, "")}`, nickname: nick, verified: Boolean(p?.badge) };
 }
 
 /* ───────────── Mensajes ───────────── */
 
-export type PublicMessage = { id: number; kind: "message" | "request"; nickname: string; body: string | null; artist: string | null; note: string | null; gif: string | null; at: string; mine: boolean };
+export type PublicMessage = { id: number; kind: "message" | "request"; nickname: string; verified: boolean; body: string | null; artist: string | null; note: string | null; gif: string | null; at: string; mine: boolean };
 export type AdminMessage = PublicMessage & { clientId: string };
 
 export async function postMessage(
   db: Db,
-  input: { clientId: string; nickname: string; text?: string; gif?: string },
+  input: { clientId: string; nickname: string; text?: string; gif?: string; userId?: string; verified?: boolean },
   now: Date = new Date(),
 ): Promise<PublicMessage> {
   const cfg = await getChatConfig(db);
   if (!cfg.enabled) throw new DomainError("chat_off", "El chat está apagado en este momento.");
   const v = validateMessage(input);
+  if (v.gif?.startsWith("u:") && !(input.userId && (await ownsUserGif(db, input.userId, v.gif)))) throw new DomainError("bad_gif", "Ese GIF no es tuyo o ya no existe.");
   await assertNotMuted(db, input.clientId, now);
   const [row] = await db
     .insert(chatMessages)
-    .values({ clientId: input.clientId, nickname: v.nickname, body: v.body, gif: v.gif, createdAt: now })
+    .values({ clientId: input.clientId, nickname: v.nickname, verified: input.verified === true, body: v.body, gif: v.gif, createdAt: now })
     .returning();
   if (row.seq % 100 === 0) await db.delete(chatMessages).where(lt(chatMessages.createdAt, new Date(now.getTime() - KEEP_DAYS * 86_400_000)));
   return toPublic(row, true);
@@ -118,6 +133,7 @@ const toPublic = (r: MessageRow, mine: boolean): PublicMessage => ({
   id: r.seq,
   kind: r.kind === "request" ? "request" : "message",
   nickname: r.nickname,
+  verified: r.verified,
   body: r.body,
   artist: r.artist,
   note: r.note,
@@ -126,11 +142,13 @@ const toPublic = (r: MessageRow, mine: boolean): PublicMessage => ({
   mine,
 });
 
-type ListQ = { after?: number; clientId?: string; limit?: number };
+type ListQ = { after?: number; clientId?: string; limit?: number; now?: Date };
 
 async function loadMessages(db: Db, q: ListQ) {
   const limit = Math.min(Math.max(q.limit ?? 50, 1), 100);
-  const where = and(isNull(chatMessages.deletedAt), q.after !== undefined ? gt(chatMessages.seq, q.after) : undefined);
+  // Solo se ve lo de la ventana actual: al llegar la hora de reinicio el chat vuelve a empezar limpio.
+  const win = chatWindow(q.now);
+  const where = and(isNull(chatMessages.deletedAt), gte(chatMessages.createdAt, win.startsAt), lt(chatMessages.createdAt, win.resetsAt), q.after !== undefined ? gt(chatMessages.seq, q.after) : undefined);
   // Primera carga: los últimos N; con cursor: lo nuevo en orden.
   const rows =
     q.after === undefined

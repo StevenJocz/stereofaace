@@ -63,13 +63,13 @@ describe("chat público", () => {
     expect(j.messages.at(-1)).toMatchObject({ nickname: "Bea", body: "soy yo", mine: true });
   });
 
-  it("con Space, el apodo es su @usuario", async () => {
+  it("con Space, el nombre que se ve es su nombre visible (no el @usuario)", async () => {
     const c = await person("Carlos Pérez");
     await h.db.insert(spaceProfiles).values({ userId: c.id, username: "carlos_dj", displayName: "Carlos" });
     await publicChatPost(h.db, { text: "hey" }, "1.1.1.1", c);
     const j = await (await publicChatGet(h.db, { after: null, user: c })).json();
-    expect(j.viewer.nickname).toBe("carlos_dj");
-    expect(j.messages.at(-1)).toMatchObject({ nickname: "carlos_dj" });
+    expect(j.viewer.nickname).toBe("Carlos");
+    expect(j.messages.at(-1)).toMatchObject({ nickname: "Carlos", verified: false });
   });
 
   it("una cuenta con el Space desactivado por moderación no puede escribir", async () => {

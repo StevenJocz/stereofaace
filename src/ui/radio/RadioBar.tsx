@@ -200,7 +200,6 @@ export function RadioBar() {
   // La programación solo existe para la emisora propia (StereoFace Radio).
   const program = useNowPlayingProgram(r.current?.slug === OWN_STATION_SLUG);
   const tracks = useStationTracks(r.current?.slug === OWN_STATION_SLUG);
-  const listeners = tracks?.listeners ?? null;
 
   // Publica la altura real para reservar espacio y colocar el panel.
   useEffect(() => {
@@ -372,14 +371,13 @@ export function RadioBar() {
                   </svg>
                   <span>{r.status === "playing" ? "En vivo" : STATUS[r.status].label}</span>
                 </p>
-                {own && listeners !== null && (
-                  <p className="rb-live-sub">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                      <circle cx="12" cy="9" r="3.6" />
-                      <path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4" />
+                {own && (
+                  <button type="button" className="rb-chat-btn" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen} aria-controls="chat-panel">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z" />
                     </svg>
-                    {new Intl.NumberFormat("es-CO").format(listeners)} {listeners === 1 ? "oyente" : "oyentes"}
-                  </p>
+                    Chat y pedir canción
+                  </button>
                 )}
               </div>
               <div className="rb-vol">

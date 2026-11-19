@@ -4,9 +4,27 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CHAT_GIFS, gifByKey } from "@/modules/chat/gifs";
 import type { PublicMessage, PublicRequest } from "@/modules/chat/service";
 import { EMOJI_GROUPS } from "./emojis";
-import { mergeMessages, postJson, type ChatConfig, type MessagesResponse, type RequestsResponse, type Viewer } from "./chat-client";
+import { mergeMessages, postJson, type ChatConfig, type ChatReset, type MessagesResponse, type RequestsResponse, type Viewer } from "./chat-client";
 
 const POLL_MS = 3500;
+/** Origen de la imagen de un GIF del chat: de la bandeja (clave corta) o propio de alguien («u:<id>», servido por /s). */
+const gifView = (key: string | null): { src: string; label: string } | null => {
+  if (!key) return null;
+  const g = gifByKey(key);
+  if (g) return { src: g.src, label: g.label };
+  return /^u:[0-9a-f-]{36}$/i.test(key) ? { src: `/s/${key.slice(2)}`, label: "GIF" } : null;
+};
+type MyGif = { id: string; key: string; url: string };
+
+/** Chulo de verificado junto al nombre. */
+function Check() {
+  return (
+    <svg className="chat-check" width="13" height="13" viewBox="0 0 24 24" aria-label="Cuenta verificada" role="img">
+      <circle cx="12" cy="12" r="10.5" fill="currentColor" />
+      <path d="m7.5 12.3 3 3 6-6.3" fill="none" stroke="#07080a" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota", hour12: false });
 
 type Tab = "chat" | "requests";
@@ -18,7 +36,9 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
   const [messages, setMessages] = useState<PublicMessage[]>([]);
   const [requests, setRequests] = useState<PublicRequest[]>([]);
   const [viewer, setViewer] = useState<Viewer | null>(null);
+  const [reset, setReset] = useState<ChatReset | null>(null);
   const lastRef = useRef<number | undefined>(undefined);
+  const windowRef = useRef<string | null>(null);
 
   // Mensajes y pedidos: sondeo suave mientras el panel está abierto y la pestaña visible.
   useEffect(() => {
@@ -33,6 +53,15 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
           const d = (await r.json()) as MessagesResponse;
           setConfig(d.config);
           setViewer(d.viewer);
+          setReset(d.reset);
+          // Si cambió la ventana de 6 horas, el chat arranca limpio: se descarta lo que había en pantalla.
+          const fresh = windowRef.current !== null && windowRef.current !== d.reset.startsAt;
+          windowRef.current = d.reset.startsAt;
+          if (fresh) {
+            lastRef.current = undefined;
+            setMessages([]);
+            return;
+          }
           lastRef.current = d.last;
           setMessages((cur) => mergeMessages(cur, d.messages));
         }
@@ -78,7 +107,7 @@ export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => voi
         </button>
       </header>
       {tab === "chat" ? (
-        <ChatTab config={config} viewer={viewer} messages={messages} onSent={(m) => setMessages((cur) => mergeMessages(cur, [m]))} />
+        <ChatTab config={config} viewer={viewer} reset={reset} messages={messages} onSent={(m) => setMessages((cur) => mergeMessages(cur, [m]))} />
       ) : (
         <RequestsTab config={config} viewer={viewer} requests={requests} onCreated={() => void 0} />
       )}
@@ -116,12 +145,15 @@ function AsLine({ nickname }: { nickname: string }) {
   );
 }
 
-function ChatTab({ config, viewer, messages, onSent }: { config: ChatConfig | null; viewer: Viewer | null; messages: PublicMessage[]; onSent: (m: PublicMessage) => void }) {
+function ChatTab({ config, viewer, reset, messages, onSent }: { config: ChatConfig | null; viewer: Viewer | null; reset: ChatReset | null; messages: PublicMessage[]; onSent: (m: PublicMessage) => void }) {
   const [text, setText] = useState("");
   const [picker, setPicker] = useState<"emoji" | "gif" | null>(null);
   const [group, setGroup] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mine, setMine] = useState<MyGif[]>([]);
+  const [upBusy, setUpBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -146,6 +178,45 @@ function ChatTab({ config, viewer, messages, onSent }: { config: ChatConfig | nu
     [onSent],
   );
 
+  // Mis GIF: se cargan al abrir la bandeja de GIF (solo con cuenta).
+  useEffect(() => {
+    if (picker !== "gif" || !viewer?.signedIn) return;
+    let alive = true;
+    fetch("/api/chat/gifs", { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ gifs: MyGif[] }>) : null))
+      .then((d) => d && alive && setMine(d.gifs))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [picker, viewer?.signedIn]);
+
+  const uploadGif = async (file: File | undefined) => {
+    if (!file) return;
+    setUpBusy(true);
+    setError(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/api/chat/gifs", { method: "POST", body: fd });
+      const body = (await res.json().catch(() => ({}))) as { gif?: MyGif; error?: string };
+      if (!res.ok || !body.gif) throw new Error(body.error ?? "No se pudo subir el GIF.");
+      setMine((cur) => [...cur, body.gif!]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir el GIF.");
+    } finally {
+      setUpBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const removeGif = async (id: string) => {
+    setError(null);
+    const res = await fetch(`/api/chat/gifs?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => null);
+    if (res?.ok) setMine((cur) => cur.filter((g) => g.id !== id));
+    else setError("No se pudo borrar el GIF.");
+  };
+
   if (config && !config.enabled) {
     return <p className="chat-off">El chat está en pausa. Vuelve cuando haya transmisión en vivo.</p>;
   }
@@ -162,6 +233,7 @@ function ChatTab({ config, viewer, messages, onSent }: { config: ChatConfig | nu
         aria-live="polite"
       >
         {messages.length === 0 && <p className="mono muted p-3 text-[0.74rem]">Aún no hay mensajes. ¡Escribe el primero!</p>}
+        {reset && <p className="mono muted px-3 pb-1 pt-0.5 text-[0.58rem]">El chat se reinicia cada 6 horas · próximo reinicio a las {hhmm(reset.resetsAt)}</p>}
         {messages.map((m) =>
           m.kind === "request" ? (
             <div key={m.id} className="chat-request-card" data-mine={m.mine}>
@@ -174,7 +246,7 @@ function ChatTab({ config, viewer, messages, onSent }: { config: ChatConfig | nu
               </span>
               <div className="min-w-0 flex-1">
                 <p className="mono text-[0.6rem] text-accent-ink">
-                  <strong className="text-fg">{m.nickname}</strong> pidió una canción
+                  <strong className="text-fg">{m.nickname}</strong>{m.verified && <Check />} pidió una canción
                 </p>
                 <p className="chat-request-title">{m.body}</p>
                 {m.artist && <p className="chat-request-artist">{m.artist}</p>}
@@ -184,12 +256,15 @@ function ChatTab({ config, viewer, messages, onSent }: { config: ChatConfig | nu
             </div>
           ) : (
           <div key={m.id} className="chat-msg" data-mine={m.mine}>
-            <span className="chat-nick">{m.nickname}</span>
+            <span className="chat-nick">
+              {m.nickname}
+              {m.verified && <Check />}
+            </span>
             <time className="mono muted text-[0.6rem]">{hhmm(m.at)}</time>
             {m.body && <p className="chat-body">{m.body}</p>}
-            {m.gif && gifByKey(m.gif) && (
-              // eslint-disable-next-line @next/next/no-img-element -- GIF propio de /public
-              <img src={gifByKey(m.gif)!.src} alt={gifByKey(m.gif)!.label} className="chat-gif" width={96} height={96} loading="lazy" />
+            {gifView(m.gif) && (
+              // eslint-disable-next-line @next/next/no-img-element -- GIF de la bandeja (/public) o propio de alguien (servido por /s)
+              <img src={gifView(m.gif)!.src} alt={gifView(m.gif)!.label} className="chat-gif" width={96} height={96} loading="lazy" />
             )}
           </div>
           ),
@@ -230,6 +305,31 @@ function ChatTab({ config, viewer, messages, onSent }: { config: ChatConfig | nu
                 <img src={g.src} alt="" width={64} height={64} loading="lazy" />
               </button>
             ))}
+          </div>
+          <div className="chat-mygifs">
+            <div className="flex items-center justify-between gap-2">
+              <p className="mono text-[0.62rem] text-accent-ink">Mis GIF ({mine.length}/12)</p>
+              <label className="btn !px-2.5 !py-1 !text-[0.62rem]" aria-disabled={upBusy}>
+                {upBusy ? "Subiendo…" : "Subir GIF"}
+                <input ref={fileRef} type="file" accept="image/gif" hidden disabled={upBusy || mine.length >= 12} onChange={(e) => void uploadGif(e.target.files?.[0])} />
+              </label>
+            </div>
+            <p className="mono muted text-[0.58rem]">Solo GIF de hasta 2 MB y 600×600 px. Se ven en el chat para todas las personas.</p>
+            {mine.length > 0 && (
+              <div className="chat-gif-grid">
+                {mine.map((g) => (
+                  <span key={g.id} className="chat-mygif">
+                    <button type="button" disabled={busy} onClick={() => void send({ gif: g.key })} aria-label="Enviar mi GIF">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- GIF propio servido por /s */}
+                      <img src={g.url} alt="" width={64} height={64} loading="lazy" />
+                    </button>
+                    <button type="button" className="chat-mygif-x" onClick={() => void removeGif(g.id)} aria-label="Borrar este GIF">
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

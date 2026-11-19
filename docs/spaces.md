@@ -52,3 +52,9 @@ Hay **20 plantillas** (`DEFAULT_THEMES`), cada una con una **portada prediseñad
 
 - **Chulo:** `space_profiles.badge_verified_at/by`. Lo dan o quitan todos los roles por encima de oyente (permiso `space:verify`) desde **Admin → Verificar Spaces** (lista sin correos) y, el administrador, también desde la tabla de Spaces. Queda en auditoría (`space.verify` / `space.unverify`). Se ve junto al @usuario en el perfil y en las tarjetas del listado.
 - **Seguidores/seguidos:** `GET /api/spaces/follows?username=&kind=followers|following&page=`. Solo lista Spaces públicos (los contadores también cuentan solo públicos); si la persona oculta sus números, solo ella ve sus listas.
+
+## Chat: GIF propios, nombre visible y reinicio
+
+- **Nombre visible:** en el chat y en los pedidos se muestra el *nombre visible* del Space (limpio, hasta 40 caracteres); si no sirve, el @usuario. Las cuentas verificadas llevan el chulo junto al nombre (copia en `chat_messages.verified`).
+- **GIF propios:** `POST/GET/DELETE /api/chat/gifs`. Se guardan como `space_assets` de tipo `chatgif` (hasta 12, 2 MB y 600×600 px cada uno; validación por contenido GIF87a/GIF89a y terminador). Solo la dueña puede enviar su GIF (`u:<uuid>`); se sirven por `/s/<uuid>` aunque el Space sea borrador y dejan de servirse si el Space se desactiva o la administración marca el archivo. El equipo puede borrar el mensaje o silenciar a la persona desde el estudio.
+- **Reinicio:** el chat muestra solo la ventana actual de 6 horas fijas en hora de Bogotá (00:00, 06:00, 12:00 y 18:00). Los mensajes viejos quedan 2 días en la base y se purgan.
