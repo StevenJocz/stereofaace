@@ -5,7 +5,7 @@ import { DomainError } from "@/lib/errors";
 import { assertCan, type Actor } from "@/lib/rbac";
 import { siteSettings } from "@/modules/settings/schema";
 import { gifByKey } from "./gifs";
-import { ownsUserGif } from "./user-gifs";
+import { gifUsable } from "./user-gifs";
 import { spaceProfiles } from "@/modules/spaces/schema";
 import { chatMessages, chatMutes, songRequests } from "./schema";
 
@@ -118,7 +118,7 @@ export async function postMessage(
   const cfg = await getChatConfig(db);
   if (!cfg.enabled) throw new DomainError("chat_off", "El chat está apagado en este momento.");
   const v = validateMessage(input);
-  if (v.gif?.startsWith("u:") && !(input.userId && (await ownsUserGif(db, input.userId, v.gif)))) throw new DomainError("bad_gif", "Ese GIF no es tuyo o ya no existe.");
+  if (v.gif?.startsWith("u:") && !(await gifUsable(db, v.gif))) throw new DomainError("bad_gif", "Ese GIF ya no está disponible.");
   await assertNotMuted(db, input.clientId, now);
   const [row] = await db
     .insert(chatMessages)

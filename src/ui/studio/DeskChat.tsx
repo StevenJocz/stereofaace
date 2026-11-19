@@ -129,6 +129,12 @@ export function ChatModPanel({ feed, refresh, dropMessage }: { feed: DeskFeed; r
     dropMessage(id);
     await act({ action: "delete", id });
   };
+  const removeGif = async (m: AdminMessage) => {
+    if (!m.gif?.startsWith("u:") || !window.confirm("¿Quitar este GIF de la comunidad? Nadie podrá volver a usarlo y se borrará el mensaje.")) return;
+    dropMessage(m.id);
+    await act({ action: "gif-remove", key: m.gif });
+    await act({ action: "delete", id: m.id });
+  };
   const mute = async (m: AdminMessage) => {
     if (!window.confirm(`¿Silenciar a ${m.nickname} durante 1 hora? También se borrará su mensaje.`)) return;
     dropMessage(m.id);
@@ -169,6 +175,11 @@ export function ChatModPanel({ feed, refresh, dropMessage }: { feed: DeskFeed; r
               <button type="button" className="desk-chat-btn" title="Borrar mensaje" aria-label={`Borrar el mensaje de ${m.nickname}`} onClick={() => void remove(m.id)}>
                 ✕
               </button>
+              {m.gif?.startsWith("u:") && (
+                <button type="button" className="desk-chat-btn" title="Quitar este GIF de la comunidad" aria-label={`Quitar el GIF de ${m.nickname}`} onClick={() => void removeGif(m)}>
+                  🚫
+                </button>
+              )}
               <button type="button" className="desk-chat-btn" title="Silenciar 1 hora" aria-label={`Silenciar a ${m.nickname}`} onClick={() => void mute(m)}>
                 🔇
               </button>

@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import type { Actor } from "@/lib/rbac";
 import { guarded, reply } from "@/modules/studio/http";
 import type { SessionUser } from "@/modules/users/auth";
-import { listUserGifs, removeUserGif, uploadUserGif } from "./user-gifs";
+import { flagUserGif, listSharedGifs, listUserGifs, removeUserGif, uploadUserGif } from "./user-gifs";
 import {
   createRequest,
   chatIdentity,
@@ -113,11 +113,11 @@ export function publicRequestPost(db: Db, body: unknown, ip: string, user: Sessi
 
 /* ───────────── GIF propios ───────────── */
 
-/** Mis GIF: lista (GET), subir (POST multipart «file») y borrar (DELETE ?id=). Solo con sesión. */
+/** Mis GIF y los de la comunidad: lista (GET), subir (POST multipart «file») y borrar el propio (DELETE ?id=). Solo con sesión. */
 export function userGifsHandler(db: Db, user: SessionUser | null, request: Request, root: string): Promise<Response> {
   return publicGuard(async () => {
     if (!user) return authRequired();
-    if (request.method === "GET") return json({ gifs: await listUserGifs(db, user.id) });
+    if (request.method === "GET") return json({ gifs: await listUserGifs(db, user.id), shared: await listSharedGifs(db, user.id) });
     if (!sameOrigin(request)) return json({ error: "Origen no permitido." }, 403);
     if (request.method === "DELETE") {
       const id = new URL(request.url).searchParams.get("id") ?? "";
@@ -171,6 +171,10 @@ export function studioChatAction(db: Db, actor: Actor | null, body: unknown): Pr
       case "request":
         if (typeof b.id !== "string" || !["pending", "played", "rejected"].includes(str(b.status))) return reply(400, "Datos no válidos.");
         await setRequestStatus(db, actor, b.id, b.status as RequestStatus);
+        return Response.json({ ok: true });
+      case "gif-remove":
+        if (typeof b.key !== "string") return reply(400, "GIF no válido.");
+        await flagUserGif(db, actor, b.key);
         return Response.json({ ok: true });
       case "config":
         await saveChatConfig(db, actor, { enabled: b.enabled === true, requestsEnabled: b.requestsEnabled === true });

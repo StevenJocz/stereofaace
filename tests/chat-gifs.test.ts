@@ -12,7 +12,8 @@ import { registerListener } from "@/modules/spaces/accounts";
 import { readSpaceAsset } from "@/modules/spaces/assets";
 import { chatWindow, postMessage, listMessages, saveChatConfig, getChatConfig } from "@/modules/chat/service";
 import { publicChatGet, publicChatPost, userGifsHandler } from "@/modules/chat/http";
-import { MAX_GIF_BYTES, MAX_USER_GIFS, listUserGifs, ownsUserGif, uploadUserGif, validateGifBytes } from "@/modules/chat/user-gifs";
+import { MAX_GIF_BYTES, MAX_USER_GIFS, flagUserGif, gifUsable, listSharedGifs, listUserGifs, uploadUserGif, validateGifBytes } from "@/modules/chat/user-gifs";
+import { ForbiddenError, type Actor } from "@/lib/rbac";
 import { makeDb } from "./helpers";
 
 // GIF89a de 1×1 px válido.
@@ -59,24 +60,30 @@ describe("validación de un GIF por su contenido", () => {
 });
 
 describe("subir y usar un GIF propio", () => {
-  it("lo sube, lo lista, lo sirve (aunque el Space sea borrador) y solo su dueña puede enviarlo", async () => {
+  it("lo sube, lo lista, lo sirve (aunque el Space sea borrador) y cualquier persona con cuenta puede usarlo", async () => {
     const ana = await person("Ana");
     const beto = await person("Beto");
     const g = await uploadUserGif(h.db, ana.id, root, gifFile());
     expect((await listUserGifs(h.db, ana.id)).map((x) => x.key)).toEqual([g.key]);
-    expect(await ownsUserGif(h.db, ana.id, g.key)).toBe(true);
-    expect(await ownsUserGif(h.db, beto.id, g.key)).toBe(false);
+    expect(await gifUsable(h.db, g.key)).toBe(true);
     const img = await readSpaceAsset(h.db, root, g.key.slice(2), null);
     expect(img?.mime).toBe("image/gif");
+    // La comunidad lo ve (a la dueña no le sale repetido), y Beto lo puede enviar.
+    expect((await listSharedGifs(h.db, beto.id)).map((x) => x.key)).toContain(g.key);
+    expect((await listSharedGifs(h.db, ana.id)).map((x) => x.key)).not.toContain(g.key);
     resetRateLimits();
-    const ok = await publicChatPost(h.db, { gif: g.key }, "1.1.1.1", ana.session);
-    expect(ok.status).toBe(201);
-    expect((await ok.json()).message).toMatchObject({ gif: g.key, nickname: "Ana" });
-    const robado = await publicChatPost(h.db, { gif: g.key }, "1.1.1.2", beto.session);
-    expect(robado.status).toBe(400);
-    expect((await robado.json()).error).toMatch(/no es tuyo/i);
+    const deAna = await publicChatPost(h.db, { gif: g.key }, "1.1.1.1", ana.session);
+    expect(deAna.status).toBe(201);
     resetRateLimits();
-    expect((await publicChatPost(h.db, { gif: "u:no-es-un-uuid" }, "1.1.1.3", ana.session)).status).toBe(400);
+    const deBeto = await publicChatPost(h.db, { gif: g.key }, "1.1.1.2", beto.session);
+    expect(deBeto.status).toBe(201);
+    expect((await deBeto.json()).message).toMatchObject({ gif: g.key, nickname: "Beto" });
+    // Un GIF que no existe o con clave rara sigue siendo rechazado, y sin sesión no se envía nada.
+    resetRateLimits();
+    expect((await publicChatPost(h.db, { gif: "u:00000000-0000-4000-8000-000000000000" }, "1.1.1.3", beto.session)).status).toBe(400);
+    resetRateLimits();
+    expect((await publicChatPost(h.db, { gif: "u:no-es-un-uuid" }, "1.1.1.4", beto.session)).status).toBe(400);
+    expect((await publicChatPost(h.db, { gif: g.key }, "1.1.1.5", null)).status).toBe(401);
   });
 
   it("no acepta archivos que no son GIF, ni los de más de 2 MB, ni sin Space; máximo 12", async () => {
@@ -94,7 +101,7 @@ describe("subir y usar un GIF propio", () => {
     const g = await uploadUserGif(h.db, d.id, root, gifFile());
     await h.db.update(spaceAssets).set({ status: "flagged" }).where(eq(spaceAssets.storageKey, g.key.slice(2)));
     expect(await readSpaceAsset(h.db, root, g.key.slice(2), null)).toBeNull();
-    expect(await ownsUserGif(h.db, d.id, g.key)).toBe(false);
+    expect(await gifUsable(h.db, g.key)).toBe(false);
   });
 
   it("la ruta HTTP exige sesión y rechaza un cuerpo que no es multipart", async () => {
@@ -106,6 +113,22 @@ describe("subir y usar un GIF propio", () => {
     expect(bad.status).toBe(400);
     const otroOrigen = await userGifsHandler(h.db, e.session, new Request(`${ORIGIN}/api/chat/gifs`, { method: "POST", headers: { origin: "https://evil.example" } }), root);
     expect(otroOrigen.status).toBe(403);
+  });
+});
+
+describe("moderación de los GIF de la comunidad", () => {
+  it("el equipo puede quitar un GIF: deja de verse, de servirse y de poder enviarse; el resto de personas no puede", async () => {
+    const h1 = await person("Hugo");
+    const g = await uploadUserGif(h.db, h1.id, root, gifFile());
+    const dj: Actor = { id: (await h.db.select().from(users).where(eq(users.email, "dj@example.com")))[0].id, role: "locutor" };
+    const oyente: Actor = { id: h1.id, role: "oyente" };
+    await expect(flagUserGif(h.db, oyente, g.key)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(flagUserGif(h.db, null, g.key)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(flagUserGif(h.db, dj, "u:00000000-0000-4000-8000-000000000000")).rejects.toMatchObject({ code: "not_found" });
+    await flagUserGif(h.db, dj, g.key);
+    expect(await gifUsable(h.db, g.key)).toBe(false);
+    expect(await readSpaceAsset(h.db, root, g.key.slice(2), null)).toBeNull();
+    expect((await listSharedGifs(h.db, (await person()).id)).map((x) => x.key)).not.toContain(g.key);
   });
 });
 

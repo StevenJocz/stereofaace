@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import type { Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { storeBytesAtomically } from "@/modules/media/storage";
+import { assertCan, type Actor } from "@/lib/rbac";
 import { MAX_TOTAL_BYTES, removeAsset } from "@/modules/spaces/assets";
+import { recordAudit } from "@/modules/users/audit";
 import { spaceAssets, spaceProfiles } from "@/modules/spaces/schema";
 
 /** GIF propios del chat: por persona y por archivo, para cuidar el almacenamiento y el chat. */
@@ -67,13 +69,37 @@ export async function removeUserGif(db: Db, userId: string, root: string, id: st
   await removeAsset(db, userId, root, id);
 }
 
-/** ¿Esta clave «u:<uuid>» es un GIF propio, vigente y de esta persona? (nadie puede enviar el GIF de otra persona). */
-export async function ownsUserGif(db: Db, userId: string, key: string): Promise<boolean> {
+/** GIF de la comunidad: los que subieron las demás personas. Cualquiera con cuenta puede usarlos en el chat. */
+export const MAX_SHARED_GIFS = 60;
+export async function listSharedGifs(db: Db, viewerId: string): Promise<UserGif[]> {
+  const rows = await db
+    .select({ id: spaceAssets.id, storageKey: spaceAssets.storageKey })
+    .from(spaceAssets)
+    .innerJoin(spaceProfiles, eq(spaceProfiles.userId, spaceAssets.userId))
+    .where(and(eq(spaceAssets.kind, "chatgif"), eq(spaceAssets.status, "ok"), ne(spaceProfiles.status, "disabled"), ne(spaceAssets.userId, viewerId)))
+    .orderBy(desc(spaceAssets.createdAt))
+    .limit(MAX_SHARED_GIFS);
+  return rows.map(toGif);
+}
+
+/** ¿Esta clave «u:<uuid>» es un GIF de la comunidad vigente (no marcado y de un Space no desactivado)? Cualquiera con cuenta puede enviarlo. */
+export async function gifUsable(db: Db, key: string): Promise<boolean> {
   const m = /^u:([0-9a-f-]{36})$/i.exec(key);
   if (!m) return false;
   const [r] = await db
     .select({ id: spaceAssets.id })
     .from(spaceAssets)
-    .where(and(eq(spaceAssets.storageKey, m[1]), eq(spaceAssets.userId, userId), eq(spaceAssets.kind, "chatgif"), eq(spaceAssets.status, "ok")));
+    .innerJoin(spaceProfiles, eq(spaceProfiles.userId, spaceAssets.userId))
+    .where(and(eq(spaceAssets.storageKey, m[1]), eq(spaceAssets.kind, "chatgif"), eq(spaceAssets.status, "ok"), ne(spaceProfiles.status, "disabled")));
   return Boolean(r);
+}
+
+/** Moderación (locutores y superiores): quita un GIF de la comunidad. Deja de servirse y de poder enviarse. */
+export async function flagUserGif(db: Db, actor: Actor | null, key: string): Promise<void> {
+  assertCan(actor, "studio:update");
+  const m = /^u:([0-9a-f-]{36})$/i.exec(key);
+  if (!m) throw new DomainError("not_found", "Ese GIF no existe.");
+  const [r] = await db.update(spaceAssets).set({ status: "flagged" }).where(and(eq(spaceAssets.storageKey, m[1]), eq(spaceAssets.kind, "chatgif"))).returning({ id: spaceAssets.id });
+  if (!r) throw new DomainError("not_found", "Ese GIF no existe.");
+  await recordAudit(db, { userId: actor.id, action: "chat.gif.remove", entity: "space_asset", entityId: r.id });
 }

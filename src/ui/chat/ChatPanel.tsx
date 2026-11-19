@@ -152,6 +152,7 @@ function ChatTab({ config, viewer, reset, messages, onSent }: { config: ChatConf
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [mine, setMine] = useState<MyGif[]>([]);
+  const [shared, setShared] = useState<MyGif[]>([]);
   const [upBusy, setUpBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -183,8 +184,13 @@ function ChatTab({ config, viewer, reset, messages, onSent }: { config: ChatConf
     if (picker !== "gif" || !viewer?.signedIn) return;
     let alive = true;
     fetch("/api/chat/gifs", { cache: "no-store" })
-      .then((r) => (r.ok ? (r.json() as Promise<{ gifs: MyGif[] }>) : null))
-      .then((d) => d && alive && setMine(d.gifs))
+      .then((r) => (r.ok ? (r.json() as Promise<{ gifs: MyGif[]; shared: MyGif[] }>) : null))
+      .then((d) => {
+        if (d && alive) {
+          setMine(d.gifs);
+          setShared(d.shared);
+        }
+      })
       .catch(() => undefined);
     return () => {
       alive = false;
@@ -314,7 +320,7 @@ function ChatTab({ config, viewer, reset, messages, onSent }: { config: ChatConf
                 <input ref={fileRef} type="file" accept="image/gif" hidden disabled={upBusy || mine.length >= 12} onChange={(e) => void uploadGif(e.target.files?.[0])} />
               </label>
             </div>
-            <p className="mono muted text-[0.58rem]">Solo GIF de hasta 2 MB y 600×600 px. Se ven en el chat para todas las personas.</p>
+            <p className="mono muted text-[0.58rem]">Solo GIF de hasta 2 MB y 600×600 px. Los que subes los puede usar cualquier persona del chat.</p>
             {mine.length > 0 && (
               <div className="chat-gif-grid">
                 {mine.map((g) => (
@@ -331,6 +337,19 @@ function ChatTab({ config, viewer, reset, messages, onSent }: { config: ChatConf
               </div>
             )}
           </div>
+          {shared.length > 0 && (
+            <div className="chat-mygifs">
+              <p className="mono text-[0.62rem] text-accent-ink">Comunidad ({shared.length})</p>
+              <div className="chat-gif-grid">
+                {shared.map((g) => (
+                  <button key={g.id} type="button" disabled={busy} onClick={() => void send({ gif: g.key })} aria-label="Enviar este GIF de la comunidad">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- GIF de otra persona servido por /s */}
+                    <img src={g.url} alt="" width={64} height={64} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
