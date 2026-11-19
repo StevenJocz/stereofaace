@@ -108,6 +108,16 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const [cabinLive, setCabinLive] = useState(false);
   const [searchSeed, setSearchSeed] = useState<{ text: string; n: number } | null>(null);
   const [ytSeed, setYtSeed] = useState<{ text: string; n: number } | null>(null);
+  const [extOn, setExtOn] = useState(false);
+  const [extVol, setExtVol] = useState(1);
+  const [ytFollow, setYtFollow] = useState(true);
+  const ytFollowRef = useRef(true);
+  const extVolRef = useRef(1);
+  const resumeRef = useRef<(() => Promise<void>) | null>(null);
+  useEffect(() => {
+    ytFollowRef.current = ytFollow;
+    extVolRef.current = extVol;
+  });
   const desk = useDeskFeed(visible);
   const [relayState, setRelayState] = useState<RelayState>("idle");
   const [relayVolume, setRelayVolume] = useState(0.8);
@@ -185,6 +195,10 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         return n;
       });
     e.onRelayState = setRelayState;
+    e.onExternalLost = () => setExtOn(false);
+    e.onExternalIdle = () => {
+      if (ytFollowRef.current) void resumeRef.current?.();
+    };
     e.onMicLost = () => {
       setMicActive(false);
       setMicError("Se perdió el micrófono (¿se desconectó?). Actívalo de nuevo.");
@@ -667,6 +681,47 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     await loadToDeck(next, id);
     await play(id);
   }, [loadToDeck, play]);
+  useEffect(() => {
+    resumeRef.current = resumeQueueAfterVideo;
+  });
+
+  /** Comparte la pestaña de YouTube (con su audio) y la mezcla en la emisión. La pestaña queda en silencio para el locutor. */
+  const shareExternal = useCallback(async () => {
+    const md = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
+    if (!md?.getDisplayMedia) throw new Error("Este navegador no permite compartir el audio de una pestaña. Usa Chrome o Edge.");
+    const e = getEngine();
+    await e.resume();
+    let stream: MediaStream;
+    try {
+      stream = await md.getDisplayMedia({
+        video: { frameRate: 1 },
+        audio: { suppressLocalAudioPlayback: true, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        // Solo pestañas, y nunca la del propio estudio (se oiría a sí mismo).
+        selfBrowserSurface: "exclude",
+        preferCurrentTab: false,
+        surfaceSwitching: "exclude",
+        systemAudio: "exclude",
+        monitorTypeSurfaces: "exclude",
+      } as unknown as DisplayMediaStreamOptions);
+    } catch (err) {
+      if (err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "AbortError")) return; // cerró el selector
+      throw new Error("No se pudo compartir la pestaña. Inténtalo de nuevo.");
+    }
+    if (stream.getAudioTracks().length === 0) {
+      for (const t of stream.getTracks()) t.stop();
+      throw new Error("No se compartió el audio. Vuelve a intentarlo, elige la pestaña del video y marca «Compartir audio de la pestaña».");
+    }
+    e.attachExternalStream(stream, extVolRef.current);
+    setExtOn(true);
+  }, [getEngine]);
+  const stopExternal = useCallback(() => {
+    engineRef.current?.stopExternal();
+    setExtOn(false);
+  }, []);
+  const changeExtVolume = useCallback((v: number) => {
+    setExtVol(v);
+    engineRef.current?.setExternalVolume(v);
+  }, []);
 
   // Atajos de los carts (1 tecla) y Esc para detenerlos todos.
   useEffect(() => {
@@ -947,7 +1002,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
           </div>
           {/* Siempre montado (solo se oculta): cambiar de pestaña no corta el video que se está escuchando. */}
           <div id="tool-youtube" role="tabpanel" aria-labelledby="tool-tab-youtube" className="studio-tool-body" hidden={tool !== "youtube"}>
-            <YouTubePanel seed={ytSeed} onEnded={resumeQueueAfterVideo} />
+            <YouTubePanel seed={ytSeed} onAir={{ on: extOn, share: shareExternal, stop: stopExternal, volume: extVol, setVolume: changeExtVolume }} follow={ytFollow} onFollow={setYtFollow} />
           </div>
           <div id="tool-chat" role="tabpanel" aria-labelledby="tool-tab-chat" className="studio-tool-body" hidden={tool !== "chat"}>
             <ChatModPanel feed={desk.feed} refresh={desk.refresh} dropMessage={desk.dropMessage} />

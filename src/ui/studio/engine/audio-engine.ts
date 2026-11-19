@@ -1,3 +1,4 @@
+import { SilenceWatch } from "./silence-watch";
 import { LoadGate } from "./autoplay";
 import { equalPowerGains, FadeGeneration } from "./crossfade";
 import { EQ_BANDS, FLAT_EQ, clampEq, type EqSettings } from "./eq";
@@ -81,6 +82,11 @@ export class AudioEngine {
   onDeckEnded: ((deck: DeckId) => void) | null = null;
   onDeckTime: ((deck: DeckId, current: number, duration: number) => void) | null = null;
   onMicLost: (() => void) | null = null;
+  /** La persona dejó de compartir la pestaña (o se cerró). */
+  onExternalLost: (() => void) | null = null;
+  /** El audio externo se quedó en silencio tras haber sonado (p. ej. terminó el video). */
+  onExternalIdle: (() => void) | null = null;
+  private ext: { stream: MediaStream; source: MediaStreamAudioSourceNode; gain: GainNode; analyser: AnalyserNode; buf: Float32Array<ArrayBuffer>; timer: ReturnType<typeof setInterval>; watch: SilenceWatch } | null = null;
   onRelayState: ((s: RelayState) => void) | null = null;
   private relayEl: HTMLAudioElement | null = null;
   private relayGain: GainNode | null = null;
@@ -385,6 +391,61 @@ export class AudioEngine {
     this.ensureControl();
   }
 
+  /**
+   * Audio de otra pestaña (p. ej. un video de YouTube compartido con getDisplayMedia) mezclado en la emisión como una pista más:
+   * pasa por el EQ y el ducker de la música (baja cuando el DJ habla) y por el limitador. También se oye en el monitor del DJ.
+   */
+  attachExternalStream(stream: MediaStream, volume = 1): void {
+    this.stopExternal();
+    const source = this.ctx.createMediaStreamSource(stream);
+    const gain = this.ctx.createGain();
+    gain.gain.value = Math.min(1.5, Math.max(0, volume));
+    const analyser = this.ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(gain);
+    gain.connect(this.musicBus);
+    gain.connect(analyser);
+    const ext = { stream, source, gain, analyser, buf: new Float32Array(analyser.fftSize) as Float32Array<ArrayBuffer>, timer: 0 as unknown as ReturnType<typeof setInterval>, watch: new SilenceWatch() };
+    ext.timer = setInterval(() => {
+      ext.analyser.getFloatTimeDomainData(ext.buf);
+      let sum = 0;
+      for (let i = 0; i < ext.buf.length; i++) sum += ext.buf[i] * ext.buf[i];
+      const db = 20 * Math.log10(Math.sqrt(sum / ext.buf.length) + 1e-9);
+      if (ext.watch.push(db, performance.now())) this.onExternalIdle?.();
+    }, 500);
+    this.ext = ext;
+    for (const t of stream.getTracks()) {
+      t.onended = () => {
+        if (this.ext?.stream === stream) {
+          this.stopExternal();
+          this.onExternalLost?.();
+        }
+      };
+    }
+  }
+
+  get externalActive(): boolean {
+    return this.ext !== null;
+  }
+
+  setExternalVolume(v: number): void {
+    if (this.ext) this.ext.gain.gain.setTargetAtTime(Math.min(1.5, Math.max(0, v)), this.ctx.currentTime, 0.02);
+  }
+
+  stopExternal(): void {
+    const x = this.ext;
+    if (!x) return;
+    this.ext = null;
+    clearInterval(x.timer);
+    for (const t of x.stream.getTracks()) {
+      t.onended = null;
+      t.stop();
+    }
+    x.source.disconnect();
+    x.gain.disconnect();
+    x.analyser.disconnect();
+  }
+
   stopMic(): void {
     const m = this.mic;
     if (!m) return;
@@ -619,6 +680,7 @@ export class AudioEngine {
     this.stopRelay();
     this.stopAllCarts();
     this.stopMic();
+    this.stopExternal();
     if (this.controlTimer) clearInterval(this.controlTimer);
     this.controlTimer = null;
     for (const t of this.fadeTimers) clearTimeout(t);
