@@ -5406,3 +5406,21 @@ body[data-radio="on"] .adm-shell {
     opacity: 0;
   }
 }
+
+/* Portada más ancha y play a poca distancia de las barras (sin tocarlas). */
+.rb-wave {
+  margin: 0.3rem 0 0.3rem;
+}
+@media (min-width: 1024px) {
+  .rb-card {
+    grid-template-columns: 8.6rem minmax(0, 1fr) 12.5rem;
+  }
+  .rb-cover {
+    width: 8.6rem;
+  }
+}
+@media (min-width: 1280px) {
+  .rb-card {
+    grid-template-columns: 9.5rem 8.6rem minmax(0, 1fr) 12.5rem;
+  }
+}
