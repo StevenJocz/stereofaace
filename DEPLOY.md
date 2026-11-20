@@ -350,7 +350,7 @@ Al terminar, deja por escrito (en el informe al humano y, si procede, en `PROGRE
 Las fuentes de `/admin/fuentes` de tipo RSS o Atom se leen solas, **sin configuración extra**: el propio servidor web revisa cada minuto qué fuentes les toca (según su intervalo) y las lee.
 
 - **Condiciones para que una fuente se lea:** activa, con términos verificados y no pausada. Nacen desactivadas.
-- **Qué crea:** un **borrador** por cada nota nueva (título, extracto del feed, enlace y atribución). La imagen solo se trae si la política de derechos de la fuente no es «solo metadatos». Nada se publica solo; los borradores se revisan en `/admin/articulos?estado=draft`. No se descarga el texto completo de las notas.
+- **Qué crea:** un **borrador** por cada nota nueva (título, extracto del feed, enlace y atribución). La imagen solo se trae si la política de derechos de la fuente no es «solo metadatos»: se toma del feed o, si el feed no la trae, de la propia página de la nota (`og:image`, máx. 20 páginas por lectura); al cambiar la política, la siguiente lectura rellena los borradores de los últimos 7 días. Nada se publica solo; los borradores se revisan en `/admin/articulos?estado=draft`. No se descarga el texto completo de las notas.
 - **Cómo ver que funciona:** ficha de la fuente → «Probar el feed» (no guarda nada) y «Ejecutar ahora»; abajo queda el historial de lecturas (nuevos, ya conocidos, errores y el motivo). En los registros del contenedor aparecen líneas `[ingest]`.
 - **Fallos:** tras 5 fallos seguidos la fuente se pausa sola y hay que reanudarla desde su ficha.
 - **Seguridad:** solo destinos públicos (se comprueba la IP real al conectar y en cada redirección), máximo 3 MB por feed y 15 s por lectura.

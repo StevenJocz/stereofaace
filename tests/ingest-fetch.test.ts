@@ -2,7 +2,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
-import { FeedFetchError, fetchFeedText, isPublicAddress, MAX_FEED_BYTES } from "@/modules/ingest/fetch";
+import { FeedFetchError, fetchFeedText, fetchPageHead, isPublicAddress, MAX_FEED_BYTES } from "@/modules/ingest/fetch";
 
 let server: http.Server | null = null;
 afterEach(() => new Promise<void>((r) => (server ? server.close(() => r()) : r())).then(() => (server = null)));
@@ -82,5 +82,18 @@ describe("fetchFeedText", () => {
     });
     await expect(fetchFeedText(`${base}/500`, anyAddress)).rejects.toThrow("código 503");
     await expect(fetchFeedText(`${base}/big`, anyAddress)).rejects.toThrow("demasiado grande");
+  });
+});
+
+describe("fetchPageHead", () => {
+  it("devuelve el inicio de una página enorme (donde está el <head>) en vez de fallar", async () => {
+    const base = await serve((_req, res) => res.end(`<html><head><meta property="og:image" content="https://cdn.x.test/a.jpg"></head><body>${"x".repeat(2 * 1024 * 1024)}</body></html>`));
+    const html = await fetchPageHead(`${base}/`, anyAddress);
+    expect(html).toContain('og:image');
+    expect(html.length).toBeLessThanOrEqual(512 * 1024 + 65536);
+  });
+
+  it("mantiene las protecciones: no entra a destinos internos", async () => {
+    await expect(fetchPageHead("http://127.0.0.1:1/")).rejects.toThrow(FeedFetchError);
   });
 });

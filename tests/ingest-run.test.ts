@@ -6,6 +6,7 @@ import type { DbHandle } from "@/lib/db";
 import type { Actor } from "@/lib/rbac";
 import { ForbiddenError } from "@/lib/rbac";
 import { articleRevisions, articles, references, users } from "@/db/schema";
+import { clipText } from "@/modules/ingest/feed";
 import { listRuns, MAX_FAILURES, pendingCount, probeSource, resumeSource, runDueSources, runSource, runSourceNow } from "@/modules/ingest/run";
 import { sourceItems, sourceRuns, sources } from "@/modules/ingest/schema";
 import { DomainError } from "@/lib/errors";
@@ -24,6 +25,9 @@ let editor: Actor;
 let server: http.Server;
 let base = "";
 let reply: { status: number; body: string } = { status: 200, body: feed(3) };
+/** Páginas de las notas (para la imagen og:image): clave = número de nota; si no está, 404. Se anotan las visitas. */
+let pages: Record<string, string> = {};
+let pageHits: string[] = [];
 const deps = { isPublic: () => true };
 
 beforeAll(async () => {
@@ -34,7 +38,14 @@ beforeAll(async () => {
   };
   admin = await mk("admin", "adm");
   editor = await mk("editor", "edi");
-  server = http.createServer((_req, res) => res.writeHead(reply.status, { "content-type": "application/rss+xml" }).end(reply.body));
+  server = http.createServer((req, res) => {
+    const m = /^\/n\/(\d+)\//.exec(req.url ?? "");
+    if (m) {
+      pageHits.push(m[1]);
+      return pages[m[1]] === undefined ? res.writeHead(404).end("no") : res.writeHead(200, { "content-type": "text/html" }).end(pages[m[1]]);
+    }
+    res.writeHead(reply.status, { "content-type": "application/rss+xml" }).end(reply.body);
+  });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/feed/`;
 });
@@ -44,6 +55,8 @@ afterAll(async () => {
 });
 afterEach(() => {
   reply = { status: 200, body: feed(3) };
+  pages = {};
+  pageHits = [];
 });
 
 let seq = 0;
@@ -242,5 +255,93 @@ describe("acciones del panel", () => {
     const s = await makeSource();
     await h.db.insert(sourceRuns).values({ sourceId: s.id, status: "running" });
     await expect(run(s.id)).rejects.toThrow("en curso");
+  });
+});
+
+/** Como el feed real de Mondo Sonoro: solo extracto (sin content:encoded ni imágenes) y notas enlazadas en el servidor de prueba. */
+const summaryFeed = (n: number) =>
+  `<?xml version="1.0"?><rss version="2.0"><channel><title>MS</title>${Array.from({ length: n }, (_, i) => `<item><title>Solo extracto ${i + 1}</title><link>${base.replace("/feed/", "")}/n/${i + 1}/</link><guid>s${i + 1}</guid><description>Resumen ${i + 1} […]</description></item>`).join("")}</channel></rss>`;
+const withOg = (k: number) => `<html><head><meta property="og:image" content="https://cdn.mondosonoro.com/og-${k}.jpg"></head><body>nota</body></html>`;
+
+describe("imagen cuando el feed solo trae extracto", () => {
+  it("con «solo metadatos» no consulta las páginas ni pone imagen, y el borrador no repite el extracto como subtítulo", async () => {
+    reply = { status: 200, body: summaryFeed(2) };
+    pages = { "1": withOg(1), "2": withOg(2) };
+    const s = await makeSource({ rightsPolicy: "metadata_only" });
+    await run(s.id);
+    expect(pageHits).toEqual([]);
+    const rows = await h.db.select({ a: articles }).from(sourceItems).innerJoin(articles, eq(articles.id, sourceItems.articleId)).where(eq(sourceItems.sourceId, s.id));
+    expect(rows).toHaveLength(2);
+    for (const { a } of rows) {
+      expect(a.coverUrl).toBeNull();
+      expect(a.dek).toBeNull();
+      expect(a.bodyHtml).toContain("Resumen");
+    }
+  });
+
+  it("con permiso busca la imagen en la página de la nota (og:image) y pone el crédito", async () => {
+    reply = { status: 200, body: summaryFeed(2) };
+    pages = { "1": withOg(1), "2": withOg(2) };
+    const s = await makeSource({ rightsPolicy: "licensed" });
+    const r = await run(s.id);
+    expect(pageHits.sort()).toEqual(["1", "2"]);
+    expect(r.message).toContain("2 con imagen");
+    const rows = await h.db.select({ a: articles, u: sourceItems.url }).from(sourceItems).innerJoin(articles, eq(articles.id, sourceItems.articleId)).where(eq(sourceItems.sourceId, s.id));
+    expect(rows.map((x) => x.a.coverUrl).sort()).toEqual(["https://cdn.mondosonoro.com/og-1.jpg", "https://cdn.mondosonoro.com/og-2.jpg"]);
+    expect(rows[0].a.coverCredit).toBe("Foto: Mondo Sonoro (imagen de la nota original)");
+  });
+
+  it("si la página falla o no declara imagen, el borrador se crea igual (sin imagen) y la lectura sigue siendo correcta", async () => {
+    reply = { status: 200, body: summaryFeed(3) };
+    pages = { "1": "<html><head><title>sin og</title></head></html>", "3": withOg(3) }; // la 2 da 404
+    const s = await makeSource({ rightsPolicy: "express_permission" });
+    const r = await run(s.id);
+    expect(r).toMatchObject({ status: "ok", newItems: 3, errors: 0 });
+    const covers = (await h.db.select({ c: articles.coverUrl, t: articles.title }).from(sourceItems).innerJoin(articles, eq(articles.id, sourceItems.articleId)).where(eq(sourceItems.sourceId, s.id))).map((x) => [x.t, x.c]).sort();
+    expect(covers).toEqual([["Solo extracto 1", null], ["Solo extracto 2", null], ["Solo extracto 3", "https://cdn.mondosonoro.com/og-3.jpg"]]);
+  });
+
+  it("al cambiar la política a una que permite imágenes, la siguiente lectura las añade a los borradores ya creados (y no vuelve a pedir los que ya tienen)", async () => {
+    reply = { status: 200, body: summaryFeed(2) };
+    pages = { "1": withOg(1), "2": withOg(2) };
+    const s = await makeSource({ rightsPolicy: "metadata_only" });
+    await run(s.id);
+    expect(pageHits).toEqual([]);
+
+    await h.db.update(sources).set({ rightsPolicy: "express_permission" }).where(eq(sources.id, s.id));
+    const r2 = await run(s.id, new Date(Date.now() + 1000));
+    expect(r2).toMatchObject({ newItems: 0, duplicates: 2 });
+    expect(r2.message).toContain("2 con imagen");
+    const rows = await h.db.select({ c: articles.coverUrl }).from(sourceItems).innerJoin(articles, eq(articles.id, sourceItems.articleId)).where(eq(sourceItems.sourceId, s.id));
+    expect(rows.every((x) => x.c?.startsWith("https://cdn.mondosonoro.com/og-"))).toBe(true);
+
+    pageHits = [];
+    await run(s.id, new Date(Date.now() + 2000));
+    expect(pageHits).toEqual([]);
+  });
+
+  it("respeta una portada puesta a mano y no pisa un subtítulo editado; quita solo el subtítulo heredado idéntico al extracto", async () => {
+    reply = { status: 200, body: summaryFeed(2) };
+    const s = await makeSource({ rightsPolicy: "metadata_only" });
+    await run(s.id);
+    const items = await h.db.select().from(sourceItems).where(eq(sourceItems.sourceId, s.id));
+    const [a, b] = items;
+    await h.db.update(articles).set({ dek: clipText(a.summary!, 220) }).where(eq(articles.id, a.articleId!)); // como la primera versión
+    await h.db.update(articles).set({ dek: "Subtítulo escrito por una persona" }).where(eq(articles.id, b.articleId!));
+    await run(s.id, new Date(Date.now() + 1000));
+    expect((await h.db.select().from(articles).where(eq(articles.id, a.articleId!)))[0].dek).toBeNull();
+    expect((await h.db.select().from(articles).where(eq(articles.id, b.articleId!)))[0].dek).toBe("Subtítulo escrito por una persona");
+  });
+
+  it("limita las consultas a páginas por lectura y retoma el resto en la siguiente", async () => {
+    reply = { status: 200, body: summaryFeed(25) };
+    pages = Object.fromEntries(Array.from({ length: 25 }, (_, i) => [String(i + 1), withOg(i + 1)]));
+    const s = await makeSource({ rightsPolicy: "licensed", dailyLimit: 100 });
+    await run(s.id);
+    expect(pageHits).toHaveLength(20);
+    pageHits = [];
+    const r2 = await run(s.id, new Date(Date.now() + 1000));
+    expect(pageHits).toHaveLength(5);
+    expect(r2.message).toContain("5 con imagen");
   });
 });

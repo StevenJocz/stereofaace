@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SUMMARY, parseFeed } from "@/modules/ingest/feed";
+import { extractPageImage, MAX_SUMMARY, parseFeed } from "@/modules/ingest/feed";
 import { parseXml, XmlError } from "@/modules/ingest/xml";
 
 const FEED = "https://www.mondosonoro.com/feed/";
@@ -119,5 +119,26 @@ describe("parseFeed (Atom y otros)", () => {
     expect(parseFeed(rss(""), FEED)).toEqual([]);
     expect(() => parseFeed("<html><body><p>Hola</p></body></html>", FEED)).toThrow(XmlError);
     expect(() => parseFeed("no es xml", FEED)).toThrow(XmlError);
+  });
+});
+
+describe("extractPageImage (og:image)", () => {
+  const page = (head: string, body = "") => `<!doctype html><html><head>${head}</head><body>${body}</body></html>`;
+
+  it("prefiere og:image:secure_url / og:image y entiende cualquier orden de atributos", () => {
+    expect(extractPageImage(page('<meta property="og:image" content="https://cdn.x.test/a.jpg">'), "https://x.test/n")).toBe("https://cdn.x.test/a.jpg");
+    expect(extractPageImage(page('<meta content="https://cdn.x.test/b.jpg" property="og:image" />'), "https://x.test/n")).toBe("https://cdn.x.test/b.jpg");
+    expect(extractPageImage(page("<meta property='og:image' content='https://cdn.x.test/c.jpg'><meta property=\"og:image:secure_url\" content=\"https://cdn.x.test/s.jpg\">"), "https://x.test/n")).toBe("https://cdn.x.test/s.jpg");
+  });
+
+  it("cae a twitter:image, resuelve rutas relativas y decodifica entidades", () => {
+    expect(extractPageImage(page('<meta name="twitter:image" content="/img/t.jpg?a=1&amp;b=2">'), "https://x.test/n/1")).toBe("https://x.test/img/t.jpg?a=1&b=2");
+  });
+
+  it("solo https; ignora http, data: y lo que esté fuera del <head>", () => {
+    expect(extractPageImage(page('<meta property="og:image" content="http://cdn.x.test/a.jpg">'), "https://x.test/n")).toBeNull();
+    expect(extractPageImage(page('<meta property="og:image" content="data:image/png;base64,AAAA">'), "https://x.test/n")).toBeNull();
+    expect(extractPageImage(page("", '<meta property="og:image" content="https://cdn.x.test/body.jpg">'), "https://x.test/n")).toBeNull();
+    expect(extractPageImage("sin html", "https://x.test/n")).toBeNull();
   });
 });

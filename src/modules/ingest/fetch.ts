@@ -57,7 +57,12 @@ function guardedLookup(deps: FetchDeps): Lookup {
 
 type Hop = { status: number; location: string | null; body: string | null };
 
-function once(url: URL, deps: FetchDeps): Promise<Hop> {
+type Limits = { maxBytes: number; /** Al pasar el tope, devuelve lo leído hasta ahí en vez de fallar (útil para leer solo el <head> de una página). */ truncate: boolean; accept: string };
+
+const FEED_LIMITS: Limits = { maxBytes: MAX_FEED_BYTES, truncate: false, accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5" };
+const PAGE_LIMITS: Limits = { maxBytes: 512 * 1024, truncate: true, accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5" };
+
+function once(url: URL, deps: FetchDeps, limits: Limits): Promise<Hop> {
   return new Promise((resolve, reject) => {
     const mod = url.protocol === "https:" ? https : http;
     const req = mod.request(
@@ -67,7 +72,7 @@ function once(url: URL, deps: FetchDeps): Promise<Hop> {
         lookup: guardedLookup(deps) as never,
         timeout: TIMEOUT_MS,
         headers: {
-          accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+          accept: limits.accept,
           "accept-encoding": "gzip, deflate",
           "user-agent": "StereoFaceFeedReader/1.0 (+https://stereoface.online)",
         },
@@ -86,17 +91,21 @@ function once(url: URL, deps: FetchDeps): Promise<Hop> {
         const stream = enc === "gzip" ? res.pipe(createGunzip()) : enc === "deflate" ? res.pipe(createInflate()) : res;
         const chunks: Buffer[] = [];
         let size = 0;
+        let done = false;
         stream.on("data", (c: Buffer) => {
+          if (done) return;
           size += c.length;
-          if (size > MAX_FEED_BYTES) {
+          if (size > limits.maxBytes) {
+            done = true;
             req.destroy();
-            reject(new FeedFetchError("El feed es demasiado grande (más de 3 MB)."));
+            if (limits.truncate) resolve({ status, location: null, body: Buffer.concat(chunks).toString("utf8") });
+            else reject(new FeedFetchError("El feed es demasiado grande (más de 3 MB)."));
             return;
           }
           chunks.push(c);
         });
-        stream.on("end", () => resolve({ status, location: null, body: Buffer.concat(chunks).toString("utf8") }));
-        stream.on("error", () => reject(new FeedFetchError("No se pudo leer la respuesta del sitio.")));
+        stream.on("end", () => !done && resolve({ status, location: null, body: Buffer.concat(chunks).toString("utf8") }));
+        stream.on("error", () => !done && reject(new FeedFetchError("No se pudo leer la respuesta del sitio.")));
       },
     );
     req.on("timeout", () => {
@@ -109,7 +118,12 @@ function once(url: URL, deps: FetchDeps): Promise<Hop> {
 }
 
 /** Descarga el texto de un feed. Solo http(s), sin credenciales, destinos públicos, ≤3 redirecciones, ≤3 MB y 15 s. */
-export async function fetchFeedText(rawUrl: string, deps: FetchDeps = {}): Promise<string> {
+export const fetchFeedText = (rawUrl: string, deps: FetchDeps = {}): Promise<string> => fetchText(rawUrl, deps, FEED_LIMITS);
+
+/** Primeros 512 KB del HTML de una página (donde está el <head>), con las mismas protecciones. */
+export const fetchPageHead = (rawUrl: string, deps: FetchDeps = {}): Promise<string> => fetchText(rawUrl, deps, PAGE_LIMITS);
+
+async function fetchText(rawUrl: string, deps: FetchDeps, limits: Limits): Promise<string> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -121,7 +135,7 @@ export async function fetchFeedText(rawUrl: string, deps: FetchDeps = {}): Promi
     if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) throw new FeedFetchError("Solo se permiten direcciones http(s) sin credenciales.");
     // Una IP escrita directamente no pasa por DNS: se comprueba aquí.
     if (isIP(url.hostname.replace(/^\[|\]$/g, "")) && !isPublic(url.hostname)) throw new FeedFetchError("Destino no permitido.");
-    const res = await once(url, deps);
+    const res = await once(url, deps, limits);
     if (res.body !== null) return res.body;
     if (!res.location) throw new FeedFetchError("Redirección sin destino.");
     try {

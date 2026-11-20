@@ -59,7 +59,7 @@ export default async function EditSourcePage({
         <section className="panel mt-8 p-5" aria-label="Lectura del feed">
           <h2 className="display-up text-[1.15rem]">Lectura del feed</h2>
           <p className="mt-2 max-w-[70ch] text-muted">
-            Cuando la fuente está activa se lee sola cada {source.intervalMinutes} minutos y crea un <strong>borrador</strong> por cada nota nueva (título, extracto del feed, enlace y atribución; la imagen solo si la política de derechos no es «solo metadatos»). Nada se publica solo: los borradores se revisan en{" "}
+            Cuando la fuente está activa se lee sola cada {source.intervalMinutes} minutos y crea un <strong>borrador</strong> por cada nota nueva (título, extracto del feed, enlace y atribución). La imagen —la del feed o, si no trae, la que la página de la nota declara para sus avances— solo se añade si la política de derechos <strong>no</strong> es «solo metadatos»; al cambiarla, la siguiente lectura rellena también los borradores recientes. El texto completo de las notas no se trae. Nada se publica solo: los borradores se revisan en{" "}
             <Link href="/admin/articulos?estado=draft" className="underline">Artículos</Link>.
           </p>
           <dl className="mono mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[0.74rem]">

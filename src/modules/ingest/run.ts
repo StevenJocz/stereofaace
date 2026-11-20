@@ -7,8 +7,8 @@ import { readingMinutes, sanitizeArticleHtml } from "@/lib/sanitize";
 import { slugify } from "@/lib/slug";
 import { articleRevisions, articles, references } from "@/modules/content/schema";
 import { recordAudit } from "@/modules/users/audit";
-import { clipText, parseFeed, type FeedItem } from "./feed";
-import { FeedFetchError, fetchFeedText, type FetchDeps } from "./fetch";
+import { clipText, extractPageImage, parseFeed, type FeedItem } from "./feed";
+import { FeedFetchError, fetchFeedText, fetchPageHead, type FetchDeps } from "./fetch";
 import { sourceItems, sourceRuns, sources } from "./schema";
 import { XmlError } from "./xml";
 
@@ -17,6 +17,11 @@ type Source = typeof sources.$inferSelect;
 /** Tras tantos fallos seguidos la fuente se pausa sola (se reanuda a mano desde el panel). */
 export const MAX_FAILURES = 5;
 const BUSY_WINDOW_MS = 10 * 60_000;
+/** Páginas de notas que se consultan por lectura para buscar su imagen (cuando el feed no la trae). */
+const PAGE_LOOKUPS_PER_RUN = 20;
+/** Los borradores recientes sin imagen se reintentan durante este tiempo. */
+const BACKFILL_DAYS = 7;
+const BACKFILL_LIMIT = 30;
 
 export type RunResult = { runId: string; status: "ok" | "error"; newItems: number; duplicates: number; errors: number; skippedByLimit: number; message: string };
 
@@ -37,15 +42,29 @@ async function uniqueSlug(db: Db, base: string): Promise<string> {
   return candidates.find((c) => !used.has(c)) ?? `${root}-${Date.now().toString(36)}`;
 }
 
+const allowsImages = (source: Source) => source.rightsPolicy !== "metadata_only";
+const coverCredit = (source: Source) => `Foto: ${source.name} (imagen de la nota original)`;
+
+/** Imagen de una nota: la del feed o, si no trae, la que la propia página declara para sus avances (og:image). Nunca falla la lectura. */
+async function noteImage(item: Pick<FeedItem, "url" | "imageUrl">, deps: FetchDeps | undefined, lookups: { left: number }): Promise<string | null> {
+  if (item.imageUrl) return item.imageUrl;
+  if (lookups.left <= 0) return null;
+  lookups.left--;
+  try {
+    return extractPageImage(await fetchPageHead(item.url, deps), item.url);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Borrador de artículo a partir de un elemento del feed. Solo lleva lo que el feed publica: título, extracto, enlace y atribución;
  * la imagen solo si la política de derechos de la fuente lo permite. Nunca se publica solo: lo revisa una persona.
  */
-async function createDraft(db: Db, source: Source, item: FeedItem): Promise<string> {
+async function createDraft(db: Db, source: Source, item: FeedItem, imageUrl: string | null): Promise<string> {
   const body = sanitizeArticleHtml(
     [item.summary ? `<p>${esc(item.summary)}</p>` : "", `<p>Fuente: <a href="${esc(item.url)}" rel="noopener nofollow">${esc(source.name)}</a></p>`].join(""),
   );
-  const withImage = source.rightsPolicy !== "metadata_only" && item.imageUrl !== null;
   const slug = await uniqueSlug(db, slugify(item.title));
   return db.transaction(async (tx) => {
     const [created] = await tx
@@ -54,7 +73,8 @@ async function createDraft(db: Db, source: Source, item: FeedItem): Promise<stri
         slug,
         locale: "es",
         title: item.title,
-        dek: item.summary ? clipText(item.summary, 220) : null,
+        // Sin subtítulo: el extracto ya está en el cuerpo y repetirlo en la cabecera lo duplicaba en la vista previa.
+        dek: null,
         bodyHtml: body,
         readMinutes: readingMinutes(body),
         categoryId: source.defaultCategoryId,
@@ -62,9 +82,9 @@ async function createDraft(db: Db, source: Source, item: FeedItem): Promise<stri
         origin: "imported",
         authorId: null,
         authorName: item.author ?? source.name,
-        coverUrl: withImage ? item.imageUrl : null,
-        coverAlt: withImage ? item.title : null,
-        coverCredit: withImage ? `Foto: ${source.name} (imagen de la nota original)` : null,
+        coverUrl: imageUrl,
+        coverAlt: imageUrl ? item.title : null,
+        coverCredit: imageUrl ? coverCredit(source) : null,
         seo: {},
       })
       .returning({ id: articles.id });
@@ -72,6 +92,44 @@ async function createDraft(db: Db, source: Source, item: FeedItem): Promise<stri
     await tx.insert(articleRevisions).values({ articleId: created.id, title: item.title, bodyJson: null, bodyHtml: body, authorId: null });
     return created.id;
   });
+}
+
+/**
+ * Retoma los borradores recientes de la fuente: les añade la imagen que les falta (solo si la política de derechos lo permite, p. ej.
+ * tras cambiarla) y quita el subtítulo que repetía el extracto. Es acotado: pocos borradores y pocas consultas por lectura.
+ */
+async function backfillDrafts(db: Db, source: Source, items: FeedItem[], now: Date, deps: FetchDeps | undefined, lookups: { left: number }, skip: Set<string>): Promise<number> {
+  const rows = await db
+    .select({ articleId: articles.id, title: articles.title, dek: articles.dek, coverUrl: articles.coverUrl, url: sourceItems.url, summary: sourceItems.summary })
+    .from(sourceItems)
+    .innerJoin(articles, eq(articles.id, sourceItems.articleId))
+    .where(
+      and(
+        eq(sourceItems.sourceId, source.id),
+        eq(sourceItems.status, "pending_review"),
+        eq(articles.status, "draft"),
+        isNull(articles.deletedAt),
+        gte(sourceItems.createdAt, new Date(now.getTime() - BACKFILL_DAYS * 86_400_000)),
+      ),
+    )
+    .orderBy(desc(sourceItems.createdAt))
+    .limit(BACKFILL_LIMIT);
+  const byUrl = new Map(items.map((i) => [i.url, i]));
+  let added = 0;
+  for (const r of rows) {
+    if (skip.has(r.url)) continue; // recién creado en esta lectura: ya se buscó su imagen
+    const patch: Partial<typeof articles.$inferInsert> = {};
+    // Subtítulo heredado de la primera versión: era idéntico al extracto del cuerpo.
+    if (r.dek && r.summary && r.dek === clipText(r.summary, 220)) patch.dek = null;
+    if (allowsImages(source) && !r.coverUrl) {
+      const image = await noteImage({ url: r.url, imageUrl: byUrl.get(r.url)?.imageUrl ?? null }, deps, lookups);
+      if (image) Object.assign(patch, { coverUrl: image, coverAlt: r.title, coverCredit: coverCredit(source) });
+    }
+    if (Object.keys(patch).length === 0) continue;
+    await db.update(articles).set(patch).where(eq(articles.id, r.articleId));
+    if (patch.coverUrl) added++;
+  }
+  return added;
 }
 
 /**
@@ -98,6 +156,8 @@ export async function runSource(db: Db, id: string, opts: { deps?: FetchDeps; no
   let duplicates = 0;
   let errors = 0;
   let skippedByLimit = 0;
+  let imagesAdded = 0;
+  const createdUrls = new Set<string>();
   let status: "ok" | "error" = "ok";
   let message = "";
   try {
@@ -110,6 +170,7 @@ export async function runSource(db: Db, id: string, opts: { deps?: FetchDeps; no
       .from(sourceItems)
       .where(and(eq(sourceItems.sourceId, id), gte(sourceItems.createdAt, new Date(now.getTime() - 24 * 3_600_000))));
     let budget = Math.max(0, source.dailyLimit - n);
+    const lookups = { left: PAGE_LOOKUPS_PER_RUN };
 
     for (const item of items) {
       if (known.has(item.url)) {
@@ -140,7 +201,10 @@ export async function runSource(db: Db, id: string, opts: { deps?: FetchDeps; no
       }
       budget--;
       try {
-        const articleId = await createDraft(db, source, item);
+        const image = allowsImages(source) ? await noteImage(item, opts.deps, lookups) : null;
+        const articleId = await createDraft(db, source, item, image);
+        if (image) imagesAdded++;
+        createdUrls.add(item.url);
         await db.update(sourceItems).set({ status: "pending_review", articleId }).where(eq(sourceItems.id, slot.id));
         newItems++;
       } catch (e) {
@@ -148,7 +212,8 @@ export async function runSource(db: Db, id: string, opts: { deps?: FetchDeps; no
         await db.update(sourceItems).set({ status: "error", error: safeMessage(e).slice(0, 300) }).where(eq(sourceItems.id, slot.id));
       }
     }
-    message = items.length === 0 ? "El feed no trae elementos." : `${items.length} en el feed: ${newItems} nuevos, ${duplicates} ya conocidos${skippedByLimit ? `, ${skippedByLimit} aplazados por el límite diario` : ""}${errors ? `, ${errors} con error` : ""}.`;
+    imagesAdded += await backfillDrafts(db, source, items, now, opts.deps, lookups, createdUrls);
+    message = items.length === 0 ? "El feed no trae elementos." : `${items.length} en el feed: ${newItems} nuevos, ${duplicates} ya conocidos${skippedByLimit ? `, ${skippedByLimit} aplazados por el límite diario` : ""}${errors ? `, ${errors} con error` : ""}${imagesAdded ? `; ${imagesAdded} con imagen` : ""}.`;
     if (items.length > 0 && newItems === 0 && errors === items.length) status = "error";
   } catch (e) {
     status = "error";

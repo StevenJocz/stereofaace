@@ -1,5 +1,5 @@
 import { htmlToText } from "@/lib/sanitize";
-import { child, childrenNamed, parseXml, XmlError, type XmlNode } from "./xml";
+import { child, childrenNamed, decodeEntities, parseXml, XmlError, type XmlNode } from "./xml";
 
 export type FeedItem = {
   /** Identificador estable en la fuente (guid / id; si falta, el enlace). */
@@ -98,6 +98,23 @@ function itemAuthor(item: XmlNode): string | null {
   const atom = child(child(item, "author") ?? { name: "", attrs: {}, children: [], text: "" }, "name");
   const v = text(atom) || direct;
   return v ? clipText(v, 120) : null;
+}
+
+/** Imagen de portada declarada en el <head> de una página (Open Graph / Twitter Card), solo https. Es lo que usan los «avances» de enlaces. */
+export function extractPageImage(html: string, pageUrl: string): string | null {
+  const head = html.slice(0, html.search(/<\/head>/i) === -1 ? undefined : html.search(/<\/head>/i));
+  const found: Record<string, string> = {};
+  for (const tag of head.match(/<meta\b[^>]*>/gi) ?? []) {
+    const key = /\b(?:property|name)\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase();
+    const content = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
+    const value = content?.[1] ?? content?.[2];
+    if (key && value && !(key in found)) found[key] = decodeEntities(value);
+  }
+  for (const key of ["og:image:secure_url", "og:image", "og:image:url", "twitter:image", "twitter:image:src"]) {
+    const ok = absoluteUrl(found[key], pageUrl, true);
+    if (ok) return ok;
+  }
+  return null;
 }
 
 /** Elementos `item` (RSS/RDF) o `entry` (Atom), sin entrar dentro de ellos. */
