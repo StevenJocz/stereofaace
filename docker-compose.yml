@@ -60,6 +60,8 @@ services:
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
       RADIO_EMBED_HOSTS: ${RADIO_EMBED_HOSTS:-}
       MEDIA_ROOT: /data/media
+      # Lectura automática de fuentes de noticias (RSS/Atom). «off» la apaga; las lecturas manuales del panel siguen. Ver DEPLOY.md, sección 18.
+      INGEST_SCHEDULER: ${INGEST_SCHEDULER:-}
       # Cámara en cabina (opcional; ver DEPLOY.md, sección «Cámara en cabina»). Vacías = el módulo avisa que falta configurarlo.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}

@@ -19,7 +19,7 @@ export type SourceFormValues = {
   legalNotes?: string | null;
 };
 
-/** Alta o edición del registro de una fuente. No ejecuta ninguna ingesta. */
+/** Alta o edición del registro de una fuente. Guardar no lee el feed: la lectura se hace desde la ficha o sola, con la fuente activa. */
 export function SourceForm({ initial, categories }: { initial: SourceFormValues; categories: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveSourceAction, null);
   const v = (k: string, fallback?: string | number | null) => String(state?.values?.[k] ?? fallback ?? "");
@@ -49,7 +49,7 @@ export function SourceForm({ initial, categories }: { initial: SourceFormValues;
       <Field label="Límite diario de elementos (1–500)" name="dailyLimit" errors={e("dailyLimit")}>
         <input id="dailyLimit" name="dailyLimit" type="number" min={1} max={500} className="input" defaultValue={v("dailyLimit", initial.dailyLimit ?? 20)} />
       </Field>
-      <Field label="Política de derechos" name="rightsPolicy" errors={e("rightsPolicy")}>
+      <Field label="Política de derechos" name="rightsPolicy" errors={e("rightsPolicy")} hint="Con «solo metadatos» los borradores llevan título, extracto, enlace y atribución, sin imagen. Elige otra política solo si la fuente lo autoriza.">
         <select id="rightsPolicy" name="rightsPolicy" className="input" defaultValue={v("rightsPolicy", initial.rightsPolicy ?? "metadata_only")}>
           {Object.entries(RIGHTS_LABEL).map(([val, label]) => (
             <option key={val} value={val}>

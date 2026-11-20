@@ -7,6 +7,7 @@ import { PageHead } from "@/ui/admin/fields";
 import { KIND_LABEL } from "@/ui/admin/options";
 
 const day = new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "America/Bogota" });
+const when = new Intl.DateTimeFormat("es-CO", { dateStyle: "short", timeStyle: "short", timeZone: "America/Bogota" });
 
 export default async function SourcesAdminPage({ searchParams }: { searchParams: Promise<{ borrada?: string }> }) {
   const user = await requirePermission("source:read");
@@ -26,8 +27,9 @@ export default async function SourcesAdminPage({ searchParams }: { searchParams:
       />
       {sp.borrada && <p role="status" className="mono mt-4 text-accent-ink">Fuente borrada.</p>}
       <p className="mt-4 max-w-[70ch] text-muted">
-        Registro de fuentes externas. Todas nacen desactivadas y solo se pueden activar después de verificar sus
-        términos y licencia. Por ahora no se ejecuta ninguna ingesta automática.
+        Fuentes externas de noticias. Todas nacen desactivadas y solo se pueden activar después de verificar sus
+        términos y licencia. Las fuentes RSS/Atom activas se leen solas y dejan borradores para revisar; el detalle de
+        cada lectura está en la ficha de la fuente.
       </p>
       <div className="mt-8 overflow-x-auto">
         <table className="w-full min-w-[44rem] border-collapse text-left">
@@ -36,6 +38,7 @@ export default async function SourcesAdminPage({ searchParams }: { searchParams:
               <th className="py-3 pr-4 font-normal">Fuente</th>
               <th className="py-3 pr-4 font-normal">Tipo</th>
               <th className="py-3 pr-4 font-normal">Términos</th>
+              <th className="py-3 pr-4 font-normal">Última lectura</th>
               <th className="py-3 font-normal">Estado</th>
             </tr>
           </thead>
@@ -50,7 +53,10 @@ export default async function SourcesAdminPage({ searchParams }: { searchParams:
                 <td className="py-3 pr-4">
                   {s.termsVerifiedAt ? <span className="badge badge-ok">Verificados {day.format(s.termsVerifiedAt)}</span> : <span className="badge badge-warn">Sin verificar</span>}
                 </td>
-                <td className="py-3">{s.active ? <span className="badge badge-ok">Activa</span> : <span className="badge badge-idle">Desactivada</span>}</td>
+                <td className="mono py-3 pr-4 whitespace-nowrap">{s.lastRunAt ? when.format(s.lastRunAt) : "—"}</td>
+                <td className="py-3">
+                  {s.paused ? <span className="badge badge-warn">Pausada</span> : s.active ? <span className="badge badge-ok">Activa</span> : <span className="badge badge-idle">Desactivada</span>}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -344,3 +344,14 @@ Al terminar, deja por escrito (en el informe al humano y, si procede, en `PROGRE
 | «YouTube no recibió señal a tiempo» | Revisar el panel del directo en YouTube Studio y el estado del egreso en LiveKit. |
 | Directo se cierra solo | La cámara se desconectó (pestaña cerrada o red). |
 | Cuota de YouTube | Límite diario de la API: esperar al día siguiente. |
+
+## 18. Fuentes de noticias (lectura automática de RSS/Atom)
+
+Las fuentes de `/admin/fuentes` de tipo RSS o Atom se leen solas, **sin configuración extra**: el propio servidor web revisa cada minuto qué fuentes les toca (según su intervalo) y las lee.
+
+- **Condiciones para que una fuente se lea:** activa, con términos verificados y no pausada. Nacen desactivadas.
+- **Qué crea:** un **borrador** por cada nota nueva (título, extracto del feed, enlace y atribución). La imagen solo se trae si la política de derechos de la fuente no es «solo metadatos». Nada se publica solo; los borradores se revisan en `/admin/articulos?estado=draft`. No se descarga el texto completo de las notas.
+- **Cómo ver que funciona:** ficha de la fuente → «Probar el feed» (no guarda nada) y «Ejecutar ahora»; abajo queda el historial de lecturas (nuevos, ya conocidos, errores y el motivo). En los registros del contenedor aparecen líneas `[ingest]`.
+- **Fallos:** tras 5 fallos seguidos la fuente se pausa sola y hay que reanudarla desde su ficha.
+- **Seguridad:** solo destinos públicos (se comprueba la IP real al conectar y en cada redirección), máximo 3 MB por feed y 15 s por lectura.
+- **Apagarlo:** `INGEST_SCHEDULER=off` en el entorno del servicio `web` (las lecturas manuales desde el panel siguen funcionando). Con varias instancias del servicio web no se duplica trabajo: cada lectura se «reclama» en la base de datos.

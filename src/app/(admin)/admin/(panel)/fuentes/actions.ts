@@ -1,11 +1,13 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { guard, str, type FormState } from "@/lib/admin/form";
 import { createSource, deleteSource, markTermsVerified, setSourceActive, updateSource } from "@/modules/ingest/admin";
+import { probeSource, resumeSource, runSourceNow } from "@/modules/ingest/run";
 
 function sourceRaw(fd: FormData) {
   return {
@@ -68,4 +70,41 @@ export async function deleteSourceAction(_prev: FormState, fd: FormData): Promis
   });
   if (result?.ok) redirect("/admin/fuentes?borrada=1");
   return result;
+}
+
+/** «Probar el feed»: lo descarga y lo lee sin guardar nada. */
+export async function probeSourceAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const id = str(fd, "id");
+  return guard(fd, "fuentes", async () => {
+    if (!id) throw new DomainError("bad_request", "Falta la fuente");
+    const p = await probeSource(await getDb(), user, id);
+    if (!p.ok) throw new DomainError("probe", p.message);
+    const first = p.sample[0];
+    return `Feed correcto: ${p.total} elementos (${p.withSummary} con extracto, ${p.withImage} con imagen).${first ? ` Último: «${first.title}».` : ""}`;
+  });
+}
+
+/** «Ejecutar ahora»: lee el feed y crea los borradores nuevos. */
+export async function runSourceAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const id = str(fd, "id");
+  return guard(fd, "fuentes", async () => {
+    if (!id) throw new DomainError("bad_request", "Falta la fuente");
+    const r = await runSourceNow(await getDb(), user, id);
+    // Una lectura con error también queda en el historial: se refresca la ficha aunque la acción termine en error.
+    revalidatePath("/admin/fuentes", "layout");
+    if (r.status === "error") throw new DomainError("run", r.message);
+    return r.message;
+  });
+}
+
+export async function resumeSourceAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const id = str(fd, "id");
+  return guard(fd, "fuentes", async () => {
+    if (!id) throw new DomainError("bad_request", "Falta la fuente");
+    await resumeSource(await getDb(), user, id);
+    return "Fuente reanudada";
+  });
 }
