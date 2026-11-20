@@ -933,21 +933,28 @@ body[data-radio="on"] {
   pointer-events: none;
 }
 .radio-bar > .wrap {
+  position: relative;
   pointer-events: auto;
 }
-/* Reproductor: tarjeta de vidrio redondeada con marca, portada, onda y controles. */
+
+/* Reproductor: barra de una sola fila (marca · en el aire · onda · controles · volumen · chat · herramientas).
+   Móvil y tableta: dos filas con el mismo contenido. */
 .rb-card {
   position: relative;
   display: grid;
-  grid-template-columns: 3.2rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "now transport" "cta tools";
   align-items: center;
-  gap: 0.15rem 0.7rem;
-  padding: 0.5rem 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  gap: 0.55rem 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
   border-radius: 18px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 92%, transparent), color-mix(in srgb, var(--bg) 94%, transparent));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 94%, transparent), color-mix(in srgb, var(--bg) 97%, transparent));
   backdrop-filter: blur(18px) saturate(1.2);
-  box-shadow: 0 18px 50px -18px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 0 22px -12px var(--accent), 0 18px 50px -18px rgba(0, 0, 0, 0.8);
+}
+.rb-card[data-own="false"] {
+  grid-template-areas: "now transport" "tools tools";
 }
 .rb-glow {
   position: absolute;
@@ -958,103 +965,130 @@ body[data-radio="on"] {
   filter: drop-shadow(0 0 8px var(--accent));
   pointer-events: none;
 }
-.rb-logo,
+.rb-brand,
+.rb-sep,
 .rb-wave,
-.rb-side .rb-live {
+.rb-vol {
   display: none;
+}
+
+/* Marca */
+.rb-brand {
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--fg);
+}
+.rb-mark {
+  flex: none;
+}
+.rb-brand-text {
+  display: grid;
+  gap: 0.2rem;
+}
+.rb-brand-name {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.rb-brand-name span {
+  color: var(--accent-ink);
+}
+.rb-brand-sub {
+  font-size: 0.5rem;
+  letter-spacing: 0.34em;
+  color: var(--muted);
+}
+.rb-sep {
+  flex: none;
+  width: 1px;
+  height: 2.7rem;
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+}
+
+/* Portada e información */
+.rb-now {
+  grid-area: now;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
 }
 .rb-cover {
   position: relative;
+  flex: none;
   display: block;
-  width: 3.2rem;
+  width: 2.9rem;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 10px;
-  border: 1.5px solid color-mix(in srgb, var(--accent) 75%, transparent);
-  box-shadow: 0 0 22px -8px var(--accent);
+  border-radius: 11px;
+  border: 1.5px solid color-mix(in srgb, var(--violet) 65%, transparent);
+  box-shadow: 0 0 18px -7px var(--violet);
   background: #000;
   cursor: default;
 }
 button.rb-cover {
   cursor: pointer;
+  transition: box-shadow 0.25s, transform 0.25s;
 }
-.rb-plus {
-  position: absolute;
-  z-index: 2;
-  width: 0.4rem;
-  height: 0.4rem;
-  opacity: 0.8;
-  pointer-events: none;
+button.rb-cover:hover,
+button.rb-cover:focus-visible {
+  box-shadow: 0 0 22px -3px var(--violet);
+  transform: scale(1.04);
 }
-.rb-plus::before,
-.rb-plus::after {
-  content: "";
-  position: absolute;
-  background: #fff;
-}
-.rb-plus::before {
-  inset: 50% 0 auto 0;
-  height: 1px;
-}
-.rb-plus::after {
-  inset: 0 auto 0 50%;
-  width: 1px;
-}
-.rb-plus-a {
-  left: 0.25rem;
-  top: 0.25rem;
-}
-.rb-plus-b {
-  right: 0.25rem;
-  top: 0.25rem;
-}
-.rb-plus-c {
-  left: 0.25rem;
-  bottom: 0.25rem;
-}
-.rb-plus-d {
-  right: 0.25rem;
-  bottom: 0.25rem;
-}
-.rb-main {
+.rb-info {
   display: grid;
+  gap: 0.18rem;
   min-width: 0;
-  gap: 0.05rem;
 }
 .rb-top {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.2rem 0.7rem;
+  gap: 0.6rem;
   min-width: 0;
 }
 .rb-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.1rem 0.55rem;
+  gap: 0.3rem;
+  padding: 0.08rem 0.5rem 0.08rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: 999px;
-  background: var(--accent);
-  color: #07080a;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--accent-ink);
   font-family: var(--font-jetbrains, monospace);
-  font-size: 0.54rem;
+  font-size: 0.55rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
+  line-height: 1.5;
   text-transform: uppercase;
   white-space: nowrap;
 }
-.rb-badge-dot {
-  width: 0.32rem;
-  height: 0.32rem;
-  border-radius: 999px;
-  background: #07080a;
+.rb-badge[data-tone="busy"] {
+  border-color: color-mix(in srgb, var(--violet) 60%, transparent);
+  background: color-mix(in srgb, var(--violet) 14%, transparent);
+  color: var(--violet);
 }
-.rb-station {
-  font-size: 0.68rem;
-  color: var(--muted, #9a9aa0);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.rb-badge[data-tone="warn"] {
+  border-color: rgba(255, 210, 63, 0.6);
+  background: rgba(255, 210, 63, 0.12);
+  color: #ffd23f;
+}
+.rb-badge[data-tone="bad"] {
+  border-color: rgba(255, 107, 107, 0.6);
+  background: rgba(255, 107, 107, 0.12);
+  color: #ff6b6b;
+}
+.rb-badge-dot {
+  width: 0.34rem;
+  height: 0.34rem;
+  border-radius: 999px;
+  background: currentColor;
+  animation: pulse 2s infinite;
+}
+.rb-retry {
+  font-family: var(--font-jetbrains, monospace);
+  font-size: 0.6rem;
+  color: var(--accent-ink);
+  text-decoration: underline;
 }
 .rb-title {
   overflow: hidden;
@@ -1062,201 +1096,393 @@ button.rb-cover {
   white-space: nowrap;
   font-family: var(--font-archivo), system-ui, sans-serif;
   font-weight: 800;
-  font-size: clamp(0.95rem, 1.8vw, 1.25rem);
-  line-height: 1.1;
-}
-.rb-genres,
-.rb-track {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-jetbrains, monospace);
-  font-size: 0.56rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted, #9a9aa0);
+  font-size: 0.92rem;
+  line-height: 1.15;
 }
 .rb-track {
-  color: var(--accent);
-  text-transform: none;
-  letter-spacing: 0.02em;
-}
-.rb-controls {
   display: flex;
   align-items: center;
-  gap: 0.2rem;
-  margin-top: 0.15rem;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--muted);
+  white-space: nowrap;
 }
-.rb-play {
+.rb-note {
+  flex: none;
+  color: var(--accent-ink);
+  font-size: 0.82rem;
+}
+.rb-artist,
+.rb-song {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rb-artist {
+  flex: 0 1 auto;
+  color: color-mix(in srgb, var(--fg) 78%, transparent);
+}
+.rb-song {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.rb-dash {
+  flex: none;
+  margin-inline: 0.15rem;
+}
+.rb-track-ext {
+  justify-content: space-between;
+}
+.rb-track-ext .rb-attr {
+  flex: 0 1 auto;
+  max-width: 55%;
+}
+
+/* Onda del reproductor: barras reales cuando hay señal analizable; en reposo, barras apagadas y estáticas. */
+.rb-wave {
+  grid-area: wave;
+  min-width: 0;
+  height: 2rem;
+  overflow: hidden; /* las barras nunca invaden los controles vecinos */
+}
+.rb-wave > div {
+  min-height: 0;
+}
+.rb-wave .viz-idle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+.rb-wave .viz-idle i {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 1px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--violet) 70%, transparent), color-mix(in srgb, var(--accent) 70%, transparent));
+  opacity: 0.32;
+}
+.rb-wave .viz-idle i:nth-child(n + 28) {
+  opacity: 0.2;
+}
+
+/* Transporte */
+.rb-transport {
+  grid-area: transport;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.rb-btn {
   display: grid;
   place-items: center;
   flex: none;
-  width: 2.3rem;
-  height: 2.3rem;
-  margin-inline: 0.15rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 22%, transparent);
   border-radius: 999px;
-  background: var(--accent);
-  color: #07080a;
-  box-shadow: 0 0 26px -6px var(--accent);
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+  color: var(--fg);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.rb-btn:hover,
+.rb-btn:focus-visible,
+.rb-btn[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-ink);
+}
+.rb-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.rb-btn-bare {
+  width: 2rem;
+  height: 2rem;
+  border-color: transparent;
+  background: none;
+}
+.rb-heart {
+  display: none;
+}
+.rb-play {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.9rem;
+  height: 2.9rem;
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--accent) 18%, var(--bg)), var(--bg) 78%);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent), 0 0 20px -5px var(--accent), inset 0 0 14px -8px var(--accent);
   transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s;
 }
 .rb-play:hover {
   transform: scale(1.07);
-  box-shadow: 0 0 34px -4px var(--accent);
 }
-.rb-ghost {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  color: var(--fg);
-  opacity: 0.9;
-  transition: background 0.2s, color 0.2s;
+.rb-play:active {
+  transform: scale(0.95);
 }
-.rb-ghost:hover,
-.rb-ghost:focus-visible,
-.rb-ghost[aria-pressed="true"],
-.rb-ghost[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
+.rb-play[data-playing="true"] {
+  animation: rb-breathe 1.8s ease-in-out infinite;
 }
-.rb-ghost-sm {
-  width: 1.8rem;
-  height: 1.8rem;
+.rb-ico-play {
+  transform: translateX(1px);
 }
-.rb-side {
+@keyframes rb-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent), 0 0 18px -6px var(--accent), inset 0 0 14px -8px var(--accent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 8%, transparent), 0 0 26px -3px var(--accent), inset 0 0 14px -6px var(--accent);
+  }
+}
+
+/* Volumen */
+.rb-vol {
+  align-items: center;
+  gap: 0.35rem;
+}
+.rb-vol .radio-range {
+  width: 5.5rem;
+  min-width: 0;
+}
+
+/* Chat y pedidos */
+.rb-cta {
+  grid-area: cta;
   display: flex;
-  grid-column: 1 / -1;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.rb-pill {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.42rem 0.6rem;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.rb-pill-chat {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  color: var(--accent-ink);
+}
+.rb-pill-chat:hover,
+.rb-pill-chat:focus-visible,
+.rb-pill-chat[aria-expanded="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 0 18px -4px var(--accent);
+}
+.rb-pill-req {
+  --rb-violet: color-mix(in srgb, var(--violet) 62%, var(--fg));
+  border-color: color-mix(in srgb, var(--violet) 75%, transparent);
+  background: color-mix(in srgb, var(--violet) 9%, transparent);
+  color: var(--rb-violet);
+}
+.rb-pill-req:hover,
+.rb-pill-req:focus-visible,
+.rb-pill-req[aria-expanded="true"] {
+  background: var(--violet);
+  color: #fff;
+  box-shadow: 0 0 18px -4px var(--violet);
+}
+[data-theme="light"] .rb-pill-req:hover,
+[data-theme="light"] .rb-pill-req:focus-visible,
+[data-theme="light"] .rb-pill-req[aria-expanded="true"] {
+  color: #fff;
+}
+
+/* Herramientas */
+.rb-tools {
+  grid-area: tools;
+  display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 0.1rem;
 }
-.rb-vol {
-  display: flex;
+.rb-tool {
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: center;
+  gap: 0.45rem;
+  flex: none;
+  min-width: 2.1rem;
+  height: 2.1rem;
+  padding-inline: 0.45rem;
+  border-radius: 999px;
+  color: var(--fg);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
 }
-.rb-vol .radio-range,
-.rb-vol .rb-ghost:last-child:not(:first-child) {
+.rb-tool:hover,
+.rb-tool:focus-visible,
+.rb-tool[aria-pressed="true"],
+.rb-tool[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-ink);
+}
+.rb-tool-label,
+.rb-full {
   display: none;
 }
-@media (max-width: 1023px) {
-  .rb-side {
+.rb-toast {
+  position: absolute;
+  right: var(--gutter);
+  bottom: calc(100% + 0.4rem);
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 0.72rem;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+}
+
+@media (max-width: 479px) {
+  .rb-share {
     display: none;
   }
 }
-@media (min-width: 768px) {
-  .rb-wave {
-    display: block;
-    height: 1.4rem;
-    margin-top: 0.2rem;
+@media (max-width: 767px) {
+  .rb-transport .rb-btn:disabled {
+    display: none;
   }
 }
-@media (min-width: 1024px) {
+
+/* Tableta: dos filas con onda y volumen. */
+@media (min-width: 768px) {
   .rb-card {
-    grid-template-columns: 4.8rem minmax(0, 1fr) 12.5rem;
-    gap: 0.3rem 1.1rem;
-    padding: 0.6rem 1.1rem;
+    grid-template-columns: minmax(0, 1.5fr) minmax(3rem, 1fr) auto auto;
+    grid-template-areas: "now wave transport vol" "cta cta tools tools";
+    gap: 0.6rem 1rem;
+    padding: 0.7rem 1rem;
   }
-  .rb-cover {
-    width: 4.8rem;
-    border-radius: 12px;
+  .rb-card[data-own="false"] {
+    grid-template-areas: "now wave transport vol" "tools tools tools tools";
   }
-  .rb-side {
-    grid-column: auto;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: center;
-    gap: 0.4rem;
-    padding-left: 1.1rem;
-    border-left: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  .rb-wave,
+  .rb-vol {
+    display: flex;
   }
-  .rb-side .rb-live {
+  .rb-wave {
+    display: block;
+  }
+  .rb-heart {
     display: grid;
-    gap: 0.25rem;
-    padding: 0.45rem 0.75rem;
-    border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--fg) 4%, transparent);
   }
-  .rb-live-top {
+  .rb-pill {
+    flex: 0 0 auto;
+    padding-inline: 0.95rem;
+  }
+  .rb-tool-label {
+    display: inline;
+  }
+}
+
+/* Escritorio: una sola fila. */
+@media (min-width: 1280px) {
+  .rb-card,
+  .rb-card[data-own="false"] {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.78rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--fg);
+    gap: 0.9rem;
+    padding: 0.55rem 1.1rem;
   }
-  .rb-live-top svg {
-    color: var(--accent);
-  }
-  .rb-live-sub {
+  .rb-brand,
+  .rb-sep {
     display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-size: 0.7rem;
-    color: var(--muted, #9a9aa0);
+  }
+  .rb-brand-text {
+    display: none;
+  }
+  .rb-now {
+    flex: 1 1 12.5rem;
+    max-width: 20rem;
+  }
+  .rb-wave {
+    flex: 1 1 4rem;
+    max-width: 16rem;
+    min-width: 3.5rem;
+  }
+  .rb-transport,
+  .rb-vol,
+  .rb-cta,
+  .rb-tools {
+    flex: none;
   }
   .rb-vol .radio-range {
-    display: block;
-    flex: 1;
-    min-width: 0;
+    width: 4rem;
   }
-  .rb-vol .rb-ghost:last-child:not(:first-child) {
-    display: grid;
+  .rb-tool-label {
+    display: none;
   }
-  .rb-title {
-    font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+  .rb-full {
+    display: inline-flex;
   }
-  .rb-wave {
-    height: 1.5rem;
+  .rb-pill {
+    padding: 0.44rem 0.8rem;
+    font-size: 0.7rem;
+  }
+  .rb-transport {
+    gap: 0.4rem;
+  }
+  .rb-transport .rb-btn {
+    width: 2rem;
+    height: 2rem;
+  }
+  .rb-play {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  .rb-tool {
+    padding-inline: 0.4rem;
+    font-size: 0.74rem;
   }
 }
-@media (min-width: 1280px) {
-  .rb-card {
-    grid-template-columns: 9.5rem 4.8rem minmax(0, 1fr) 12.5rem;
-  }
-  .rb-logo {
-    position: relative;
+@media (min-width: 1440px) {
+  .rb-brand-text {
     display: grid;
-    align-content: center;
-    gap: 0.2rem;
-    align-self: stretch;
-    min-height: 4.8rem;
-    overflow: hidden;
-    isolation: isolate;
   }
-  .rb-logo-mark {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
+  .rb-tool-label {
+    display: inline;
   }
-  .rb-logo-name {
-    font-size: 0.78rem;
-    white-space: nowrap;
+  .rb-vol .radio-range {
+    width: 4.5rem;
   }
-  .rb-logo-sub {
-    padding-left: 1.9rem;
-    font-size: 0.55rem;
-    letter-spacing: 0.4em;
-    color: var(--muted, #9a9aa0);
+  .rb-card,
+  .rb-card[data-own="false"] {
+    gap: 0.75rem;
   }
-  .rb-logo .topo {
-    inset: auto 0 -0.5rem -1rem;
-    z-index: -1;
-    height: 2.8rem;
-    width: 120%;
-    opacity: 0.35;
-    stroke: var(--fg);
-    -webkit-mask-image: linear-gradient(to top, #000 30%, transparent);
-    mask-image: linear-gradient(to top, #000 30%, transparent);
+}
+@media (min-width: 1700px) {
+  .rb-vol .radio-range {
+    width: 6rem;
+  }
+  .rb-card,
+  .rb-card[data-own="false"] {
+    gap: 1.1rem;
+  }
+  .rb-wave {
+    max-width: 22rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rb-play {
+  .rb-play,
+  .rb-play[data-playing="true"],
+  .rb-badge-dot {
+    animation: none;
     transition: none;
   }
 }
@@ -5198,256 +5424,6 @@ body[data-radio="on"] .adm-shell {
 }
 .space-frame .space-motto-card {
   display: none;
-}
-
-/* Onda del reproductor: barras reales cuando hay señal analizable; en reposo, barras apagadas y estáticas. */
-.rb-wave .viz-idle {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.rb-wave .viz-idle i {
-  flex: 1;
-  min-width: 2px;
-  border-radius: 2px;
-  background: linear-gradient(to top, color-mix(in srgb, var(--violet) 70%, transparent), color-mix(in srgb, var(--accent) 70%, transparent));
-  opacity: 0.32;
-}
-.rb-wave .viz-idle i:nth-child(n + 50) {
-  opacity: 0.18;
-}
-.rb-ghost:disabled {
-  opacity: 0.32;
-  pointer-events: none;
-}
-@media (max-width: 767px) {
-  .rb-wave {
-    display: none;
-  }
-}
-
-/* Ajustes finos del reproductor: controles centrados y portada a la altura de todo el texto. */
-.rb-controls {
-  justify-content: center;
-}
-@media (min-width: 1024px) {
-  .rb-card {
-    grid-template-columns: 5.6rem minmax(0, 1fr) 12.5rem;
-    align-items: stretch;
-  }
-  .rb-cover {
-    width: 5.6rem;
-    height: auto;
-    align-self: stretch;
-  }
-  .rb-main {
-    align-content: center;
-  }
-}
-@media (min-width: 1280px) {
-  .rb-card {
-    grid-template-columns: 9.5rem 5.6rem minmax(0, 1fr) 12.5rem;
-  }
-}
-
-/* Barras más finas y pequeñas; play/pausa llamativo y animado. */
-.rb-wave {
-  margin: 0.3rem 0 0.45rem;
-}
-@media (min-width: 768px) {
-  .rb-wave {
-    height: 1rem;
-  }
-}
-@media (min-width: 1024px) {
-  .rb-wave {
-    height: 1.05rem;
-  }
-}
-.rb-wave .viz-idle {
-  gap: 1.5px;
-}
-.rb-wave .viz-idle i {
-  min-width: 1px;
-  border-radius: 1px;
-}
-.rb-controls {
-  margin-top: 0.2rem;
-  gap: 0.4rem;
-}
-.rb-play {
-  position: relative;
-  width: 2.9rem;
-  height: 2.9rem;
-  margin-inline: 0.35rem;
-  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent) 62%, color-mix(in srgb, var(--accent) 80%, #000));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent), 0 6px 22px -4px var(--accent);
-  animation: rb-breathe 2.4s ease-in-out infinite;
-}
-.rb-play:hover {
-  transform: scale(1.1);
-}
-.rb-play:active {
-  transform: scale(0.95);
-}
-.rb-play-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  border: 2px solid var(--accent);
-  opacity: 0;
-  pointer-events: none;
-  animation: rb-ping 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
-}
-.rb-play-ring-2 {
-  animation-delay: 1.2s;
-}
-.rb-play > .rb-ico,
-.rb-play > svg:not(.rb-ico) {
-  position: relative;
-  z-index: 1;
-}
-.rb-ico-play {
-  transform: translateX(1px);
-  animation: rb-nudge 1.6s ease-in-out infinite;
-}
-.rb-pause-bar {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: rb-bar 0.9s ease-in-out infinite alternate;
-}
-.rb-pause-bar-2 {
-  animation-delay: 0.45s;
-}
-.rb-play[data-playing="true"] {
-  animation-duration: 1.6s;
-}
-@keyframes rb-breathe {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent), 0 6px 22px -4px var(--accent);
-  }
-  50% {
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 10%, transparent), 0 8px 34px -2px var(--accent);
-  }
-}
-@keyframes rb-ping {
-  0% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  100% {
-    transform: scale(1.75);
-    opacity: 0;
-  }
-}
-@keyframes rb-nudge {
-  0%,
-  100% {
-    transform: translateX(1px) scale(1);
-  }
-  50% {
-    transform: translateX(2px) scale(1.12);
-  }
-}
-@keyframes rb-bar {
-  from {
-    transform: scaleY(1);
-  }
-  to {
-    transform: scaleY(0.62);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .rb-play,
-  .rb-play-ring,
-  .rb-ico-play,
-  .rb-pause-bar {
-    animation: none;
-  }
-}
-
-/* Corrección: el botón de play no debe invadir las barras (anillos y brillo contenidos, más separación). */
-.rb-wave {
-  margin: 0.3rem 0 0.85rem;
-}
-.rb-controls {
-  position: relative;
-  z-index: 2;
-  margin-top: 0;
-}
-.rb-play {
-  width: 2.6rem;
-  height: 2.6rem;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent), 0 3px 12px -3px var(--accent);
-}
-.rb-play-ring {
-  border-width: 1.5px;
-  animation-name: rb-ping-soft;
-}
-@keyframes rb-breathe {
-  0%,
-  100% {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent), 0 3px 12px -3px var(--accent);
-  }
-  50% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent), 0 4px 16px -2px var(--accent);
-  }
-}
-@keyframes rb-ping-soft {
-  0% {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  100% {
-    transform: scale(1.32);
-    opacity: 0;
-  }
-}
-
-/* Portada más ancha y play a poca distancia de las barras (sin tocarlas). */
-.rb-wave {
-  margin: 0.3rem 0 0.3rem;
-}
-@media (min-width: 1024px) {
-  .rb-card {
-    grid-template-columns: 8.6rem minmax(0, 1fr) 12.5rem;
-  }
-  .rb-cover {
-    width: 8.6rem;
-  }
-}
-@media (min-width: 1280px) {
-  .rb-card {
-    grid-template-columns: 9.5rem 8.6rem minmax(0, 1fr) 12.5rem;
-  }
-}
-
-/* Botón de chat y pedidos en el panel «En vivo» (en lugar del número de oyentes). */
-.rb-chat-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-  font-family: var(--font-jetbrains, monospace);
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition: background 0.2s, color 0.2s;
-}
-.rb-chat-btn:hover,
-.rb-chat-btn:focus-visible,
-.rb-chat-btn[aria-expanded="true"] {
-  background: var(--accent);
-  color: #07080a;
 }
 
 /* Chat: chulo de verificado y GIF propios. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Props = {
   /** La señal está sonando ahora mismo. */
@@ -12,6 +12,8 @@ type Props = {
   getAnalyser: () => AnalyserNode | null;
   /** Variante del reproductor en tarjeta: sin texto de estado y, sin señal, barras en reposo (estáticas, apagadas). */
   deck?: boolean;
+  /** Número de barras (por defecto 72, o 120 en la variante tarjeta). */
+  bars?: number;
 };
 
 type VizState = "none" | "analyzing" | "live" | "blocked" | "silenced" | "reduced";
@@ -34,12 +36,15 @@ const DECK_BARS = 120;
  * analizador no recibe señal, lo dice con claridad en vez de dibujar una animación decorativa.
  */
 /** Envolvente fija de las barras en reposo (decorativa y estática: no simula audio). */
-const IDLE = Array.from({ length: DECK_BARS }, (_, i) => {
-  const x = i / (DECK_BARS - 1);
-  return 18 + 42 * Math.exp(-(((x - 0.38) / 0.28) ** 2)) + 10 * Math.sin(i * 1.7) ** 2;
-});
+const idleBars = (n: number) =>
+  Array.from({ length: n }, (_, i) => {
+    const x = i / Math.max(1, n - 1);
+    return 18 + 42 * Math.exp(-(((x - 0.38) / 0.28) ** 2)) + 10 * Math.sin(i * 1.7) ** 2;
+  });
 
-export function Visualizer({ active, analysable, silenced, getAnalyser, deck = false }: Props) {
+export function Visualizer({ active, analysable, silenced, getAnalyser, deck = false, bars }: Props) {
+  const nBars = bars ?? (deck ? DECK_BARS : BARS);
+  const idle = useMemo(() => idleBars(nBars), [nBars]);
   const canvas = useRef<HTMLCanvasElement>(null);
   // Resultado medido por el bucle de dibujo; el resto de estados se derivan de las propiedades.
   const [measured, setMeasured] = useState<"live" | "blocked" | null>(null);
@@ -69,7 +74,6 @@ export function Visualizer({ active, analysable, silenced, getAnalyser, deck = f
     const analyser = getAnalyser();
     if (!analyser) return;
 
-    const nBars = deck ? DECK_BARS : BARS;
     const data = new Uint8Array(analyser.frequencyBinCount);
     const startedAt = performance.now();
     let seen = false;
@@ -131,7 +135,7 @@ export function Visualizer({ active, analysable, silenced, getAnalyser, deck = f
       ro.disconnect();
       setMeasured(null);
     };
-  }, [active, analysable, silenced, reduced, getAnalyser, deck]);
+  }, [active, analysable, silenced, reduced, getAnalyser, deck, nBars]);
 
   const state: VizState = !analysable
     ? "none"
@@ -147,7 +151,7 @@ export function Visualizer({ active, analysable, silenced, getAnalyser, deck = f
     <div className="relative h-full min-h-10 w-full" role="img" aria-label={`Visualizador de audio: ${LABEL[state]}`}>
       {deck && state !== "live" && (
         <span className="viz-idle" aria-hidden="true">
-          {IDLE.map((h, i) => (
+          {idle.map((h, i) => (
             <i key={i} style={{ height: `${h}%` }} />
           ))}
         </span>

@@ -27,11 +27,18 @@ function Check() {
 }
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota", hour12: false });
 
-type Tab = "chat" | "requests";
+export type ChatTabId = "chat" | "requests";
+type Tab = ChatTabId;
 
 /** Chat público de StereoFace Radio y pedidos de canciones. Solo consulta al servidor mientras está abierto. */
-export function ChatPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>("chat");
+export function ChatPanel({ open, onClose, tab: controlledTab, onTabChange }: { open: boolean; onClose: () => void; tab?: ChatTabId; onTabChange?: (tab: ChatTabId) => void }) {
+  const [ownTab, setOwnTab] = useState<Tab>("chat");
+  // La pestaña puede venir de fuera (los botones «Chat en vivo» y «Pedir canción» del reproductor) o llevarse dentro.
+  const tab = controlledTab ?? ownTab;
+  const setTab = (t: Tab) => {
+    setOwnTab(t);
+    onTabChange?.(t);
+  };
   const [config, setConfig] = useState<ChatConfig | null>(null);
   const [messages, setMessages] = useState<PublicMessage[]>([]);
   const [requests, setRequests] = useState<PublicRequest[]>([]);
