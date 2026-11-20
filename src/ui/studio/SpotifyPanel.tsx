@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import type { SpotifyNow } from "@/modules/studio/spotify-now";
-import { SPOTIFY_CALLBACK_PATH, type SpotifyLink } from "./useSpotifyNow";
+import { useEffect, useState } from "react";
+import type { StudioProgram } from "@/modules/schedule/dj";
 
 export type SpotifyOnAir = {
   /** El audio de Spotify está entrando a la emisión. */
@@ -14,27 +13,24 @@ export type SpotifyOnAir = {
   setVolume: (v: number) => void;
 };
 
-const noopSubscribe = () => () => {};
-const origin = () => window.location.origin;
-
-/** «Título — Artista» de lo que suena en Spotify. */
-function NowPlaying({ now, conn }: { now: SpotifyNow | null; conn: SpotifyLink["conn"] }) {
-  if (conn !== "connected") return null;
-  const t = now?.track;
+/** Lo que verá quien escucha mientras Spotify está al aire: el programa, con su imagen. */
+function ProgramCard({ program, label }: { program: StudioProgram | null; label: string }) {
   return (
-    <p className="mono mt-2 flex flex-wrap items-baseline gap-x-2 text-[0.72rem]" aria-live="polite">
-      <span className="text-muted">SUENA EN SPOTIFY</span>
-      {now?.ad ? (
-        <span className="text-[#ffd23f]">Anuncio de Spotify</span>
-      ) : t ? (
-        <>
-          <strong className="text-[0.84rem] font-semibold normal-case tracking-normal text-[color:var(--fg)]">{t.artist ? `${t.title} — ${t.artist}` : t.title}</strong>
-          {!now?.playing && <span className="text-muted">en pausa</span>}
-        </>
-      ) : (
-        <span className="text-muted">nada por ahora</span>
-      )}
-    </p>
+    <div className="mt-2 flex items-center gap-3">
+      <span className="relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-black" aria-hidden="true">
+        {program?.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- imagen propia del programa servida por /media
+          <img src={program.imageUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <span className="display-up text-[1.1rem] text-accent-ink">{(program?.name ?? "S").slice(0, 1)}</span>
+        )}
+      </span>
+      <p className="min-w-0">
+        <span className="mono block text-[0.62rem] text-muted">{label}</span>
+        <strong className="block truncate text-[0.92rem]">{program?.name ?? "En vivo"}</strong>
+        {program?.hosts && <span className="block truncate text-[0.74rem] text-muted">Con {program.hosts}</span>}
+      </p>
+    </div>
   );
 }
 
@@ -42,14 +38,13 @@ function NowPlaying({ now, conn }: { now: SpotifyNow | null; conn: SpotifyLink["
  * Spotify en el estudio, para pedidos. Spotify NO suena aquí: el locutor lo abre en su propia pestaña de Spotify, comparte esa
  * pestaña (con su audio) y el estudio lo mezcla en la emisión; el navegador silencia esa pestaña para que no se duplique el sonido.
  * El audio entra como una pista más: pasa por el EQ, baja cuando el locutor habla y tiene su propio volumen.
- * El nombre de la canción lo da la API de Spotify (cuenta conectada una vez); sin conexión, el audio sale igual pero sin nombre.
+ * Si suena Spotify es porque hay un programa en vivo: quien escucha ve el nombre y la imagen del programa, no el de una canción.
  * Los anuncios los decide Spotify (sin anuncios con Premium); la música de Spotify no tiene licencia de radio.
  */
-export function SpotifyPanel({ seed, onAir, follow, onFollow, spotify }: { seed?: { text: string; n: number } | null; onAir: SpotifyOnAir; follow: boolean; onFollow: (v: boolean) => void; spotify: SpotifyLink }) {
+export function SpotifyPanel({ seed, onAir, follow, onFollow, program }: { seed?: { text: string; n: number } | null; onAir: SpotifyOnAir; follow: boolean; onFollow: (v: boolean) => void; program: StudioProgram | null }) {
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const host = useSyncExternalStore(noopSubscribe, origin, () => "");
 
   useEffect(() => {
     if (seed?.text) setSearch(seed.text); // eslint-disable-line react-hooks/set-state-in-effect -- precarga la búsqueda desde un pedido
@@ -68,7 +63,6 @@ export function SpotifyPanel({ seed, onAir, follow, onFollow, spotify }: { seed?
   };
 
   const q = search.trim();
-  const shownError = error ?? spotify.error;
   return (
     <section className="studio-voice panel" aria-label="Spotify">
       <h2 className="display-up text-[1.15rem]">Spotify al aire</h2>
@@ -80,8 +74,8 @@ export function SpotifyPanel({ seed, onAir, follow, onFollow, spotify }: { seed?
             <span aria-hidden="true" className="inline-block size-2 rounded-full bg-accent live-dot" />
             AL AIRE · audio de Spotify
           </p>
-          <NowPlaying now={spotify.now} conn={spotify.conn} />
-          <label className="mt-2 flex items-center gap-3 text-[0.8rem]">
+          <ProgramCard program={program} label="AL AIRE COMO" />
+          <label className="mt-3 flex items-center gap-3 text-[0.8rem]">
             <span className="mono text-[0.66rem] text-muted">VOL</span>
             <input type="range" min={0} max={1.5} step={0.01} value={onAir.volume} onChange={(e) => onAir.setVolume(Number(e.target.value))} className="radio-range flex-1" aria-label="Volumen del audio de Spotify" style={{ ["--v" as string]: `${(onAir.volume / 1.5) * 100}%` }} />
           </label>
@@ -111,54 +105,16 @@ export function SpotifyPanel({ seed, onAir, follow, onFollow, spotify }: { seed?
               <span className="text-muted">Elige la pestaña de Spotify y marca «Compartir audio de la pestaña».</span>
             </li>
           </ol>
-          <NowPlaying now={spotify.now} conn={spotify.conn} />
+          <ProgramCard program={program} label="QUIEN ESCUCHA VERÁ" />
           <p className="mono muted mt-2 text-[0.62rem]">Solo en Chrome o Edge. La pestaña de Spotify queda en silencio para ti: la oyes por la salida del estudio.</p>
         </>
       )}
 
-      {shownError && (
+      {error && (
         <p role="alert" className="mono mt-2 text-[0.7rem] text-[#ff8a8a]">
-          {shownError}
+          {error}
         </p>
       )}
-
-      {/* Conexión con la cuenta: solo sirve para leer el nombre de la canción que suena. */}
-      <div className="mt-3 border-t border-line pt-3">
-        {spotify.conn === "unconfigured" && (
-          <p className="mono muted text-[0.62rem]">
-            Para ver aquí el nombre real de la canción, quien administra debe poner <code>SPOTIFY_CLIENT_ID</code> en el servidor (ver DEPLOY.md). Mientras tanto el audio sale igual, sin nombre.
-          </p>
-        )}
-        {spotify.conn === "disconnected" && (
-          <>
-            <button type="button" className="btn !px-3 !py-1" onClick={spotify.connect}>
-              Conectar Spotify para ver el nombre ↗
-            </button>
-            <p className="mono muted mt-1 text-[0.62rem]">Solo permite ver qué canción suena; no controla ni cambia nada. Se hace una vez.</p>
-          </>
-        )}
-        {spotify.conn === "connecting" && (
-          <p className="mono flex flex-wrap items-center gap-2 text-[0.7rem] text-muted" role="status">
-            Esperando a Spotify en la ventana emergente…
-            <button type="button" className="btn !px-2.5 !py-0.5 !text-[0.66rem]" onClick={spotify.cancel}>
-              Cancelar
-            </button>
-          </p>
-        )}
-        {spotify.conn === "connected" && (
-          <p className="mono flex flex-wrap items-center gap-2 text-[0.66rem] text-muted">
-            Spotify conectado.
-            <button type="button" className="underline" onClick={spotify.disconnect}>
-              Desconectar
-            </button>
-          </p>
-        )}
-        {spotify.conn !== "unconfigured" && host && (
-          <p className="mono muted mt-1 text-[0.58rem]">
-            URI de redirección en Spotify for Developers: <code>{host}{SPOTIFY_CALLBACK_PATH}</code>
-          </p>
-        )}
-      </div>
 
       <div className="mt-3 border-t border-line pt-3">
         <p className="mono text-[0.66rem] text-accent-ink">Buscar un pedido en Spotify</p>

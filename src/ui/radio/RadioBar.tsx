@@ -378,7 +378,9 @@ export function RadioBar() {
         : "Reproducir";
   const onPlay = r.status === "error" ? r.retry : r.toggle;
 
-  const np = own ? tracks?.nowPlaying : null;
+  // Con Spotify al aire el estudio publica el nombre del programa como título: eso no es una canción, no se muestra como tal.
+  const rawNp = own ? tracks?.nowPlaying : null;
+  const np = rawNp && !(program && !rawNp.artist && rawNp.title.trim().toLowerCase() === program.program.name.trim().toLowerCase()) ? rawNp : null;
   const trackId = np ? (np.artist ? `${np.artist} - ${np.title}` : np.title) : null;
   const trackFav = trackId !== null && favs.tracks.includes(trackId);
   const stationFav = favs.stations.includes(s.id);

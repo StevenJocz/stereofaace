@@ -344,16 +344,3 @@ Al terminar, deja por escrito (en el informe al humano y, si procede, en `PROGRE
 | «YouTube no recibió señal a tiempo» | Revisar el panel del directo en YouTube Studio y el estado del egreso en LiveKit. |
 | Directo se cierra solo | La cámara se desconectó (pestaña cerrada o red). |
 | Cuota de YouTube | Límite diario de la API: esperar al día siguiente. |
-
-## 18. Spotify en el estudio (nombre real de la canción)
-
-La pestaña **Spotify** del estudio abre Spotify en otra pestaña, saca su audio a la emisión (compartir pestaña) y busca pedidos. Para que además **muestre el nombre real de la canción** (en el estudio y como título de la emisión) se usa la API oficial de Spotify, que dice qué reproduce la cuenta del locutor. Es opcional: sin esto el audio sale igual, pero sin nombre.
-
-1. En https://developer.spotify.com/dashboard crear una aplicación (API: *Web API*).
-2. En **Redirect URIs** agregar exactamente `https://TU-DOMINIO/api/studio/spotify/callback` (la pestaña la muestra una vez conectada la primera vez).
-3. En `.env`: `SPOTIFY_CLIENT_ID=<Client ID>` y `docker compose up -d web`. No hay «client secret»: se usa PKCE.
-4. **Modo desarrollo de Spotify:** mientras la aplicación no tenga «extended quota», solo funcionan las cuentas agregadas en *User Management* del panel (hasta 25). Cada locutor debe estar ahí con el correo de su cuenta de Spotify.
-5. Cada locutor pulsa una vez **Conectar Spotify para ver el nombre** en la pestaña. El permiso es solo `user-read-currently-playing` (ver qué suena). El refresh token queda en el navegador de ese locutor (`localStorage`); se quita con **Desconectar** o en https://www.spotify.com/account/apps/.
-
-Límites: la música de Spotify no tiene licencia de radio; los anuncios de las cuentas gratuitas también salen al aire (Spotify los reporta como «Anuncio de Spotify» y no se pone título); el audio de la pestaña solo se puede capturar en Chrome o Edge.
-
