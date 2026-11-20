@@ -6,8 +6,31 @@ const RPM_DEG_PER_SEC = 200; // 33⅓ rpm
 const SPIN_UP = 4; // arranque rápido
 const SPIN_DOWN = 2.2; // frenada con inercia
 
-/** Plato de vinilo que gira mientras el deck suena, con arranque y frenada suaves y un brazo que se posa sobre el disco. */
-export function VinylDisc({ playing, deck, accent, coverUrl = null, className = "" }: { playing: boolean; deck: string; accent: string; coverUrl?: string | null; className?: string }) {
+/**
+ * Plato de vinilo que gira mientras el deck suena, con arranque y frenada suaves y un brazo que se posa sobre el disco.
+ * `compact` es la variante de la barra de radio: etiqueta central grande para el logo o la carátula, sin plato ni brazo.
+ */
+export function VinylDisc({
+  playing,
+  deck,
+  accent,
+  coverUrl = null,
+  className = "",
+  compact = false,
+  letter,
+}: {
+  playing: boolean;
+  deck: string;
+  accent: string;
+  coverUrl?: string | null;
+  className?: string;
+  compact?: boolean;
+  /** Texto de la etiqueta cuando no hay imagen (por defecto, el nombre del deck). */
+  letter?: string;
+}) {
+  const label = compact ? 44 : 36; // radio de la etiqueta central
+  const art = compact ? 39 : 27; // radio de la imagen dentro de la etiqueta
+  const text = letter ?? deck;
   const [failed, setFailed] = useState<string | null>(null);
   const showCover = !!coverUrl && failed !== coverUrl;
   const disc = useRef<HTMLDivElement>(null);
@@ -47,7 +70,7 @@ export function VinylDisc({ playing, deck, accent, coverUrl = null, className = 
   );
 
   return (
-    <div className={`studio-vinyl ${className}`} data-playing={playing} aria-hidden="true">
+    <div className={`studio-vinyl ${className}`} data-playing={playing} data-compact={compact || undefined} aria-hidden="true">
       <div className="studio-vinyl-plate" />
       <div ref={disc} className="studio-vinyl-disc">
         <svg viewBox="0 0 200 200" width="100%" height="100%" focusable="false">
@@ -66,43 +89,47 @@ export function VinylDisc({ playing, deck, accent, coverUrl = null, className = 
           <path d="M100 100 m-78 0 a78 78 0 0 1 40 -68" fill="none" stroke="#fff" strokeOpacity="0.16" strokeWidth="1.6" strokeLinecap="round" />
           <path d="M100 100 m62 20 a64 64 0 0 1 -30 40" fill="none" stroke="#fff" strokeOpacity="0.12" strokeWidth="1.2" strokeLinecap="round" />
           <path d="M100 100 m-30 66 a72 72 0 0 0 52 14" fill="none" stroke="#fff" strokeOpacity="0.1" strokeWidth="1.2" strokeLinecap="round" />
-          <circle cx="100" cy="100" r="36" fill={accent} />
-          <circle cx="100" cy="100" r="36" fill="none" stroke="#000" strokeOpacity="0.35" strokeWidth="1" />
-          <circle cx="100" cy="100" r="29" fill="none" stroke="#000" strokeOpacity="0.2" strokeWidth="0.8" strokeDasharray="2 3" />
+          <circle cx="100" cy="100" r={label} fill={accent} />
+          <circle cx="100" cy="100" r={label} fill="none" stroke="#000" strokeOpacity="0.35" strokeWidth="1" />
+          {!compact && <circle cx="100" cy="100" r="29" fill="none" stroke="#000" strokeOpacity="0.2" strokeWidth="0.8" strokeDasharray="2 3" />}
           {showCover ? (
             <>
               <clipPath id={`cp-${deck}`}>
-                <circle cx="100" cy="100" r="27" />
+                <circle cx="100" cy="100" r={art} />
               </clipPath>
-              <image href={coverUrl ?? undefined} x="73" y="73" width="54" height="54" preserveAspectRatio="xMidYMid slice" clipPath={`url(#cp-${deck})`} />
-              <circle cx="100" cy="100" r="27" fill="none" stroke="#000" strokeOpacity="0.4" strokeWidth="1" />
-              <text x="100" y="135.2" textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#07080a" fontFamily="inherit">
-                {deck}
-              </text>
+              <image href={coverUrl ?? undefined} x={100 - art} y={100 - art} width={art * 2} height={art * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#cp-${deck})`} />
+              <circle cx="100" cy="100" r={art} fill="none" stroke="#000" strokeOpacity="0.4" strokeWidth="1" />
+              {!compact && (
+                <text x="100" y="135.2" textAnchor="middle" fontSize="8.5" fontWeight="900" fill="#07080a" fontFamily="inherit">
+                  {deck}
+                </text>
+              )}
             </>
           ) : (
-            <text x="100" y="112" textAnchor="middle" fontSize="34" fontWeight="900" fill="#07080a" fontFamily="inherit">
-              {deck}
+            <text x="100" y={compact ? 117 : 112} textAnchor="middle" fontSize={compact ? 46 : 34} fontWeight="900" fill="#07080a" fontFamily="inherit">
+              {text}
             </text>
           )}
-          <circle cx="100" cy="66" r="2.2" fill="#07080a" />
-          <circle cx="100" cy="100" r="3.2" fill="#0a0a0a" stroke="#888" strokeWidth="0.8" />
+          {!compact && <circle cx="100" cy="66" r="2.2" fill="#07080a" />}
+          <circle cx="100" cy="100" r={compact ? 2.4 : 3.2} fill="#0a0a0a" stroke="#888" strokeWidth="0.8" />
         </svg>
         {coverUrl && (
           // Precarga para detectar una carátula rota y volver a la letra del deck.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={coverUrl} alt="" hidden onError={() => setFailed(coverUrl)} />
+          <img src={coverUrl} alt="" hidden referrerPolicy="no-referrer" onError={() => setFailed(coverUrl)} />
         )}
       </div>
       <div className="studio-vinyl-shine" />
-      <svg className="studio-tonearm" viewBox="0 0 200 200" focusable="false" aria-hidden="true">
-        <g>
-          <circle cx="178" cy="26" r="14" fill="#1b1b1b" stroke="#3a3a3a" strokeWidth="1.5" />
-          <circle cx="178" cy="26" r="5" fill="#777" />
-          <path d="M178 26 L150 60 L96 128" fill="none" stroke="#bdbdbd" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-          <rect x="84" y="120" width="20" height="12" rx="2" fill="#2a2a2a" stroke="#555" transform="rotate(-38 94 126)" />
-        </g>
-      </svg>
+      {!compact && (
+        <svg className="studio-tonearm" viewBox="0 0 200 200" focusable="false" aria-hidden="true">
+          <g>
+            <circle cx="178" cy="26" r="14" fill="#1b1b1b" stroke="#3a3a3a" strokeWidth="1.5" />
+            <circle cx="178" cy="26" r="5" fill="#777" />
+            <path d="M178 26 L150 60 L96 128" fill="none" stroke="#bdbdbd" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="84" y="120" width="20" height="12" rx="2" fill="#2a2a2a" stroke="#555" transform="rotate(-38 94 126)" />
+          </g>
+        </svg>
+      )}
     </div>
   );
 }

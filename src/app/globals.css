@@ -1012,27 +1012,33 @@ body[data-radio="on"] {
   gap: 0.7rem;
   min-width: 0;
 }
-.rb-cover {
+/* Disco de vinilo (el mismo del estudio): gira solo mientras suena. */
+.rb-disc {
   position: relative;
   flex: none;
   display: block;
-  width: 2.9rem;
+  width: 3.4rem;
   aspect-ratio: 1;
-  overflow: hidden;
-  border-radius: 11px;
-  border: 1.5px solid color-mix(in srgb, var(--violet) 65%, transparent);
-  box-shadow: 0 0 18px -7px var(--violet);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--violet) 65%, transparent), 0 0 18px -6px var(--violet);
   background: #000;
   cursor: default;
-}
-button.rb-cover {
-  cursor: pointer;
   transition: box-shadow 0.25s, transform 0.25s;
 }
-button.rb-cover:hover,
-button.rb-cover:focus-visible {
-  box-shadow: 0 0 22px -3px var(--violet);
-  transform: scale(1.04);
+button.rb-disc {
+  cursor: pointer;
+}
+button.rb-disc:hover,
+button.rb-disc:focus-visible {
+  box-shadow: 0 0 0 1.5px var(--violet), 0 0 22px -3px var(--violet);
+  transform: scale(1.05);
+}
+.rb-disc .studio-vinyl {
+  width: 100%;
+}
+/* En la barra el disco no lleva plato ni brazo: el aro violeta hace de borde. */
+.studio-vinyl[data-compact] .studio-vinyl-plate {
+  display: none;
 }
 .rb-info {
   display: grid;

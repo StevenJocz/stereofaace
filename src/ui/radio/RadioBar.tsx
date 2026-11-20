@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Art } from "@/ui/Art";
-import { Mark } from "@/ui/Header";
 import { useRadio, type RadioStatus } from "./RadioProvider";
 import { ScheduleModal } from "./ScheduleModal";
 import { OWN_STATION_SLUG, useNowPlayingProgram } from "./useNowPlayingProgram";
 import { ChatPanel, type ChatTabId } from "@/ui/chat/ChatPanel";
 import { useStationTracks } from "./useStationTracks";
 import { Visualizer } from "./Visualizer";
+import { VinylDisc } from "@/ui/studio/VinylDisc";
 import type { PublicStation } from "@/modules/radio/service";
 
 const STATUS: Record<RadioStatus, { label: string; tone: "live" | "busy" | "idle" | "warn" | "bad" }> = {
@@ -387,6 +387,19 @@ export function RadioBar() {
   const calm = r.status === "idle" || r.status === "playing" || r.status === "paused";
   const badge = calm ? "En vivo" : STATUS[r.status].label;
 
+  // Disco de vinilo que gira mientras suena. Etiqueta: imagen del programa al aire, el logo de la radio o la carátula de la emisora.
+  const programName = own ? program?.program.name : null;
+  const disc = (
+    <VinylDisc
+      compact
+      deck="radio"
+      playing={r.status === "playing"}
+      accent={own && program ? program.program.color : "#c6ff00"}
+      coverUrl={own ? (program ? (program.program.imageUrl ?? null) : "/brand/stereoface-logo.png") : (s.imageUrl ?? null)}
+      letter={(programName ?? s.name).slice(0, 1).toUpperCase()}
+    />
+  );
+
   const openChat = (tab: ChatTabId) => {
     // Pulsar de nuevo el botón de la pestaña que ya está abierta cierra el panel.
     setChatOpen((open) => !(open && chatTab === tab));
@@ -438,28 +451,12 @@ export function RadioBar() {
             {/* Portada e información */}
             <div className="rb-now">
               {own ? (
-                <button type="button" className="rb-cover" onClick={() => setScheduleOpen(true)} aria-label={program ? `Al aire: ${program.program.name}. Ver programación completa` : `${s.name}, en vivo. Ver programación completa`}>
-                  {program?.program.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- imagen propia del programa servida por /media
-                    <img src={program.program.imageUrl} alt="" className="absolute inset-0 size-full object-cover" />
-                  ) : program ? (
-                    <span className="display-up grid size-full place-items-center text-[1.6rem] text-black" style={{ background: `linear-gradient(135deg, ${program.program.color}, #0c0c0c)` }}>
-                      {program.program.name.slice(0, 1)}
-                    </span>
-                  ) : (
-                    <span className="grid size-full place-items-center bg-black">
-                      <Mark size={34} />
-                    </span>
-                  )}
+                <button type="button" className="rb-disc" onClick={() => setScheduleOpen(true)} aria-label={program ? `Al aire: ${program.program.name}. Ver programación completa` : `${s.name}, en vivo. Ver programación completa`}>
+                  {disc}
                 </button>
               ) : (
-                <span className="rb-cover" aria-hidden="true">
-                  {s.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- imagen remota de la emisora: no se optimiza ni se almacena en nuestro servidor
-                    <img src={s.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="absolute inset-0 size-full object-cover" />
-                  ) : (
-                    <Art scene="wave" tone="acid" seed={seedOf(s.name)} />
-                  )}
+                <span className="rb-disc" aria-hidden="true">
+                  {disc}
                 </span>
               )}
 
