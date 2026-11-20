@@ -56,7 +56,7 @@ export function SpacesMenu() {
 
   return (
     <div ref={root} className="spm" onMouseEnter={show} onMouseLeave={hideSoon} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && hideSoon()} onFocus={show}>
-      <button type="button" className="btn-icon spm-btn" aria-label="Mi Space" aria-expanded={open} aria-controls={id} onClick={show} data-has={mine ? "true" : undefined}>
+      <button type="button" className="btn-icon spm-btn max-sm:!size-[2.2rem]" aria-label="Mi Space" aria-expanded={open} aria-controls={id} onClick={show} data-has={mine ? "true" : undefined}>
         {mine?.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- foto propia servida por /s
           <img src={mine.avatarUrl} alt="" className="spm-avatar" />

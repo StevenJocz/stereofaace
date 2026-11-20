@@ -16,14 +16,14 @@ const NAV = [
   { href: "/#cultura", label: "Cultura" },
 ];
 
-export function Mark({ size = 34 }: { size?: number }) {
+export function Mark({ size = 34, className = "" }: { size?: number; className?: string }) {
   return (
     <Image
       src="/brand/stereoface-logo.png"
       width={size}
       height={size}
       sizes={`${size}px`}
-      className="shrink-0 rounded-full"
+      className={`shrink-0 rounded-full ${className}`}
       alt=""
       aria-hidden="true"
     />
@@ -77,10 +77,11 @@ export function Header() {
         className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur-md transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)]"
         style={{ transform: hidden && !open ? "translateY(-100%)" : "none" }}
       >
-        <div className="wrap grid grid-cols-[1fr_auto] items-center gap-3 py-3 xl:grid-cols-[1fr_auto_1fr]">
-          <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="StereoFace, inicio">
-            <Mark />
-            <span className="display-wide text-[1.05rem] sm:text-[1.3rem]">
+        <div className="wrap grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-3 xl:grid-cols-[1fr_auto_1fr]">
+          {/* En teléfono todo se achica en escalera (logo, título, botones); bajo 360 px solo queda el logo. */}
+          <Link href="/" className="flex min-w-0 items-center gap-2.5 sm:gap-3" aria-label="StereoFace, inicio">
+            <Mark className="max-sm:!size-[1.9rem]" />
+            <span className="display-wide whitespace-nowrap text-[clamp(0.75rem,3.6vw,1.05rem)] max-[359px]:sr-only sm:text-[1.3rem]">
               Stereo<span className="text-accent-ink">Face</span>
             </span>
           </Link>
@@ -102,7 +103,7 @@ export function Header() {
             ))}
           </nav>
 
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2">
             <SpacesMenu />
             <RadioHeaderButton />
             <button
@@ -133,7 +134,7 @@ export function Header() {
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="btn !px-4 !py-2 xl:hidden"
+              className="btn !px-3 !py-2 sm:!px-4 xl:hidden"
               aria-expanded={open}
               aria-controls="menu-overlay"
             >
