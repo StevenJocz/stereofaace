@@ -41,7 +41,7 @@ async function Shell({ children }: { children: React.ReactNode }) {
           ) : (
             <>
               {children}
-              {relay && <PersistentStudio relay={relay} locutor={locutor ?? undefined} />}
+              {relay && <PersistentStudio relay={relay} locutor={locutor ?? undefined} spotifyClientId={process.env.SPOTIFY_CLIENT_ID?.trim() || null} />}
             </>
           )}
         </div>

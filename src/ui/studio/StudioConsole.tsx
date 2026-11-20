@@ -6,6 +6,7 @@ import { LibraryPanel } from "./LibraryPanel";
 import type { DjProgramInfo, StudioProgram } from "@/modules/schedule/dj";
 import type { CartView } from "@/modules/studio/carts";
 import { SpotifyPanel } from "./SpotifyPanel";
+import { useSpotifyNow } from "./useSpotifyNow";
 import { CartWall } from "./CartWall";
 import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
@@ -56,13 +57,13 @@ const noopSubscribe = () => () => {};
 /** Primero la entrada del DJ (usuario, contraseña y programa); después, la consola. */
 export type RelayInfo = { configured: boolean; name: string };
 
-export function StudioConsole({ relay, visible = true, locutor }: { relay: RelayInfo; visible?: boolean; locutor?: string }) {
+export function StudioConsole({ relay, visible = true, locutor, spotifyClientId = null }: { relay: RelayInfo; visible?: boolean; locutor?: string; spotifyClientId?: string | null }) {
   const [picked, setPicked] = useState<DjEntry | null>(null);
   // Un locutor ya inició sesión en el panel: no hay segunda entrada, su acceso a AzuraCast lo da el servidor en su horario.
   const own = useMemo<DjEntry | null>(() => (locutor ? { user: locutor, password: "", programChoice: "" } : null), [locutor]);
   const entry = own ?? picked;
   if (!entry) return <DjGate onEnter={setPicked} />;
-  return <StudioConsoleInner entry={entry} relay={relay} visible={visible} locked={Boolean(locutor)} />;
+  return <StudioConsoleInner entry={entry} relay={relay} visible={visible} locked={Boolean(locutor)} spotifyClientId={spotifyClientId} />;
 }
 
 /** Acceso a AzuraCast de un locutor: el servidor solo lo entrega dentro de su horario. */
@@ -73,7 +74,7 @@ async function fetchDjCredentials(): Promise<Creds> {
   return { user: body.user, password: body.password };
 }
 
-function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry; relay: RelayInfo; visible: boolean; locked: boolean }) {
+function StudioConsoleInner({ entry, relay, visible, locked, spotifyClientId }: { entry: DjEntry; relay: RelayInfo; visible: boolean; locked: boolean; spotifyClientId: string | null }) {
   const visibleRef = useRef(visible);
   useEffect(() => {
     visibleRef.current = visible; // los atajos del teclado solo valen con la consola a la vista
@@ -118,6 +119,8 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     spFollowRef.current = spFollow;
     extVolRef.current = extVol;
   });
+  // Qué suena en Spotify: se consulta con el panel abierto o con su audio al aire.
+  const spotify = useSpotifyNow({ clientId: spotifyClientId, active: extOn || tool === "spotify" });
   const desk = useDeskFeed(visible);
   const [relayState, setRelayState] = useState<RelayState>("idle");
   const [relayVolume, setRelayVolume] = useState(0.8);
@@ -566,6 +569,23 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     if (!deckBusy) senderRef.current?.setMetadata({ title: relayTrack.title, artist: relayTrack.artist || relay.name });
   }, [relayTrack, relay.name]);
 
+  // Con el audio de Spotify al aire y en directo, quien escucha ve el nombre real de la canción (como con la señal externa).
+  const spotifyTitle = spotify.now?.playing && spotify.now.track ? spotify.now.track.title : null;
+  const spotifyArtist = spotify.now?.track?.artist ?? "";
+  const spotifyPushed = useRef(false);
+  useEffect(() => {
+    const sender = senderRef.current;
+    if (extOn && live === "live" && spotifyTitle) {
+      spotifyPushed.current = true;
+      sender?.setMetadata({ title: spotifyTitle, artist: spotifyArtist });
+    } else if (!extOn && spotifyPushed.current) {
+      // Spotify salió del aire: no se deja su última canción como si siguiera sonando.
+      spotifyPushed.current = false;
+      const deckBusy = (["A", "B"] as const).some((id) => engineRef.current?.isPlaying(id));
+      if (live === "live" && !deckBusy) sender?.setMetadata({ title: programRef.current?.name ?? "En vivo", artist: "" });
+    }
+  }, [extOn, live, spotifyTitle, spotifyArtist]);
+
   const toggleRelay = useCallback(async () => {
     const e = getEngine();
     if (relayState === "playing" || relayState === "connecting") {
@@ -1002,7 +1022,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
           </div>
           {/* Siempre montado (solo se oculta): cambiar de pestaña no corta el video que se está escuchando. */}
           <div id="tool-spotify" role="tabpanel" aria-labelledby="tool-tab-spotify" className="studio-tool-body" hidden={tool !== "spotify"}>
-            <SpotifyPanel seed={spSeed} onAir={{ on: extOn, share: shareExternal, stop: stopExternal, volume: extVol, setVolume: changeExtVolume }} follow={spFollow} onFollow={setSpFollow} />
+            <SpotifyPanel seed={spSeed} spotify={spotify} onAir={{ on: extOn, share: shareExternal, stop: stopExternal, volume: extVol, setVolume: changeExtVolume }} follow={spFollow} onFollow={setSpFollow} />
           </div>
           <div id="tool-chat" role="tabpanel" aria-labelledby="tool-tab-chat" className="studio-tool-body" hidden={tool !== "chat"}>
             <ChatModPanel feed={desk.feed} refresh={desk.refresh} dropMessage={desk.dropMessage} />
