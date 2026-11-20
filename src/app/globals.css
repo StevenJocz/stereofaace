@@ -1356,12 +1356,6 @@ button.rb-cover:focus-visible {
     display: none;
   }
 }
-@media (max-width: 767px) {
-  .rb-transport .rb-btn:disabled {
-    display: none;
-  }
-}
-
 /* Tableta: dos filas con onda y volumen. */
 @media (min-width: 768px) {
   .rb-card {

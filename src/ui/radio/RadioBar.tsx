@@ -25,8 +25,6 @@ const STATUS: Record<RadioStatus, { label: string; tone: "live" | "busy" | "idle
 const Icon = {
   play: <path d="M7 5v14l11-7z" fill="currentColor" stroke="none" />,
   pause: <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor" stroke="none" />,
-  prev: <path d="M6 5v14M19 5L9 12l10 7z" />,
-  next: <path d="M18 5v14M5 5l10 7-10 7z" />,
   list: <path d="M4 6h16M4 12h16M4 18h10" />,
   vol: <path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />,
   mute: <path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6" />,
@@ -517,9 +515,6 @@ export function RadioBar() {
               >
                 <IcoHeart filled={trackFav} />
               </button>
-              <button type="button" className="rb-btn" onClick={() => r.step(-1)} disabled={!multi} aria-label="Emisora anterior">
-                <Ico name="prev" size={17} />
-              </button>
               <button type="button" onClick={onPlay} className="rb-play" data-playing={playing || undefined} aria-label={playLabel}>
                 {isEmbed ? (
                   <Ico name="list" size={20} />
@@ -533,9 +528,6 @@ export function RadioBar() {
                     <path d="M7.2 4.8v14.4a.9.9 0 0 0 1.4.8l11.2-7.2a.9.9 0 0 0 0-1.6L8.6 4a.9.9 0 0 0-1.4.8Z" />
                   </svg>
                 )}
-              </button>
-              <button type="button" className="rb-btn" onClick={() => r.step(1)} disabled={!multi} aria-label="Emisora siguiente">
-                <Ico name="next" size={17} />
               </button>
             </div>
 
