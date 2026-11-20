@@ -5,7 +5,7 @@ import { DeckPanel, type DeckView } from "./DeckPanel";
 import { LibraryPanel } from "./LibraryPanel";
 import type { DjProgramInfo, StudioProgram } from "@/modules/schedule/dj";
 import type { CartView } from "@/modules/studio/carts";
-import { YouTubePanel } from "./YouTubePanel";
+import { SpotifyPanel } from "./SpotifyPanel";
 import { CartWall } from "./CartWall";
 import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
@@ -104,18 +104,18 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
-  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay" | "requests" | "chat" | "youtube" | "camera">("carts");
+  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay" | "requests" | "chat" | "spotify" | "camera">("carts");
   const [cabinLive, setCabinLive] = useState(false);
   const [searchSeed, setSearchSeed] = useState<{ text: string; n: number } | null>(null);
-  const [ytSeed, setYtSeed] = useState<{ text: string; n: number } | null>(null);
+  const [spSeed, setSpSeed] = useState<{ text: string; n: number } | null>(null);
   const [extOn, setExtOn] = useState(false);
   const [extVol, setExtVol] = useState(1);
-  const [ytFollow, setYtFollow] = useState(true);
-  const ytFollowRef = useRef(true);
+  const [spFollow, setSpFollow] = useState(true);
+  const spFollowRef = useRef(true);
   const extVolRef = useRef(1);
   const resumeRef = useRef<(() => Promise<void>) | null>(null);
   useEffect(() => {
-    ytFollowRef.current = ytFollow;
+    spFollowRef.current = spFollow;
     extVolRef.current = extVol;
   });
   const desk = useDeskFeed(visible);
@@ -197,7 +197,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     e.onRelayState = setRelayState;
     e.onExternalLost = () => setExtOn(false);
     e.onExternalIdle = () => {
-      if (ytFollowRef.current) void resumeRef.current?.();
+      if (spFollowRef.current) void resumeRef.current?.();
     };
     e.onMicLost = () => {
       setMicActive(false);
@@ -670,7 +670,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const stopCarts = useCallback(() => engineRef.current?.stopAllCarts(), []);
   const readCartRemaining = useCallback((id: string) => engineRef.current?.cartRemaining(id) ?? 0, []);
 
-  /** Al terminar un video de YouTube del DJ: si ningún deck suena y «siguiente automática» está activa, arranca la siguiente pista de la cola. */
+  /** Al terminar el audio de Spotify del DJ: si ningún deck suena y «siguiente automática» está activa, arranca la siguiente pista de la cola. */
   const resumeQueueAfterVideo = useCallback(async () => {
     const e = engineRef.current;
     if (!e || !autoRef.current) return;
@@ -685,7 +685,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     resumeRef.current = resumeQueueAfterVideo;
   });
 
-  /** Comparte la pestaña de YouTube (con su audio) y la mezcla en la emisión. La pestaña queda en silencio para el locutor. */
+  /** Comparte la pestaña de Spotify (con su audio) y la mezcla en la emisión. La pestaña queda en silencio para el locutor. */
   const shareExternal = useCallback(async () => {
     const md = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
     if (!md?.getDisplayMedia) throw new Error("Este navegador no permite compartir el audio de una pestaña. Usa Chrome o Edge.");
@@ -932,7 +932,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
               ["voice", "Voz", micActive && !micMuted],
               ["requests", `Pedidos${desk.feed.requests.length > 0 ? ` (${desk.feed.requests.length})` : ""}`, desk.feed.requests.length > 0],
               ["chat", "Chat", false],
-              ["youtube", "YouTube", false],
+              ["spotify", "Spotify", false],
               ["relay", "Señal", relayState === "playing" || relayState === "connecting"],
               ["camera", "Cámara", cabinLive],
               ["eq", "Ecualizador", false],
@@ -998,11 +998,11 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
             />
           </div>
           <div id="tool-requests" role="tabpanel" aria-labelledby="tool-tab-requests" className="studio-tool-body" hidden={tool !== "requests"}>
-            <RequestsPanel feed={desk.feed} refresh={desk.refresh} onSearch={(text) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }))} onYouTube={(text) => { setYtSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 })); setTool("youtube"); }} />
+            <RequestsPanel feed={desk.feed} refresh={desk.refresh} onSearch={(text) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }))} onSpotify={(text) => { setSpSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 })); setTool("spotify"); }} />
           </div>
           {/* Siempre montado (solo se oculta): cambiar de pestaña no corta el video que se está escuchando. */}
-          <div id="tool-youtube" role="tabpanel" aria-labelledby="tool-tab-youtube" className="studio-tool-body" hidden={tool !== "youtube"}>
-            <YouTubePanel seed={ytSeed} onAir={{ on: extOn, share: shareExternal, stop: stopExternal, volume: extVol, setVolume: changeExtVolume }} follow={ytFollow} onFollow={setYtFollow} />
+          <div id="tool-spotify" role="tabpanel" aria-labelledby="tool-tab-spotify" className="studio-tool-body" hidden={tool !== "spotify"}>
+            <SpotifyPanel seed={spSeed} onAir={{ on: extOn, share: shareExternal, stop: stopExternal, volume: extVol, setVolume: changeExtVolume }} follow={spFollow} onFollow={setSpFollow} />
           </div>
           <div id="tool-chat" role="tabpanel" aria-labelledby="tool-tab-chat" className="studio-tool-body" hidden={tool !== "chat"}>
             <ChatModPanel feed={desk.feed} refresh={desk.refresh} dropMessage={desk.dropMessage} />

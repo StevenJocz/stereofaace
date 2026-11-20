@@ -113,6 +113,11 @@ export function parseSpotify(raw: string, kinds: SpotifyKind[]): SpotifyRef | nu
   if (kind === "user" ? !/^[A-Za-z0-9._~-]{1,64}$/.test(id) : !/^[A-Za-z0-9]{22}$/.test(id)) return null;
   return { kind: kind as SpotifyKind, id };
 }
+/** Convierte un URI de la app de Spotify (`spotify:track:<id>`) en su enlace web; cualquier otro texto se devuelve igual. */
+export const spotifyUriToUrl = (raw: string): string => {
+  const m = /^spotify:(artist|user|playlist|album|track|show|episode):([A-Za-z0-9._~-]{1,64})$/i.exec(raw.trim());
+  return m ? `https://open.spotify.com/${m[1].toLowerCase()}/${m[2]}` : raw;
+};
 /** Los perfiles de usuario no tienen reproductor incrustable: se muestran como enlace. */
 export const spotifyEmbedSrc = (r: SpotifyRef): string | null => (r.kind === "user" ? null : `https://open.spotify.com/embed/${r.kind}/${r.id}`);
 export const spotifyHref = (r: SpotifyRef): string => `https://open.spotify.com/${r.kind}/${r.id}`;

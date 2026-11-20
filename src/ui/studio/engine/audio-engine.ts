@@ -392,7 +392,7 @@ export class AudioEngine {
   }
 
   /**
-   * Audio de otra pestaña (p. ej. un video de YouTube compartido con getDisplayMedia) mezclado en la emisión como una pista más:
+   * Audio de otra pestaña (p. ej. una canción de Spotify compartida con getDisplayMedia) mezclado en la emisión como una pista más:
    * pasa por el EQ y el ducker de la música (baja cuando el DJ habla) y por el limitador. También se oye en el monitor del DJ.
    */
   attachExternalStream(stream: MediaStream, volume = 1): void {

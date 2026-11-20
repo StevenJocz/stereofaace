@@ -65,7 +65,7 @@ function Switches({ config, onChange }: { config: ChatConfig | null; onChange: (
   );
 }
 
-export function RequestsPanel({ feed, refresh, onSearch, onYouTube }: { feed: DeskFeed; refresh: () => void; onSearch: (text: string) => void; onYouTube?: (text: string) => void }) {
+export function RequestsPanel({ feed, refresh, onSearch, onSpotify }: { feed: DeskFeed; refresh: () => void; onSearch: (text: string) => void; onSpotify?: (text: string) => void }) {
   const setStatus = async (id: string, status: "played" | "rejected") => {
     await act({ action: "request", id, status });
     refresh();
@@ -99,9 +99,9 @@ export function RequestsPanel({ feed, refresh, onSearch, onYouTube }: { feed: De
                 <button type="button" className="btn !px-2.5 !py-0.5 !text-[0.7rem]" onClick={() => onSearch(`${r.title}${r.artist ? ` ${r.artist}` : ""}`)}>
                   Buscar en la biblioteca
                 </button>
-                {onYouTube && (
-                  <button type="button" className="btn !px-2.5 !py-0.5 !text-[0.7rem]" onClick={() => onYouTube(`${r.title}${r.artist ? ` ${r.artist}` : ""}`)}>
-                    Buscar en YouTube
+                {onSpotify && (
+                  <button type="button" className="btn !px-2.5 !py-0.5 !text-[0.7rem]" onClick={() => onSpotify(`${r.title}${r.artist ? ` ${r.artist}` : ""}`)}>
+                    Buscar en Spotify
                   </button>
                 )}
                 <button type="button" className="btn btn-accent !px-2.5 !py-0.5 !text-[0.7rem]" onClick={() => void setStatus(r.id, "played")}>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_THEMES } from "@/modules/spaces/defaults";
-import { BLOCK_IDS, COVER_IDS, contrast, designSchema, designVars, normalizeDesign, orderedBlocks, parseSpotify, parseYouTube, safeUrl, spotifyEmbedSrc, spotifyHref, youtubeEmbedSrc, type SpaceDesign } from "@/modules/spaces/design";
+import { BLOCK_IDS, COVER_IDS, contrast, designSchema, designVars, normalizeDesign, orderedBlocks, parseSpotify, parseYouTube, safeUrl, spotifyEmbedSrc, spotifyHref, spotifyUriToUrl, youtubeEmbedSrc, type SpaceDesign } from "@/modules/spaces/design";
 
 const ok = () => structuredClone(DEFAULT_THEMES[0].design) as SpaceDesign;
 const bad = (mut: (d: Record<string, unknown>) => void) => {
@@ -137,5 +137,17 @@ describe("Spotify y YouTube incrustados", () => {
     const user = parseSpotify("https://open.spotify.com/user/yo", ["user"])!;
     expect(spotifyEmbedSrc(user)).toBeNull(); // los perfiles de usuario van como enlace
     expect(spotifyHref(user)).toBe("https://open.spotify.com/user/yo");
+  });
+});
+
+describe("spotifyUriToUrl", () => {
+  it("convierte el URI de la app en el enlace web y deja el resto igual", () => {
+    expect(spotifyUriToUrl("spotify:track:4uLU6hMCjMI75M1A2tKUQC")).toBe("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC");
+    expect(spotifyUriToUrl("  spotify:album:4uLU6hMCjMI75M1A2tKUQC ")).toBe("https://open.spotify.com/album/4uLU6hMCjMI75M1A2tKUQC");
+    expect(spotifyUriToUrl("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x")).toBe("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x");
+    expect(spotifyUriToUrl("spotify:track:../../evil")).toBe("spotify:track:../../evil");
+  });
+  it("el resultado pasa por parseSpotify", () => {
+    expect(parseSpotify(spotifyUriToUrl("spotify:track:4uLU6hMCjMI75M1A2tKUQC"), ["track"])).toEqual({ kind: "track", id: "4uLU6hMCjMI75M1A2tKUQC" });
   });
 });
