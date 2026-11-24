@@ -1,6 +1,6 @@
 # SEO de StereoFace: auditoría y trabajo en curso
 
-Fecha: 24 de noviembre de 2026. Rama de trabajo: `codex/seo-integral`, basada en `origin/main` (`e47fd1e`). Los cambios descritos como implementados están en esta rama; no se han desplegado.
+Fecha: 24 de noviembre de 2026. Los cambios de aplicación se desplegaron desde `main` en la revisión `791441b`, mediante el flujo CI/CD.
 
 ## Diagnóstico inicial
 
@@ -37,7 +37,7 @@ Archivos: `src/lib/seo.ts`, `src/lib/news-sitemap.ts`, `src/lib/local-media-imag
 
 Una ejecución Lighthouse 13.6.0 móvil de la portada pública antes de los cambios, 24 de noviembre de 2026: SEO 92/100, rendimiento 53/100, accesibilidad 100/100, buenas prácticas 100/100; LCP 15,6 s, CLS 0,017 y TBT 420 ms. El informe completo está en `seo-auditoria/lighthouse-home-antes.json`. Son resultados de laboratorio de una sola ejecución, no datos de usuarios ni INP real. Lighthouse identificó una portada JPEG de 4 MB y un ahorro estimado de imágenes de 5.703 KiB.
 
-El sitio público respondió 200 en portada, `/noticias`, `/robots.txt` y `/sitemap.xml`; una muestra de artículo devolvió canonical, descripción, imagen Open Graph y Twitter. No se ha completado un rastreo exhaustivo de enlaces ni una medición posterior: la rama aún no está desplegada.
+Tras el despliegue, la portada, `/robots.txt`, `/sitemap.xml` y `/news-sitemap.xml` respondieron 200 y una imagen optimizada de `/media/` respondió 200. Una ejecución Lighthouse móvil posterior obtuvo SEO 92/100, rendimiento 71/100, LCP 5,7 s, CLS 0,0012 y TBT 204 ms. El informe está en `seo-auditoria/lighthouse-home-despues.json`. Comparación orientativa de una ejecución antes y una después: son mediciones de laboratorio sujetas a variación, no INP ni datos de usuarios reales. No se ha completado un rastreo exhaustivo de enlaces.
 
 El 24 de noviembre de 2026, `npm test` completó 839 pruebas en 93 archivos; `npm run typecheck` y `npm run build` terminaron correctamente. Durante el prerender hubo avisos porque no se configuró `DATABASE_URL` en el entorno local; esto no equivale a una prueba funcional con datos de producción. `npm run lint` terminó sin errores, con una advertencia existente por `StatusPill` sin usar en `RadioBar.tsx`. Las pruebas del optimizador comprueban el marcado generado, no su funcionamiento completo dentro del contenedor.
 
