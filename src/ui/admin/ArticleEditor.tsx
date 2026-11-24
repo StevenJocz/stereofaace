@@ -34,6 +34,8 @@ export type EditorArticle = {
   coverArt: CoverArt | null;
   seoTitle: string;
   seoDescription: string;
+  seoCanonical: string;
+  seoOgImage: string;
   noindex: boolean;
   tags: string[];
   artistIds: string[];
@@ -136,6 +138,8 @@ export function ArticleEditor({
     art: article.coverArt ?? ({ scene: "wave", tone: "acid", seed: 7 } as CoverArt),
     seoTitle: article.seoTitle,
     seoDescription: article.seoDescription,
+    seoCanonical: article.seoCanonical,
+    seoOgImage: article.seoOgImage,
     noindex: article.noindex,
     tags: article.tags.join(", "),
     artistIds: article.artistIds,
@@ -182,7 +186,7 @@ export function ArticleEditor({
         coverUrl: opt(f.coverUrl),
         coverAlt: opt(f.coverAlt),
         coverCredit: opt(f.coverCredit),
-        seo: { title: opt(f.seoTitle), description: opt(f.seoDescription), noindex: f.noindex || undefined },
+        seo: { title: opt(f.seoTitle), description: opt(f.seoDescription), canonical: opt(f.seoCanonical), ogImage: opt(f.seoOgImage), noindex: f.noindex || undefined },
         authorName: opt(f.authorName),
         tags: f.tags
           .split(",")
@@ -612,6 +616,12 @@ export function ArticleEditor({
           </Section>
 
           <Section title="SEO" id="s-seo">
+            <L id="seoCanonical" label="URL canónica" hint="Opcional. Déjala vacía para usar la dirección de esta nota.">
+              <input id="seoCanonical" type="url" className="input" value={f.seoCanonical} disabled={disabled} onChange={(e) => set("seoCanonical", e.target.value)} />
+            </L>
+            <L id="seoOgImage" label="Imagen para redes sociales" hint="Opcional. Si no se define, se usa la portada.">
+              <input id="seoOgImage" type="url" className="input" value={f.seoOgImage} disabled={disabled} onChange={(e) => set("seoOgImage", e.target.value)} />
+            </L>
             <L id="seoTitle" label="Título SEO" hint={`${f.seoTitle.length}/70`}>
               <input
                 id="seoTitle"

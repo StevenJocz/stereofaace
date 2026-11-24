@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { localMediaImage } from "@/lib/local-media-image";
+import { SITE_URL } from "@/lib/site";
 import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { Art, type Scene, type Tone } from "./Art";
@@ -263,9 +266,11 @@ export function HeroSlider({ slides }: Props) {
             <div className="hero-art">
               <div data-par>
                 <div data-scale>
-                  {sl.coverUrl ? (
+                  {sl.coverUrl && localMediaImage(sl.coverUrl, SITE_URL) ? (
+                    <Image src={localMediaImage(sl.coverUrl, SITE_URL)!} alt={sl.coverAlt ?? ""} fill sizes="(min-width: 1024px) 56vw, 100vw" className="object-cover" loading={i === 0 ? "eager" : "lazy"} fetchPriority={i === 0 ? "high" : "auto"} />
+                  ) : sl.coverUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- puede ser una imagen editorial propia servida por /media.
-                    <img src={sl.coverUrl} alt={sl.coverAlt ?? ""} className="size-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={sl.coverUrl} alt={sl.coverAlt ?? ""} className="size-full object-cover" referrerPolicy="no-referrer" loading={i === 0 ? "eager" : "lazy"} fetchPriority={i === 0 ? "high" : "auto"} />
                   ) : sl.art === "figure" ? (
                     <HeroFigure tone={sl.tone} />
                   ) : (

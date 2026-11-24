@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     title: `${title} · StereoFace`,
     description,
     alternates: { canonical: a.seo.canonical ?? url },
-    robots: a.seo.noindex ? { index: false, follow: false } : undefined,
+    robots: a.seo.noindex ? { index: false, follow: false } : { index: true, follow: true, googleBot: { "max-image-preview": "large" } },
     openGraph: {
       type: "article",
       title,
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
       modifiedTime: a.updatedAt.toISOString(),
       images: a.seo.ogImage ? [a.seo.ogImage] : a.coverUrl ? [a.coverUrl] : undefined,
     },
-    twitter: { card: "summary_large_image", title, description },
+    twitter: { card: "summary_large_image", title, description, images: a.seo.ogImage ? [a.seo.ogImage] : a.coverUrl ? [a.coverUrl] : undefined },
   };
 }
 
@@ -64,7 +64,7 @@ async function ArticleView({ params }: { params: Promise<Params> }) {
     description: a.dek ?? undefined,
     datePublished: a.publishedAt.toISOString(),
     dateModified: a.updatedAt.toISOString(),
-    author: { "@type": "Person", name: a.authorName ?? "Redacción StereoFace" },
+    author: !a.authorName || /^redacci[oó]n\b/i.test(a.authorName) ? { "@type": "Organization", name: a.authorName ?? "Redacción StereoFace" } : { "@type": "Person", name: a.authorName },
     publisher: { "@type": "Organization", name: "StereoFace" },
     mainEntityOfPage: url,
     image: a.coverUrl ? [a.coverUrl] : undefined,
@@ -117,6 +117,7 @@ async function ArticleView({ params }: { params: Promise<Params> }) {
           <>
             <span className="text-white">{a.authorName ?? "Redacción StereoFace"}</span>
             <time dateTime={a.publishedAt.toISOString()}>{formatShortDate(a.publishedAt)}</time>
+            {a.updatedAt.getTime() - a.publishedAt.getTime() >= 60_000 && <span>Actualizado: <time dateTime={a.updatedAt.toISOString()}>{formatShortDate(a.updatedAt)}</time></span>}
             {a.readMinutes && <span>{a.readMinutes} min de lectura</span>}
           </>
         }

@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { connection } from "next/server";
 import { getDb } from "@/lib/db";
 import { SITE_URL } from "@/lib/site";
+import { includeInSitemap } from "@/lib/seo";
 import { listSitemapEntries } from "@/modules/content/service";
 import { listPublishedPageSlugs } from "@/modules/content/pages-admin";
 import { listArtistSlugs } from "@/modules/artists/profile";
@@ -42,7 +43,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly" as const,
       priority: 0.5,
     })),
-    ...entries.map((e) => ({
+    ...entries.filter((e) => includeInSitemap(e.seo, `${SITE_URL}/noticias/${e.slug}`)).map((e) => ({
       url: `${SITE_URL}/noticias/${e.slug}`,
       lastModified: e.updatedAt,
       changeFrequency: "weekly" as const,

@@ -297,9 +297,19 @@ export async function getRelatedArticles(
 /** Entradas del sitemap: artículos públicos con su última modificación (hasta 5000). */
 export async function listSitemapEntries(db: Db, now = new Date()) {
   return db
-    .select({ slug: articles.slug, updatedAt: articles.updatedAt })
+    .select({ slug: articles.slug, updatedAt: articles.updatedAt, seo: articles.seo })
     .from(articles)
     .where(and(isPublic(now), eq(articles.locale, "es")))
     .orderBy(desc(articles.updatedAt))
     .limit(5000);
+}
+
+/** Candidatos recientes; el sitemap aplica además criterios editoriales y de indexación. */
+export async function listRecentNewsSitemapEntries(db: Db, now = new Date()) {
+  const since = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+  return db.select({ slug: articles.slug, title: articles.title, createdAt: articles.createdAt, publishedAt: articles.publishedAt, seo: articles.seo, origin: articles.origin, isDemo: articles.isDemo })
+    .from(articles)
+    .where(and(isPublic(now), eq(articles.locale, "es"), sql`${articles.createdAt} >= ${since}`))
+    .orderBy(desc(articles.publishedAt))
+    .limit(1000);
 }

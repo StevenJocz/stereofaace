@@ -7,9 +7,9 @@ const seoSchema = z
   .object({
     title: z.string().max(70).optional(),
     description: z.string().max(170).optional(),
-    canonical: z.url().optional(),
+    canonical: httpsUrlSchema.optional(),
     noindex: z.boolean().optional(),
-    ogImage: z.url().optional(),
+    ogImage: httpsUrlSchema.optional(),
   })
   .default({});
 

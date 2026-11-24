@@ -1,4 +1,7 @@
 import { Art } from "@/ui/Art";
+import Image from "next/image";
+import { localMediaImage } from "@/lib/local-media-image";
+import { SITE_URL } from "@/lib/site";
 import type { StoryCard } from "@/modules/content/service";
 
 /** Portada: la fotografía por URL tiene prioridad; si no hay, la ilustración generativa (siempre marcada demo si lo es). */
@@ -18,7 +21,9 @@ export function ArticleCover({
       className={`relative overflow-hidden rounded-[var(--r)] border border-line bg-black ${className}`}
       style={{ aspectRatio: ratio }}
     >
-      {s.coverUrl ? (
+      {s.coverUrl && localMediaImage(s.coverUrl, SITE_URL) ? (
+        <Image src={localMediaImage(s.coverUrl, SITE_URL)!} alt={s.coverAlt ?? ""} fill sizes="(max-width: 767px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} />
+      ) : s.coverUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- imagen remota por URL: no se optimiza hasta que exista el módulo de medios
         <img
           src={s.coverUrl}

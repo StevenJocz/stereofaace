@@ -44,6 +44,8 @@ export default async function ArticleEditorPage({ params }: { params: Promise<{ 
     coverArt: a.coverArt ?? null,
     seoTitle: a.seo.title ?? "",
     seoDescription: a.seo.description ?? "",
+    seoCanonical: a.seo.canonical ?? "",
+    seoOgImage: a.seo.ogImage ?? "",
     noindex: !!a.seo.noindex,
     tags: a.tags,
     artistIds: a.artistIds,
