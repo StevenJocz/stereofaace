@@ -13,6 +13,8 @@ export type QueueItem = {
 
 export type QueueAction =
   | { type: "add"; items: QueueItem[] }
+  /** Pone pistas al principio de la lista (suenan antes que lo que ya había): lo usa el programador de eventos. */
+  | { type: "prepend"; items: QueueItem[] }
   | { type: "remove"; id: string }
   | { type: "move"; from: number; to: number }
   | { type: "shift" }
@@ -23,6 +25,8 @@ export function queueReducer(state: QueueItem[], action: QueueAction): QueueItem
   switch (action.type) {
     case "add":
       return [...state, ...action.items];
+    case "prepend":
+      return action.items.length ? [...action.items, ...state] : state;
     case "remove":
       return state.some((i) => i.id === action.id) ? state.filter((i) => i.id !== action.id) : state;
     case "move": {

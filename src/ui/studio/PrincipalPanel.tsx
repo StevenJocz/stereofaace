@@ -129,7 +129,7 @@ export function PrincipalPanel({
   const remaining = cur.item && total > 0 ? Math.max(0, total - cur.currentSec) : null;
   const progress = cur.item && total > 0 ? Math.min(100, (cur.currentSec / total) * 100) : 0;
   // El deck contrario puede tener ya cargada (y sin sonar) la pista que sigue.
-  const preloaded = nextDeck.item && !nextDeck.playing ? nextDeck : null;
+  const preloaded = nextDeck.item && !nextDeck.playing && !nextDeck.spent ? nextDeck : null;
 
   const listTotal = sumDurations([cur.item ? total : null, preloaded?.durationSec, ...queue.map((q) => q.durationSec)]);
   const listLeft = sumDurations([remaining, preloaded?.durationSec, ...queue.map((q) => q.durationSec)]);

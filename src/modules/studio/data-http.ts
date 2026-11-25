@@ -6,6 +6,7 @@ import { guarded, reply } from "./http";
 import { loadAzuraClient } from "./settings";
 import { listHistory, logPlayed, type HistoryEntry } from "./history";
 import { deleteSaved, getSaved, listSaved, saveList, type SaveListInput } from "./playlists";
+import { createEvent, deleteEvent, listEvents, updateEvent, type EventInput } from "./events";
 
 // ── Listas guardadas ──
 
@@ -65,4 +66,26 @@ export const historyCsvHandler = (db: Db, actor: Actor | null) =>
     return new Response(lines.join("\n") + "\n", {
       headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="historial-estudio.csv"', "cache-control": "private, no-store" },
     });
+  });
+
+// ── Eventos del programador ──
+
+export const eventsListHandler = (db: Db, actor: Actor | null) => guarded(actor, async () => Response.json(await listEvents(db, actor), { headers: { "cache-control": "private, no-store" } }));
+
+export const eventsCreateHandler = (db: Db, actor: Actor | null, body: unknown) =>
+  guarded(actor, async () => {
+    if (typeof body !== "object" || body === null) return reply(400, "Cuerpo no válido.");
+    return Response.json(await createEvent(db, actor, body as EventInput), { status: 201 });
+  });
+
+export const eventsUpdateHandler = (db: Db, actor: Actor | null, id: string, body: unknown) =>
+  guarded(actor, async () => {
+    if (typeof body !== "object" || body === null) return reply(400, "Cuerpo no válido.");
+    return Response.json(await updateEvent(db, actor, id, body as EventInput));
+  });
+
+export const eventsDeleteHandler = (db: Db, actor: Actor | null, id: string) =>
+  guarded(actor, async () => {
+    await deleteEvent(db, actor, id);
+    return Response.json({ ok: true });
   });

@@ -127,6 +127,13 @@
       "when": 1795047027735,
       "tag": "0017_chat_verificado",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795599586841,
+      "tag": "0018_programador_eventos",
+      "breakpoints": true
     }
   ]
 }

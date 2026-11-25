@@ -8,6 +8,8 @@ import type { CartView } from "@/modules/studio/carts";
 import { SpotifyPanel } from "./SpotifyPanel";
 import { CartWall } from "./CartWall";
 import { EventsPanel } from "./EventsPanel";
+import { useStudioEvents } from "./useStudioEvents";
+import type { EventView } from "@/modules/studio/events";
 import { JingleBar } from "./JingleBar";
 import { PrincipalPanel } from "./PrincipalPanel";
 import { StatusBar } from "./StatusBar";
@@ -28,6 +30,7 @@ import { loadCover, type DeckCover } from "./engine/deck-cover";
 import { FLAT_EQ, type EqSettings } from "./engine/eq";
 import { DEFAULT_DUCK, type DuckSettings } from "./engine/voice";
 import { pickNext, shouldAdvanceOnEnd, shouldStartFade } from "./engine/autoplay";
+import { dueOccurrences, eventAction, eventToQueue } from "./engine/scheduler";
 import { DjGate, type DjEntry } from "./DjGate";
 import { CabinCamera } from "./CabinCamera";
 import { queueReducer, type QueueItem } from "./engine/queue";
@@ -36,7 +39,7 @@ import { WEBCAST_MIME, WEBCAST_URL, WebcastSender, type LiveState, type Recorder
 const FADE_SEC = 6;
 const CREDS_KEY = "sf-studio-dj";
 const other = (d: DeckId): DeckId => (d === "A" ? "B" : "A");
-const emptyDeck = (): DeckView => ({ item: null, durationSec: null, currentSec: 0, playing: false, volume: 1, coverUrl: null });
+const emptyDeck = (): DeckView => ({ item: null, durationSec: null, currentSec: 0, playing: false, volume: 1, coverUrl: null, spent: false });
 
 type Creds = { user: string; password: string };
 
@@ -76,6 +79,19 @@ async function fetchDjCredentials(): Promise<Creds> {
   const body = (await res.json().catch(() => ({}))) as { error?: string; user?: string; password?: string };
   if (!res.ok || !body.user || !body.password) throw new Error(body.error ?? "No se pudo obtener tu acceso al estudio.");
   return { user: body.user, password: body.password };
+}
+
+const FIRED_KEY = "sf-studio-fired";
+const SCHED_KEY = "sf-studio-scheduler";
+
+/** Eventos ya disparados hoy en esta pestaña (sobreviven a recargar, para no repetir un evento Fijo dentro de su margen). */
+function readFired(): Set<string> {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(FIRED_KEY) ?? "[]") as unknown;
+    return new Set(Array.isArray(v) ? v.filter((k): k is string => typeof k === "string").slice(-200) : []);
+  } catch {
+    return new Set();
+  }
 }
 
 function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry; relay: RelayInfo; visible: boolean; locked: boolean }) {
@@ -124,6 +140,13 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     extVolRef.current = extVol;
   });
   const desk = useDeskFeed(visible);
+  // Programador de eventos: se leen de la base y los dispara esta consola mientras se emite en vivo.
+  const eventsApi = useStudioEvents(visible);
+  const [schedulerOn, setSchedulerOn] = useState(true);
+  const [firedKeys, setFiredKeys] = useState<ReadonlySet<string>>(() => readFired());
+  const firedRef = useRef<Set<string>>(new Set(firedKeys));
+  const eventsRef = useRef<EventView[]>([]);
+  const cartsRef = useRef<CartView[]>([]);
   const [relayState, setRelayState] = useState<RelayState>("idle");
   const [relayVolume, setRelayVolume] = useState(0.8);
   const [relayTrack, setRelayTrack] = useState<RelayTrack | null>(null);
@@ -152,6 +175,10 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const coversRef = useRef<Record<DeckId, DeckCover | null>>({ A: null, B: null });
   const coverSeqRef = useRef<Record<DeckId, number>>({ A: 0, B: 0 });
   const liveSinceRef = useRef<number | null>(null);
+  useEffect(() => {
+    eventsRef.current = eventsApi.events;
+    cartsRef.current = carts;
+  }, [eventsApi.events, carts]);
   useEffect(() => {
     queueRef.current = queue;
     activeRef.current = active;
@@ -233,6 +260,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
       if (!pick) return;
       fadingRef.current = true;
       handedOffRef.current[from] = true; // antes de cualquier await: bloquea disparos repetidos
+      setDecks((d) => ({ ...d, [from]: { ...d[from], spent: true } }));
       try {
         let item: QueueItem;
         if (pick.source === "queue") {
@@ -245,6 +273,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
           item = e.deckItem(to) as QueueItem;
         }
         handedOffRef.current[to] = false;
+        setDecks((d) => ({ ...d, [to]: { ...d[to], spent: false } }));
         if (mode === "fade") {
           await e.crossfadeTo(to, FADE_SEC);
         } else {
@@ -255,7 +284,10 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         markActive(to);
         senderRef.current?.setMetadata(metaFor(item));
       } catch (err) {
-        if (mode === "fade") handedOffRef.current[from] = false; // la saliente sigue siendo la dueña del aire
+        if (mode === "fade") {
+          handedOffRef.current[from] = false; // la saliente sigue siendo la dueña del aire
+          setDecks((d) => ({ ...d, [from]: { ...d[from], spent: false } }));
+        }
         if (!(err instanceof LoadSupersededError)) {
           setMessage(err instanceof Error ? err.message : "No se pudo pasar a la siguiente pista.");
         }
@@ -265,7 +297,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     };
     nextRef.current = (mode) => startNext(activeRef.current, mode);
     e.onDeckEnded = (id) => {
-      setDecks((d) => ({ ...d, [id]: { ...d[id], playing: false } }));
+      setDecks((d) => ({ ...d, [id]: { ...d[id], playing: false, spent: true } }));
       const to = other(id);
       const hasNext =
         pickNext({
@@ -489,7 +521,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         const { durationSec } = await e.loadDeck(id, item);
         handedOffRef.current[id] = false;
         dispatch({ type: "remove", id: item.id });
-        setDecks((d) => ({ ...d, [id]: { ...d[id], item, durationSec, currentSec: 0, playing: false } }));
+        setDecks((d) => ({ ...d, [id]: { ...d[id], item, durationSec, currentSec: 0, playing: false, spent: false } }));
         attachCover(id, item);
         if (!durationSec) setMessage(`No se pudo leer la duración de «${item.title}»: no habrá fundido automático al terminar.`);
         if (!e.isPlaying(other(id))) {
@@ -510,7 +542,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         const e = getEngine();
         await e.resume();
         await e.play(id);
-        setDecks((d) => ({ ...d, [id]: { ...d[id], playing: true } }));
+        setDecks((d) => ({ ...d, [id]: { ...d[id], playing: true, spent: false } }));
         if (!e.isPlaying(other(id))) {
           e.cut(id);
           handedOffRef.current[id] = false;
@@ -604,6 +636,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         if (busy) {
           handedOffRef.current[from] = true;
           handedOffRef.current[to] = false;
+          setDecks((d) => ({ ...d, [from]: { ...d[from], spent: true } }));
           await e.crossfadeTo(to, FADE_SEC);
           setDecks((d) => ({ ...d, [to]: { ...d[to], playing: true } }));
           activeRef.current = to;
@@ -613,7 +646,10 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
           await play(to);
         }
       } catch (err) {
-        if (busy) handedOffRef.current[from] = false;
+        if (busy) {
+          handedOffRef.current[from] = false;
+          setDecks((d) => ({ ...d, [from]: { ...d[from], spent: false } }));
+        }
         if (!(err instanceof LoadSupersededError)) setMessage(err instanceof Error ? err.message : "No se pudo reproducir la pista.");
       } finally {
         fadingRef.current = false;
@@ -621,6 +657,79 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     },
     [getEngine, loadToDeck, play, metaFor],
   );
+
+  /* ───────────── Programador de eventos ───────────── */
+
+  /**
+   * Dispara uno o varios eventos: sus audios pasan al frente de la lista y la consola actúa según cómo entran. Con nada sonando
+   * arrancan ya; «Fijo» salta al primer audio (con fundido o en seco); «Retardado» queda al frente y entra al terminar la pista.
+   */
+  const fireEvents = useCallback(
+    async (evs: EventView[]) => {
+      const e = getEngine();
+      const all: QueueItem[] = [];
+      const missing: string[] = [];
+      for (const ev of evs) {
+        const r = eventToQueue(ev.items, cartsRef.current, () => crypto.randomUUID());
+        all.push(...r.items);
+        missing.push(...r.missing);
+      }
+      if (missing.length) setMessage(`Faltan jingles que ya no existen en el Cart Wall: ${missing.join(", ")}.`);
+      if (all.length === 0) {
+        if (!missing.length) setMessage("El evento no tiene audios que se puedan reproducir.");
+        return;
+      }
+      queueRef.current = [...all, ...queueRef.current]; // ya visible para el motor; el reductor deja lo mismo
+      dispatch({ type: "prepend", items: all });
+      const playing = e.isPlaying("A") || e.isPlaying("B");
+      const actions = evs.map((ev) => eventAction({ mode: ev.mode, transition: ev.transition, playing }));
+      const action = actions.includes("skip-cut") ? "skip-cut" : actions.includes("skip-fade") ? "skip-fade" : actions.includes("start") ? "start" : "wait";
+      if (action === "start") await playMain();
+      else if (action === "skip-cut") await skipMain("cut");
+      else if (action === "skip-fade") await skipMain("fade");
+      else if (!autoRef.current) setMessage(`«${evs[0].name}» queda en espera: pulsa «Siguiente» o activa Auto para que entre.`);
+    },
+    [getEngine, playMain, skipMain],
+  );
+
+  // Cada segundo: ¿algún evento ya le toca? Solo con la emisión EN VIVO y el programador activo.
+  useEffect(() => {
+    if (!schedulerOn) return;
+    const tick = () => {
+      if (liveRef.current !== "live") return;
+      const due = dueOccurrences(eventsRef.current, Date.now(), firedRef.current);
+      if (due.length === 0) return;
+      for (const o of due) firedRef.current.add(o.key);
+      const keys = [...firedRef.current].slice(-200);
+      setFiredKeys(new Set(keys));
+      try {
+        sessionStorage.setItem(FIRED_KEY, JSON.stringify(keys));
+      } catch {
+        /* sin almacenamiento: al recargar, el margen de gracia basta para no repetirlos casi nunca */
+      }
+      void fireEvents(due.map((o) => o.event as EventView));
+    };
+    const t = setInterval(tick, 1000);
+    tick();
+    return () => clearInterval(t);
+  }, [schedulerOn, fireEvents]);
+
+  // El programador pausado o activo se recuerda en este navegador.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SCHED_KEY) === "0") setSchedulerOn(false); // eslint-disable-line react-hooks/set-state-in-effect -- preferencia guardada solo en el navegador
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, []);
+  const changeScheduler = useCallback((on: boolean) => {
+    setSchedulerOn(on);
+    try {
+      localStorage.setItem(SCHED_KEY, on ? "1" : "0");
+    } catch {
+      /* solo vale para esta visita */
+    }
+  }, []);
 
   const startMic = useCallback(async () => {
     try {
@@ -1022,7 +1131,18 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
 
       <div className="zs-grid">
         <div className="zs-col">
-          <EventsPanel />
+          <EventsPanel
+            events={eventsApi.events}
+            state={eventsApi.state}
+            carts={carts}
+            fired={firedKeys}
+            schedulerOn={schedulerOn}
+            onSchedulerOn={changeScheduler}
+            live={live === "live"}
+            onFire={(ev) => void fireEvents([ev])}
+            onSave={eventsApi.save}
+            onDelete={eventsApi.remove}
+          />
           <ZaraWindow title={`Pedidos${desk.feed.requests.length > 0 ? ` (${desk.feed.requests.length})` : ""}`} tone="blue" className="zs-requests-win">
             <RequestsPanel bare feed={desk.feed} refresh={desk.refresh} onSearch={searchFor} onSpotify={(text) => { setSpSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 })); setTool("spotify"); }} />
           </ZaraWindow>

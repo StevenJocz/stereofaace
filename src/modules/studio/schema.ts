@@ -60,3 +60,38 @@ export const studioHistory = pgTable(
   },
   (t) => [index("studio_history_played_idx").on(t.playedAt)],
 );
+
+/** Cómo entra un evento del programador: `delayed` espera a que termine la pista que suena; `fixed` entra a su hora exacta. */
+export const EVENT_MODES = ["delayed", "fixed"] as const;
+export type EventMode = (typeof EVENT_MODES)[number];
+/** Transición de un evento `fixed` con algo sonando: fundido o corte en seco. */
+export const EVENT_TRANSITIONS = ["fade", "cut"] as const;
+export type EventTransition = (typeof EVENT_TRANSITIONS)[number];
+
+/** Qué suena en un evento: un cart (jingle, promo…) del Cart Wall o una pista de la biblioteca de AzuraCast. */
+export type EventItem =
+  | { kind: "cart"; cartId: string; name: string; durationSec: number | null }
+  | { kind: "file"; azId: string; title: string; artist: string; durationSec: number | null };
+
+/**
+ * Programador del estudio (como los «eventos» de ZaraStudio): a una hora y en ciertos días entra un bloque de audios.
+ * Los ejecuta la consola del estudio mientras se emite en vivo; aquí solo se guardan, compartidos por toda la emisora.
+ */
+export const studioEvents = pgTable(
+  "studio_events",
+  {
+    id: pk(),
+    name: text("name").notNull(),
+    /** Hora del evento: minutos desde la medianoche, hora de Bogotá (0–1439). */
+    minuteOfDay: integer("minute_of_day").notNull(),
+    /** Días en que corre, ISO: 1 lunes … 7 domingo. */
+    days: jsonb("days").$type<number[]>().notNull().default([1, 2, 3, 4, 5, 6, 7]),
+    mode: text("mode").notNull().default("delayed"),
+    transition: text("transition").notNull().default("fade"),
+    active: boolean("active").notNull().default(true),
+    items: jsonb("items").$type<EventItem[]>().notNull().default([]),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("studio_events_minute_idx").on(t.minuteOfDay)],
+);

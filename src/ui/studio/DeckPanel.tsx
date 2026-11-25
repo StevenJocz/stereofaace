@@ -8,4 +8,6 @@ export type DeckView = {
   playing: boolean;
   volume: number;
   coverUrl: string | null;
+  /** Ya cedió el aire (o terminó): su pista no cuenta como «la siguiente» aunque siga cargada. */
+  spent: boolean;
 };
