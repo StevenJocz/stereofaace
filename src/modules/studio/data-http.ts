@@ -6,7 +6,7 @@ import { guarded, reply } from "./http";
 import { loadAzuraClient } from "./settings";
 import { listHistory, logPlayed, type HistoryEntry } from "./history";
 import { deleteSaved, getSaved, listSaved, saveList, type SaveListInput } from "./playlists";
-import { createEvent, deleteEvent, listEvents, updateEvent, type EventInput } from "./events";
+import { createEvent, deleteEvent, listEvents, saveHourEvents, updateEvent, type EventInput, type HoursInput } from "./events";
 
 // ── Listas guardadas ──
 
@@ -88,4 +88,10 @@ export const eventsDeleteHandler = (db: Db, actor: Actor | null, id: string) =>
   guarded(actor, async () => {
     await deleteEvent(db, actor, id);
     return Response.json({ ok: true });
+  });
+
+export const eventsHoursHandler = (db: Db, actor: Actor | null, body: unknown) =>
+  guarded(actor, async () => {
+    if (typeof body !== "object" || body === null) return reply(400, "Cuerpo no válido.");
+    return Response.json(await saveHourEvents(db, actor, body as HoursInput));
   });

@@ -6479,3 +6479,51 @@ body[data-radio="on"] .adm-shell {
   padding: 0.4rem 0.55rem;
   font-size: 0.68rem;
 }
+
+/* Anuncios de la hora */
+.zs-hours {
+  width: min(44rem, calc(100vw - 2rem));
+}
+.zs-hours-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.8rem;
+  max-height: 18rem;
+  margin: 0;
+  padding: 0.5rem;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.zs-hours-grid label {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4rem;
+}
+.zs-hours-grid select {
+  width: 100%;
+  min-width: 0;
+}
+.zs-hours-label {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 560px) {
+  .zs-hours-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Controlador MIDI: lista de acciones con su control vinculado */
+.zs-midi-group { border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: 8px; margin: 0 0 .6rem; padding: .35rem .6rem .5rem; min-width: 0; }
+.zs-midi-group legend { padding: 0 .35rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+.zs-midi-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) auto auto; align-items: center; gap: .5rem; padding: .22rem 0; border-top: 1px solid rgba(255,255,255,.06); }
+.zs-midi-row:first-of-type { border-top: 0; }
+.zs-midi-row[data-learning] { background: rgba(255, 190, 40, .12); border-radius: 6px; padding-inline: .35rem; }
+.zs-midi-label { font-size: .88rem; }
+.zs-midi-key { font-size: .78rem; opacity: .8; overflow-wrap: anywhere; }
+.zs-midi .zs-midi-btn { padding: .2rem .55rem; font-size: .78rem; min-height: 0; }
+@media (max-width: 640px) { .zs-midi-row { grid-template-columns: 1fr auto auto; } .zs-midi-key { grid-column: 1 / -1; order: 3; } }

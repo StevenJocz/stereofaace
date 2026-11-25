@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { EventInput, EventView } from "@/modules/studio/events";
+import type { EventInput, EventView, HoursInput, HoursResult } from "@/modules/studio/events";
 
 export type EventsState = "loading" | "ready" | "error";
 export type EventResult = { ok: true } | { ok: false; error: string };
+export type HoursOutcome = { ok: true; result: HoursResult } | { ok: false; error: string };
 
 async function send(url: string, method: "POST" | "PUT" | "DELETE", body?: unknown): Promise<EventResult> {
   try {
@@ -61,5 +62,21 @@ export function useStudioEvents(active: boolean) {
     [reload],
   );
 
-  return { events, state, reload, save, remove };
+  /** Anuncios de la hora: crea, actualiza o quita en bloque los eventos «Hora · HH:MM». */
+  const saveHours = useCallback(
+    async (input: HoursInput): Promise<HoursOutcome> => {
+      try {
+        const r = await fetch("/api/studio/events/hours", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+        const d = (await r.json().catch(() => null)) as (Partial<HoursResult> & { error?: string }) | null;
+        if (!r.ok || !d) return { ok: false, error: d?.error ?? "No se pudo guardar. Inténtalo de nuevo." };
+        await reload();
+        return { ok: true, result: { created: d.created ?? 0, updated: d.updated ?? 0, removed: d.removed ?? 0, skipped: d.skipped ?? [] } };
+      } catch {
+        return { ok: false, error: "Sin conexión con el servidor." };
+      }
+    },
+    [reload],
+  );
+
+  return { events, state, reload, save, remove, saveHours };
 }

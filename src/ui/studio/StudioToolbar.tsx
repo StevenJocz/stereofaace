@@ -4,10 +4,12 @@ import { Mark } from "@/ui/Header";
 import { formatClock, formatDayShort } from "./zara-format";
 import { useClock } from "./ZaraWindow";
 
-export type ToolId = "carts" | "voice" | "chat" | "spotify" | "relay" | "camera" | "eq";
+export type ToolId = "carts" | "line" | "midi" | "voice" | "chat" | "spotify" | "relay" | "camera" | "eq";
 
 const I = {
   carts: <path d="M4 5h16v14H4zM4 10h16M10 5v14" />,
+  line: <path d="M4 7h16v10H4zM8 11v2M12 10v4M16 11v2" />,
+  midi: <path d="M4 6h16v12H4zM8 6v7M12 6v7M16 6v7M6 13h4M14 13h4" />,
   voice: <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4" />,
   chat: <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z" />,
   spotify: <path d="M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z" />,
@@ -37,6 +39,8 @@ export function StudioToolbar({
   const tools: [ToolId, string][] = [
     ["carts", "Cart Wall"],
     ["voice", "Voz"],
+    ["line", "Consola"],
+    ["midi", "Controlador"],
     ["chat", "Chat"],
     ["spotify", "Spotify"],
     ["relay", "Señal"],

@@ -22,6 +22,10 @@ import { RelayPanel } from "./RelayPanel";
 import { ChatModPanel, RequestsPanel, useDeskFeed } from "./DeskChat";
 import { liveStore } from "./live-store";
 import { LiveBar } from "./LiveBar";
+import { LinePanel } from "./LinePanel";
+import { MidiPanel } from "./MidiPanel";
+import { useMidi } from "./useMidi";
+import type { MidiEvent } from "./engine/midi";
 import { MicPanel, type MicDevice } from "./MicPanel";
 import { AudioEngine, LoadSupersededError, type DeckId, type Levels, type RelayState } from "./engine/audio-engine";
 import { makeItems } from "./engine/audio-files";
@@ -30,7 +34,7 @@ import { loadCover, type DeckCover } from "./engine/deck-cover";
 import { FLAT_EQ, type EqSettings } from "./engine/eq";
 import { DEFAULT_DUCK, type DuckSettings } from "./engine/voice";
 import { pickNext, shouldAdvanceOnEnd, shouldStartFade } from "./engine/autoplay";
-import { dueOccurrences, eventAction, eventToQueue } from "./engine/scheduler";
+import { dueOccurrences, eventAction, eventToQueue, nextOccurrence } from "./engine/scheduler";
 import { DjGate, type DjEntry } from "./DjGate";
 import { CabinCamera } from "./CabinCamera";
 import { queueReducer, type QueueItem } from "./engine/queue";
@@ -129,6 +133,13 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const [cabinLive, setCabinLive] = useState(false);
   const [searchSeed, setSearchSeed] = useState<{ text: string; n: number } | null>(null);
   const [spSeed, setSpSeed] = useState<{ text: string; n: number } | null>(null);
+  // Entrada de consola o mezclador externo del DJ.
+  const [lineOn, setLineOn] = useState(false);
+  const [lineVol, setLineVol] = useState(1);
+  const [lineDevices, setLineDevices] = useState<MicDevice[]>([]);
+  const [lineDeviceId, setLineDeviceId] = useState("");
+  const [lineError, setLineError] = useState<string | null>(null);
+  const lineVolRef = useRef(1);
   const [extOn, setExtOn] = useState(false);
   const [extVol, setExtVol] = useState(1);
   const [spFollow, setSpFollow] = useState(true);
@@ -175,6 +186,9 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const coversRef = useRef<Record<DeckId, DeckCover | null>>({ A: null, B: null });
   const coverSeqRef = useRef<Record<DeckId, number>>({ A: 0, B: 0 });
   const liveSinceRef = useRef<number | null>(null);
+  useEffect(() => {
+    lineVolRef.current = lineVol;
+  }, [lineVol]);
   useEffect(() => {
     eventsRef.current = eventsApi.events;
     cartsRef.current = carts;
@@ -230,6 +244,10 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
       });
     e.onRelayState = setRelayState;
     e.onExternalLost = () => setExtOn(false);
+    e.onLineLost = () => {
+      setLineOn(false);
+      setLineError("Se perdió la entrada de la consola (¿se desconectó el aparato?). Conéctala de nuevo.");
+    };
     e.onExternalIdle = () => {
       if (spFollowRef.current) void resumeRef.current?.();
     };
@@ -731,6 +749,41 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     }
   }, []);
 
+  /** Conecta la entrada de la consola o mezclador del DJ a la emisión. */
+  const startLine = useCallback(async () => {
+    try {
+      setLineError(null);
+      const e = getEngine();
+      await e.resume();
+      await e.startLine(lineDeviceId || undefined, lineVolRef.current);
+      setLineOn(true);
+      setLineDevices(await e.listMics()); // las etiquetas solo existen tras conceder el permiso
+    } catch (err) {
+      setLineOn(false);
+      const denied = err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "SecurityError");
+      const missing = err instanceof DOMException && (err.name === "NotFoundError" || err.name === "OverconstrainedError");
+      setLineError(denied ? "El navegador no dejó usar la entrada de audio. Permítela en el candado de la barra de direcciones." : missing ? "No se encontró esa entrada de audio. Revisa que el aparato esté conectado." : err instanceof Error ? err.message : "No se pudo abrir la entrada.");
+    }
+  }, [lineDeviceId, getEngine]);
+  const stopLine = useCallback(() => {
+    engineRef.current?.stopLine();
+    setLineOn(false);
+  }, []);
+  const changeLineVolume = useCallback((v: number) => {
+    setLineVol(v);
+    engineRef.current?.setLineVolume(v);
+  }, []);
+  const readLine = useCallback(() => engineRef.current?.lineLevelDb() ?? -100, []);
+  const midiActionRef = useRef<(ev: MidiEvent) => void>(() => undefined);
+  const midi = useMidi((ev) => midiActionRef.current(ev));
+  // Las entradas disponibles se actualizan al conectar o desconectar un aparato.
+  useEffect(() => {
+    if (!navigator.mediaDevices?.addEventListener) return;
+    const refresh = () => void getEngine().listMics().then(setLineDevices).catch(() => undefined);
+    navigator.mediaDevices.addEventListener("devicechange", refresh);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", refresh);
+  }, [getEngine]);
+
   const startMic = useCallback(async () => {
     try {
       setMicError(null);
@@ -776,15 +829,15 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const spotifyPushed = useRef(false);
   useEffect(() => {
     const sender = senderRef.current;
-    if (extOn && live === "live") {
+    if ((extOn || lineOn) && live === "live") {
       spotifyPushed.current = true;
       sender?.setMetadata({ title: programName ?? "En vivo", artist: "" });
-    } else if (!extOn && spotifyPushed.current) {
+    } else if (!extOn && !lineOn && spotifyPushed.current) {
       spotifyPushed.current = false;
       const deckBusy = (["A", "B"] as const).some((id) => engineRef.current?.isPlaying(id));
       if (live === "live" && !deckBusy) sender?.setMetadata({ title: programName ?? "En vivo", artist: "" });
     }
-  }, [extOn, live, programName]);
+  }, [extOn, lineOn, live, programName]);
 
   const toggleRelay = useCallback(async () => {
     const e = getEngine();
@@ -1092,14 +1145,107 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   if (relayState === "playing" || relayState === "connecting") hot.add("relay");
   if (cabinLive) hot.add("camera");
   if (extOn) hot.add("spotify");
+  if (lineOn) hot.add("line");
+  if (midi.status === "ready" && midi.inputs.length > 0) hot.add("midi");
 
-  const TOOL_TITLE: Record<ToolId, string> = { carts: "Cart Wall", voice: "Voz y ducking", chat: "Chat de la audiencia", spotify: "Spotify al aire", relay: "Señal externa", camera: "Cámara en cabina", eq: "Ecualizador" };
+  const TOOL_TITLE: Record<ToolId, string> = { midi: "Controlador MIDI", line: "Consola o mezclador externo", carts: "Cart Wall", voice: "Voz y ducking", chat: "Chat de la audiencia", spotify: "Spotify al aire", relay: "Señal externa", camera: "Cámara en cabina", eq: "Ecualizador" };
   const searchFor = (text: string) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }));
   const setBothVolumes = (v: number) => {
     setDecks((d) => ({ A: { ...d.A, volume: v }, B: { ...d.B, volume: v } }));
     engineRef.current?.setDeckVolume("A", v);
     engineRef.current?.setDeckVolume("B", v);
   };
+
+  // Lo que pide el controlador MIDI del DJ. Se vuelve a asignar en cada dibujo, así siempre usa el estado de ahora.
+  useEffect(() => {
+    midiActionRef.current = (ev) => {
+      const id = ev.action;
+      if (ev.kind === "fader") {
+        const v = ev.value;
+        if (id === "vol-master") {
+          setMasterVolume(v);
+          masterRef.current = v;
+          engineRef.current?.setMasterVolume(v);
+        } else if (id === "vol-decks") setBothVolumes(v);
+        else if (id === "mic-gain") {
+          setMicGain(v * 2);
+          engineRef.current?.setMicGain(v * 2);
+        } else if (id === "vol-line") changeLineVolume(v * 1.5);
+        else if (id === "vol-ext") changeExtVolume(v * 1.5);
+        return;
+      }
+      if (id === "mic-ptt") {
+        const eng = engineRef.current;
+        if (ev.press) {
+          if (!eng?.micActive) {
+            setMessage("Activa el micrófono en «Voz» para hablar con el botón del aparato.");
+            return;
+          }
+          if (!voiceRef.current.micMuted) return; // ya está abierto
+          pttRef.current = true;
+          eng.setMicMuted(false);
+          setMicMuted(false);
+        } else if (pttRef.current) {
+          pttRef.current = false;
+          eng?.setMicMuted(true);
+          setMicMuted(true);
+        }
+        return;
+      }
+      if (!ev.press) return; // el resto actúa al pulsar, no al soltar
+      const jingle = /^jingle-(\d)$/.exec(id);
+      if (jingle) {
+        const cart = [...cartsRef.current].sort((a, b) => a.position - b.position)[Number(jingle[1]) - 1];
+        if (cart) void fireCart(cart);
+        return;
+      }
+      switch (id) {
+        case "play":
+          void playMain();
+          break;
+        case "pause":
+          pause(activeRef.current);
+          break;
+        case "stop":
+          stopMain();
+          break;
+        case "fade":
+          void skipMain("fade");
+          break;
+        case "cut":
+          void skipMain("cut");
+          break;
+        case "restart":
+          restartMain();
+          break;
+        case "carts-stop":
+          stopCarts();
+          break;
+        case "mic-toggle": {
+          if (!engineRef.current?.micActive) {
+            setMessage("Activa el micrófono en «Voz» para silenciarlo o abrirlo desde el aparato.");
+            break;
+          }
+          const m = !voiceRef.current.micMuted;
+          setMicMuted(m);
+          engineRef.current.setMicMuted(m);
+          break;
+        }
+        case "event-next": {
+          const next = nextOccurrence(eventsRef.current, Date.now());
+          if (next) void fireEvents([next.event as EventView]);
+          else setMessage("No hay eventos programados para ejecutar.");
+          break;
+        }
+        case "scheduler-toggle":
+          changeScheduler(!schedulerOn);
+          break;
+        case "monitor-toggle":
+          changeMonitor(!monitorRef.current);
+          break;
+      }
+    };
+  });
 
   return (
     <div ref={rootRef} className="studio zs">
@@ -1142,6 +1288,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
             onFire={(ev) => void fireEvents([ev])}
             onSave={eventsApi.save}
             onDelete={eventsApi.remove}
+            onSaveHours={eventsApi.saveHours}
           />
           <ZaraWindow title={`Pedidos${desk.feed.requests.length > 0 ? ` (${desk.feed.requests.length})` : ""}`} tone="blue" className="zs-requests-win">
             <RequestsPanel bare feed={desk.feed} refresh={desk.refresh} onSearch={searchFor} onSpotify={(text) => { setSpSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 })); setTool("spotify"); }} />
@@ -1192,6 +1339,23 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         <div className="zs-drawer-body">
           <div id="tool-carts" className="studio-tool-body" hidden={tool !== "carts"}>
             <CartWall carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
+          </div>
+          <div id="tool-midi" className="studio-tool-body" hidden={tool !== "midi"}>
+            <MidiPanel
+              status={midi.status}
+              inputs={midi.inputs}
+              map={midi.map}
+              learning={midi.learning}
+              last={midi.last}
+              onConnect={() => void midi.connect()}
+              onDisconnect={midi.disconnect}
+              onLearn={midi.learn}
+              onUnbind={midi.unbind}
+              onClear={midi.clearAll}
+            />
+          </div>
+          <div id="tool-line" className="studio-tool-body" hidden={tool !== "line"}>
+            <LinePanel active={lineOn} devices={lineDevices} deviceId={lineDeviceId} volume={lineVol} error={lineError} readLevel={readLine} onDevice={setLineDeviceId} onStart={() => void startLine()} onStop={stopLine} onVolume={changeLineVolume} />
           </div>
           <div id="tool-voice" className="studio-tool-body grid content-start gap-4" hidden={tool !== "voice"}>
             <MicPanel

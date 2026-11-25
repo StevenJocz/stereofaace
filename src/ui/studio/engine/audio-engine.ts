@@ -89,8 +89,12 @@ export class AudioEngine {
   onMicLost: (() => void) | null = null;
   /** La persona dejó de compartir la pestaña (o se cerró). */
   onExternalLost: (() => void) | null = null;
+  /** La entrada de consola se perdió (se desconectó el aparato). */
+  onLineLost: (() => void) | null = null;
   /** El audio externo se quedó en silencio tras haber sonado (p. ej. terminó el video). */
   onExternalIdle: (() => void) | null = null;
+  /** Entrada de línea (consola, mezclador o interfaz USB del DJ): estéreo, sin procesado de voz y sin vigilar el silencio. */
+  private line: { stream: MediaStream; source: MediaStreamAudioSourceNode; gain: GainNode; analyser: AnalyserNode; buf: Float32Array<ArrayBuffer> } | null = null;
   private ext: { stream: MediaStream; source: MediaStreamAudioSourceNode; gain: GainNode; analyser: AnalyserNode; buf: Float32Array<ArrayBuffer>; timer: ReturnType<typeof setInterval>; watch: SilenceWatch } | null = null;
   onRelayState: ((s: RelayState) => void) | null = null;
   private relayEl: HTMLAudioElement | null = null;
@@ -442,6 +446,71 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * Conecta una entrada de audio externa (la salida de una consola o mezclador, una interfaz USB, la entrada de línea) a la emisión.
+   * Sin cancelación de eco, supresión de ruido ni control de ganancia (estropean la música) y en estéreo. Entra como una fuente
+   * más: pasa por el EQ y el ducker de la música y por el limitador. Si el aparato se desconecta, avisa con `onLineLost`.
+   */
+  async startLine(deviceId: string | undefined, volume = 1): Promise<void> {
+    this.stopLine();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: { ideal: 2 },
+      },
+    });
+    const source = this.ctx.createMediaStreamSource(stream);
+    const gain = this.ctx.createGain();
+    gain.gain.value = Math.min(1.5, Math.max(0, volume));
+    const analyser = this.ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(gain);
+    gain.connect(this.musicBus);
+    gain.connect(analyser);
+    const line = { stream, source, gain, analyser, buf: new Float32Array(analyser.fftSize) as Float32Array<ArrayBuffer> };
+    this.line = line;
+    for (const t of stream.getTracks()) {
+      t.onended = () => {
+        if (this.line === line) {
+          this.stopLine();
+          this.onLineLost?.();
+        }
+      };
+    }
+  }
+
+  get lineActive(): boolean {
+    return this.line !== null;
+  }
+
+  setLineVolume(v: number): void {
+    if (this.line) this.line.gain.gain.setTargetAtTime(Math.min(1.5, Math.max(0, v)), this.ctx.currentTime, 0.02);
+  }
+
+  /** Nivel de pico de la entrada de consola, en dB (−100 si no hay entrada). */
+  lineLevelDb(): number {
+    const l = this.line;
+    if (!l) return -100;
+    l.analyser.getFloatTimeDomainData(l.buf);
+    return peakToDb(l.buf);
+  }
+
+  stopLine(): void {
+    const l = this.line;
+    if (!l) return;
+    this.line = null;
+    for (const t of l.stream.getTracks()) {
+      t.onended = null;
+      t.stop();
+    }
+    l.source.disconnect();
+    l.gain.disconnect();
+    l.analyser.disconnect();
+  }
+
   get externalActive(): boolean {
     return this.ext !== null;
   }
@@ -705,6 +774,7 @@ export class AudioEngine {
     this.stopAllCarts();
     this.stopMic();
     this.stopExternal();
+    this.stopLine();
     if (this.controlTimer) clearInterval(this.controlTimer);
     this.controlTimer = null;
     for (const t of this.fadeTimers) clearTimeout(t);

@@ -138,3 +138,81 @@ export async function deleteEvent(db: Db, actor: Actor | null, id: string): Prom
   await db.delete(studioEvents).where(eq(studioEvents.id, row.id));
   await recordAudit(db, { userId: actor.id, action: "studio.event.delete", entity: "studio_event", entityId: row.id });
 }
+
+/* ───────────── Anuncios de la hora ───────────── */
+
+/** Los eventos de los anuncios de la hora se llaman «Hora · HH:MM»: así se reconocen para actualizarlos o quitarlos en bloque. */
+export const HOUR_EVENT_PREFIX = "Hora · ";
+const HOUR_NAME = /^Hora · ([01]\d|2[0-3]):([0-5]\d)$/;
+const hourName = (hour: number, minute: number) => `${HOUR_EVENT_PREFIX}${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+
+export const hoursInputSchema = z.object({
+  mode: z.enum(EVENT_MODES).default("delayed"),
+  transition: z.enum(EVENT_TRANSITIONS).default("fade"),
+  /** Minuto de cada hora en que entra el anuncio (0 = en punto). */
+  minute: z.number().int().min(0).max(59).default(0),
+  days: z
+    .array(z.number().int().min(1).max(7))
+    .min(1, "Elige al menos un día")
+    .max(7)
+    .transform((d) => [...new Set(d)].sort((a, b) => a - b)),
+  hours: z
+    .array(z.object({ hour: z.number().int().min(0).max(23), cartId: z.string().regex(UUID, "Jingle no válido").nullable() }))
+    .max(24)
+    .refine((h) => new Set(h.map((x) => x.hour)).size === h.length, "Hay una hora repetida"),
+});
+export type HoursInput = z.input<typeof hoursInputSchema>;
+export type HoursResult = { created: number; updated: number; removed: number; skipped: string[] };
+
+/**
+ * Crea, actualiza o quita de una vez los eventos de «la hora»: por cada hora con un audio asignado hay un evento «Hora · HH:MM»
+ * con ese jingle; las horas sin audio pierden su evento. Los eventos que creó otra persona y que quien guarda no puede cambiar
+ * se dejan como están y se avisan en `skipped`.
+ */
+export async function saveHourEvents(db: Db, actor: Actor | null, raw: HoursInput): Promise<HoursResult> {
+  assertCan(actor, "studio:update");
+  const input = hoursInputSchema.parse(raw);
+  const result: HoursResult = { created: 0, updated: 0, removed: 0, skipped: [] };
+  await db.transaction(async (tx) => {
+    const rows = await tx.select().from(studioEvents).orderBy(asc(studioEvents.createdAt));
+    const byHour = new Map<number, typeof studioEvents.$inferSelect>();
+    for (const r of rows) {
+      const m = HOUR_NAME.exec(r.name);
+      if (m && !byHour.has(Number(m[1]))) byHour.set(Number(m[1]), r);
+    }
+    const [{ n }] = await tx.select({ n: count() }).from(studioEvents);
+    let total = n;
+    for (const { hour, cartId } of input.hours) {
+      const existing = byHour.get(hour);
+      const name = hourName(hour, input.minute);
+      if (!cartId) {
+        if (!existing) continue;
+        if (existing.createdBy !== actor.id && !can(actor.role, "station:manage")) {
+          result.skipped.push(existing.name);
+          continue;
+        }
+        await tx.delete(studioEvents).where(eq(studioEvents.id, existing.id));
+        result.removed++;
+        total--;
+        continue;
+      }
+      const items = await resolveItems(tx as unknown as Db, [{ kind: "cart", cartId }]);
+      const values = { name, minuteOfDay: hour * 60 + input.minute, days: input.days, mode: input.mode, transition: input.transition, active: true, items };
+      if (existing) {
+        if (existing.createdBy !== actor.id && !can(actor.role, "station:manage")) {
+          result.skipped.push(existing.name);
+          continue;
+        }
+        await tx.update(studioEvents).set(values).where(eq(studioEvents.id, existing.id));
+        result.updated++;
+      } else {
+        if (total >= MAX_EVENTS) throw new DomainError("event_limit", `Hay demasiados eventos (máximo ${MAX_EVENTS}). Borra alguno antes de crear más.`);
+        await tx.insert(studioEvents).values({ ...values, createdBy: actor.id });
+        result.created++;
+        total++;
+      }
+    }
+  });
+  await recordAudit(db, { userId: actor.id, action: "studio.event.hours", entity: "studio_event", diff: { created: result.created, updated: result.updated, removed: result.removed, skipped: result.skipped.length } });
+  return result;
+}

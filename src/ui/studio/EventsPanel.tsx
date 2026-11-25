@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CartView } from "@/modules/studio/carts";
-import type { EventInput, EventView } from "@/modules/studio/events";
+import type { EventInput, EventView, HoursInput } from "@/modules/studio/events";
 import type { PublicProgram } from "@/modules/schedule/public";
 import { todayBogota } from "@/ui/radio/schedule-view";
 import { EventEditor } from "./EventEditor";
+import { HourAnnouncements } from "./HourAnnouncements";
 import { GRACE_MS, bogotaMidnight, eventDurationSec, nextOccurrence, todaysEvents } from "./engine/scheduler";
-import type { EventResult, EventsState } from "./useStudioEvents";
+import type { EventResult, EventsState, HoursOutcome } from "./useStudioEvents";
 import { formatClock, formatRemaining } from "./zara-format";
 import { useClock, ZaraWindow } from "./ZaraWindow";
 
@@ -168,6 +169,7 @@ export function EventsPanel({
   onFire,
   onSave,
   onDelete,
+  onSaveHours,
 }: {
   events: EventView[];
   state: EventsState;
@@ -181,12 +183,14 @@ export function EventsPanel({
   onFire: (ev: EventView) => void;
   onSave: (input: EventInput, id?: string) => Promise<EventResult>;
   onDelete: (id: string) => Promise<EventResult>;
+  onSaveHours: (input: HoursInput) => Promise<HoursOutcome>;
 }) {
   const now = useClock(1000);
   const [tab, setTab] = useState<"events" | "grid">("events");
   const [selected, setSelected] = useState<string | null>(null);
   /** `undefined` = editor cerrado; `null` = evento nuevo; si no, el evento que se edita. */
   const [editing, setEditing] = useState<EventView | null | undefined>(undefined);
+  const [hoursOpen, setHoursOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -254,6 +258,13 @@ export function EventsPanel({
             <button type="button" className="zs-iconbtn" onClick={() => sel && onFire(sel)} disabled={!sel} aria-label="Ejecutar ahora el evento seleccionado" title="Ejecutar ahora">
               <Svg>
                 <path d="M7 5v14l12-7z" fill="currentColor" />
+              </Svg>
+            </button>
+            <button type="button" className="zs-iconbtn" onClick={() => setHoursOpen(true)} aria-label="Anuncios de la hora" title="Anuncios de la hora">
+              <Svg>
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 7v5l3.5 2" />
+                <path d="M3 5l2-2M21 5l-2-2" />
               </Svg>
             </button>
             <span className="zs-spacer" />
@@ -350,6 +361,7 @@ export function EventsPanel({
         </>
       )}
 
+      {hoursOpen && <HourAnnouncements events={events} carts={carts} onClose={() => setHoursOpen(false)} onSave={onSaveHours} />}
       {editing !== undefined && <EventEditor key={editing?.id ?? "nuevo"} initial={editing} carts={carts} onClose={() => setEditing(undefined)} onSave={onSave} />}
     </ZaraWindow>
   );
