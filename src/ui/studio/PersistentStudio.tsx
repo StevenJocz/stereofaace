@@ -8,7 +8,7 @@ import { StudioConsole, type RelayInfo } from "./StudioConsole";
  * La consola vive en el layout del panel: al navegar a otra sección se oculta pero NO se desmonta,
  * así la transmisión, el micrófono y las pistas siguen sonando hasta que el DJ se desconecte.
  */
-export function PersistentStudio({ relay, locutor }: { relay: RelayInfo; locutor?: string }) {
+export function PersistentStudio({ relay, locutor, canManageStation = false, canDeleteStation = false }: { relay: RelayInfo; locutor?: string; canManageStation?: boolean; canDeleteStation?: boolean }) {
   const pathname = usePathname();
   const onStudio = pathname === "/admin/radio/studio";
   const [started, setStarted] = useState(onStudio);
@@ -22,7 +22,7 @@ export function PersistentStudio({ relay, locutor }: { relay: RelayInfo; locutor
   if (!started) return null;
   return (
     <div hidden={!onStudio}>
-      <StudioConsole relay={relay} visible={onStudio} locutor={locutor} />
+      <StudioConsole relay={relay} visible={onStudio} locutor={locutor} canManageStation={canManageStation} canDeleteStation={canDeleteStation} />
     </div>
   );
 }

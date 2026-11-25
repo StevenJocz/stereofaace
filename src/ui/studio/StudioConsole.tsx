@@ -7,6 +7,7 @@ import type { DjProgramInfo, StudioProgram } from "@/modules/schedule/dj";
 import type { CartView } from "@/modules/studio/carts";
 import { SpotifyPanel } from "./SpotifyPanel";
 import { CartWall } from "./CartWall";
+import { AutoDjTools } from "./AutoDjTools";
 import { EventsPanel } from "./EventsPanel";
 import { useStudioEvents } from "./useStudioEvents";
 import type { EventView } from "@/modules/studio/events";
@@ -64,13 +65,13 @@ const noopSubscribe = () => () => {};
 /** Primero la entrada del DJ (usuario, contraseña y programa); después, la consola. */
 export type RelayInfo = { configured: boolean; name: string };
 
-export function StudioConsole({ relay, visible = true, locutor }: { relay: RelayInfo; visible?: boolean; locutor?: string }) {
+export function StudioConsole({ relay, visible = true, locutor, canManageStation = false, canDeleteStation = false }: { relay: RelayInfo; visible?: boolean; locutor?: string; canManageStation?: boolean; canDeleteStation?: boolean }) {
   const [picked, setPicked] = useState<DjEntry | null>(null);
   // Un locutor ya inició sesión en el panel: no hay segunda entrada, su acceso a AzuraCast lo da el servidor en su horario.
   const own = useMemo<DjEntry | null>(() => (locutor ? { user: locutor, password: "", programChoice: "" } : null), [locutor]);
   const entry = own ?? picked;
   if (!entry) return <DjGate onEnter={setPicked} />;
-  return <StudioConsoleInner entry={entry} relay={relay} visible={visible} locked={Boolean(locutor)} />;
+  return <StudioConsoleInner entry={entry} relay={relay} visible={visible} locked={Boolean(locutor)} canManageStation={canManageStation} canDeleteStation={canDeleteStation} />;
 }
 
 /** Acceso a AzuraCast de un locutor: el servidor solo lo entrega dentro de su horario. */
@@ -94,7 +95,7 @@ function readFired(): Set<string> {
   }
 }
 
-function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry; relay: RelayInfo; visible: boolean; locked: boolean }) {
+function StudioConsoleInner({ entry, relay, visible, locked, canManageStation, canDeleteStation }: { entry: DjEntry; relay: RelayInfo; visible: boolean; locked: boolean; canManageStation: boolean; canDeleteStation: boolean }) {
   const visibleRef = useRef(visible);
   useEffect(() => {
     visibleRef.current = visible; // los atajos del teclado solo valen con la consola a la vista
@@ -126,6 +127,8 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
   const [tool, setTool] = useState<ToolId | null>(null);
+  /** El AutoDJ pesa y guarda lo que haces (subidas, formularios): una vez abierto sigue montado, solo se oculta. */
+  const [autodjOpened, setAutodjOpened] = useState(false);
   const [cabinLive, setCabinLive] = useState(false);
   const [searchSeed, setSearchSeed] = useState<{ text: string; n: number } | null>(null);
   const [spSeed, setSpSeed] = useState<{ text: string; n: number } | null>(null);
@@ -1093,7 +1096,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   if (cabinLive) hot.add("camera");
   if (extOn) hot.add("spotify");
 
-  const TOOL_TITLE: Record<ToolId, string> = { carts: "Cart Wall", voice: "Voz y ducking", chat: "Chat de la audiencia", spotify: "Spotify al aire", relay: "Señal externa", camera: "Cámara en cabina", eq: "Ecualizador" };
+  const TOOL_TITLE: Record<ToolId, string> = { autodj: "AutoDJ · programas, carpetas y música", carts: "Cart Wall", voice: "Voz y ducking", chat: "Chat de la audiencia", spotify: "Spotify al aire", relay: "Señal externa", camera: "Cámara en cabina", eq: "Ecualizador" };
   const searchFor = (text: string) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }));
   const setBothVolumes = (v: number) => {
     setDecks((d) => ({ A: { ...d.A, volume: v }, B: { ...d.B, volume: v } }));
@@ -1103,7 +1106,14 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
 
   return (
     <div ref={rootRef} className="studio zs">
-      <StudioToolbar tool={tool} onTool={setTool} hot={hot} />
+      <StudioToolbar
+        tool={tool}
+        onTool={(t) => {
+          if (t === "autodj") setAutodjOpened(true);
+          setTool(t);
+        }}
+        hot={hot}
+      />
       <LiveBar
         state={live}
         user={creds.user}
@@ -1182,7 +1192,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
       <StatusBar live={live} dj={creds.user} program={activeProgram?.name ?? null} queueCount={queue.length} active={active} />
 
       {/* Ventana de herramientas: sus cuerpos siguen montados (solo se ocultan), así cambiar de herramienta no corta la cámara ni lo que suena. */}
-      <section className="zs-drawer" hidden={tool === null} aria-label={tool ? TOOL_TITLE[tool] : "Herramientas"}>
+      <section className="zs-drawer" data-wide={tool === "autodj" || undefined} hidden={tool === null} aria-label={tool ? TOOL_TITLE[tool] : "Herramientas"}>
         <header className="zs-win-bar" data-tone="blue">
           <h2 className="zs-win-title">{tool ? TOOL_TITLE[tool] : ""}</h2>
           <button type="button" className="zs-close" onClick={() => setTool(null)} aria-label="Cerrar la ventana de herramientas">
@@ -1190,6 +1200,9 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
           </button>
         </header>
         <div className="zs-drawer-body">
+          <div id="tool-autodj" className="studio-tool-body" hidden={tool !== "autodj"}>
+            {autodjOpened && <AutoDjTools canManage={canManageStation} canDelete={canDeleteStation} />}
+          </div>
           <div id="tool-carts" className="studio-tool-body" hidden={tool !== "carts"}>
             <CartWall carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
           </div>

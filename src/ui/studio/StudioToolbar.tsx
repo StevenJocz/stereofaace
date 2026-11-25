@@ -4,9 +4,10 @@ import { Mark } from "@/ui/Header";
 import { formatClock, formatDayShort } from "./zara-format";
 import { useClock } from "./ZaraWindow";
 
-export type ToolId = "carts" | "voice" | "chat" | "spotify" | "relay" | "camera" | "eq";
+export type ToolId = "autodj" | "carts" | "voice" | "chat" | "spotify" | "relay" | "camera" | "eq";
 
 const I = {
+  autodj: <path d="M4 6h16M4 12h10M4 18h6M17 14v5l4-2.5z" />,
   carts: <path d="M4 5h16v14H4zM4 10h16M10 5v14" />,
   voice: <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4" />,
   chat: <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z" />,
@@ -35,6 +36,7 @@ export function StudioToolbar({
 }) {
   const now = useClock(1000);
   const tools: [ToolId, string][] = [
+    ["autodj", "AutoDJ"],
     ["carts", "Cart Wall"],
     ["voice", "Voz"],
     ["chat", "Chat"],

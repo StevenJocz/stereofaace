@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { addSlotAction, deleteProgramAction, removeSlotAction, saveProgramAction } from "@/app/(admin)/admin/(panel)/radio/programacion/actions";
 import type { FormState } from "@/lib/admin/form";
 import type { ProgramAdminView, SlotAdminView } from "@/modules/schedule/service";
@@ -9,11 +9,32 @@ import { MediaPicker } from "./MediaPicker";
 import { RowAction } from "./RowAction";
 import { Field, Message } from "./fields";
 
+type Act = (prev: FormState, fd: FormData) => Promise<FormState>;
+
+/**
+ * Envuelve una acción del servidor para avisar cuando salió bien. Así estos formularios sirven también dentro del estudio,
+ * donde los datos no vienen de una página del servidor y hay que volver a pedirlos (`onChanged`).
+ */
+function useDone(action: Act, onChanged?: () => void): Act {
+  return useMemo<Act>(
+    () =>
+      onChanged
+        ? async (prev, fd) => {
+            const r = await action(prev, fd);
+            if (r?.ok) onChanged();
+            return r;
+          }
+        : action,
+    [action, onChanged],
+  );
+}
+
 const DAYS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-export function ProgramForm({ program, canDelete }: { program?: ProgramAdminView; canDelete?: boolean }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(saveProgramAction, null);
+export function ProgramForm({ program, canDelete, onChanged }: { program?: ProgramAdminView; canDelete?: boolean; onChanged?: () => void }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(useDone(saveProgramAction, onChanged), null);
+  const del = useDone(deleteProgramAction, onChanged);
   const v = (k: string, fallback = "") => String(state?.values?.[k] ?? fallback);
   const e = (k: string) => state?.errors?.[k];
   const id = program?.id;
@@ -58,15 +79,15 @@ export function ProgramForm({ program, canDelete }: { program?: ProgramAdminView
       </form>
       {id && canDelete && (
         <div className="mt-3 border-t border-line pt-3">
-          <ConfirmDelete id={id} action={deleteProgramAction} label="Borrar programa" />
+          <ConfirmDelete id={id} action={del} label="Borrar programa" />
         </div>
       )}
     </div>
   );
 }
 
-export function SlotForm({ programs }: { programs: ProgramAdminView[] }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(addSlotAction, null);
+export function SlotForm({ programs, onChanged }: { programs: ProgramAdminView[]; onChanged?: () => void }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(useDone(addSlotAction, onChanged), null);
   const [kind, setKind] = useState<"weekly" | "once">("weekly");
   const e = (k: string) => state?.errors?.[k];
   return (
@@ -132,7 +153,8 @@ export function SlotForm({ programs }: { programs: ProgramAdminView[] }) {
   );
 }
 
-export function SchedulePreview({ programs, slots }: { programs: ProgramAdminView[]; slots: SlotAdminView[] }) {
+export function SchedulePreview({ programs, slots, onChanged }: { programs: ProgramAdminView[]; slots: SlotAdminView[]; onChanged?: () => void }) {
+  const removeSlot = useDone(removeSlotAction, onChanged);
   const byId = new Map(programs.map((p) => [p.id, p]));
   const weekly = (d: number) => slots.filter((s) => s.kind === "weekly" && s.weekday === d).sort((a, b) => a.start.localeCompare(b.start));
   const once = slots.filter((s) => s.kind === "once").sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`));
@@ -148,7 +170,7 @@ export function SchedulePreview({ programs, slots }: { programs: ProgramAdminVie
           {s.start}–{s.end}
         </span>
         <span className="absolute right-1.5 top-1.5">
-          <RowAction action={removeSlotAction} fields={{ id: s.id }} label="✕" className="slot-x" ariaLabel={`Quitar el horario de ${p?.name ?? "programa"} ${s.start}`} />
+          <RowAction action={removeSlot} fields={{ id: s.id }} label="✕" className="slot-x" ariaLabel={`Quitar el horario de ${p?.name ?? "programa"} ${s.start}`} />
         </span>
       </li>
     );

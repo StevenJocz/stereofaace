@@ -6205,6 +6205,16 @@ body[data-radio="on"] .adm-shell {
 .zs-drawer[hidden] {
   display: none;
 }
+.zs-drawer .panel {
+  padding: 0.75rem 0.9rem;
+}
+/* El AutoDJ es una gestión larga (parrilla, carpetas, listas): ocupa casi toda la consola */
+.zs-drawer[data-wide] {
+  left: 0.45rem;
+  width: auto;
+  height: calc(100% - 5rem);
+  max-height: none;
+}
 .zs-drawer-body {
   flex: 1;
   min-height: 0;
@@ -6423,4 +6433,56 @@ body[data-radio="on"] .adm-shell {
   padding: 0.15rem 0.45rem;
   border-bottom: 1px solid color-mix(in srgb, var(--fg) 9%, transparent);
   font-size: 0.8rem;
+}
+
+/* Pestañas de las pantallas con «studio-tabs» (Biblioteca del administrador, editor de Spaces) */
+.studio-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.studio-tab {
+  position: relative;
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.studio-tab:hover {
+  border-color: var(--accent);
+}
+.studio-tab[aria-selected="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+.studio-tab[data-hot="true"]::after {
+  content: "";
+  position: absolute;
+  top: 0.3rem;
+  right: 0.55rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 3px rgba(255, 77, 77, 0.25);
+}
+.studio-tabs {
+  flex-wrap: wrap;
+}
+.studio-tab {
+  flex: 1 1 auto;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.68rem;
 }
