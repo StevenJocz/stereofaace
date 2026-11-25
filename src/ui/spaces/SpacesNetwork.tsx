@@ -11,17 +11,24 @@ const MIN_SLOTS = 5;
 
 type Pos = { x: number; y: number };
 
-/** Posiciones deterministas en dos anillos alrededor del centro (el «hub» de invitación). */
+/**
+ * Posiciones deterministas en dos anillos alrededor del centro (el «hub» de invitación). Los nodos del anillo exterior se colocan
+ * entre dos del interior —nunca detrás de uno— para que ninguna foto tape a otra.
+ */
 function layout(count: number): Pos[] {
   const inner = Math.min(count, 5);
   const outer = count - inner;
   const out: Pos[] = [];
-  for (let i = 0; i < inner; i++) {
-    const a = ((-90 + (360 / inner) * i + (inner === 5 ? 0 : 18)) * Math.PI) / 180;
-    out.push({ x: W / 2 + 27 * Math.cos(a), y: H / 2 + 24 * Math.sin(a) });
+  const innerAngles = Array.from({ length: inner }, (_, i) => -90 + (360 / inner) * i + (inner === 5 ? 0 : 18));
+  for (const deg of innerAngles) {
+    const a = (deg * Math.PI) / 180;
+    out.push({ x: W / 2 + 25 * Math.cos(a), y: H / 2 + 22 * Math.sin(a) });
   }
-  for (let i = 0; i < outer; i++) {
-    const a = ((-90 + (360 / Math.max(outer, 1)) * i + 36) * Math.PI) / 180;
+  // Puntos medios entre nodos interiores consecutivos; con menos nodos exteriores se reparten de forma simétrica.
+  const mids = innerAngles.map((d) => d + 360 / inner / 2);
+  for (let j = 0; j < outer; j++) {
+    const deg = outer <= mids.length ? mids[Math.round((j * mids.length) / outer) % mids.length] : -90 + (360 / outer) * j + 36;
+    const a = (deg * Math.PI) / 180;
     out.push({ x: W / 2 + 43 * Math.cos(a), y: H / 2 + 37 * Math.sin(a) });
   }
   return out;
@@ -31,8 +38,8 @@ const curve = (a: Pos, b: Pos) => {
   // Curva suave hacia el centro para que las conexiones no sean rectas aburridas.
   const mx = (a.x + b.x) / 2;
   const my = (a.y + b.y) / 2;
-  const cx = mx + (W / 2 - mx) * 0.35;
-  const cy = my + (H / 2 - my) * 0.35;
+  const cx = mx + (W / 2 - mx) * 0.22;
+  const cy = my + (H / 2 - my) * 0.22;
   return `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} Q ${cx.toFixed(2)} ${cy.toFixed(2)} ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
 };
 
@@ -46,16 +53,31 @@ export function SpacesNetwork({ network, ctaHref, signedIn }: { network: Network
   const pos = useMemo(() => layout(slots), [slots]);
   const byUser = useMemo(() => new Map(network.nodes.map((n, i) => [n.username, pos[i]])), [network.nodes, pos]);
   const activeNode = network.nodes.find((n) => n.username === active) ?? null;
+  // Un seguimiento mutuo es una sola línea: A→B y B→A se dibujaban una encima de la otra.
+  const links = useMemo(() => {
+    const seen = new Set<string>();
+    return network.edges.filter((e) => {
+      const key = [e.from, e.to].sort().join("|");
+      if (e.from === e.to || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [network.edges]);
+  const neighbors = useMemo(() => {
+    const set = new Set<string>();
+    if (!active) return set;
+    for (const e of network.edges) {
+      if (e.from === active) set.add(e.to);
+      if (e.to === active) set.add(e.from);
+    }
+    return set;
+  }, [active, network.edges]);
 
   return (
     <div className="net" data-active={active ? "true" : undefined}>
       <svg className="net-svg" viewBox={`0 0 ${W} ${H}`} aria-hidden="true" focusable="false">
-        <circle className="net-orbit net-orbit-a" cx={W / 2} cy={H / 2} r="27" />
-        <circle className="net-orbit net-orbit-b" cx={W / 2} cy={H / 2} r="42" />
-        {pos.map((p, i) => (
-          <line key={`h${i}`} className={`net-hub ${i >= network.nodes.length ? "is-free" : ""}`} x1={W / 2} y1={H / 2} x2={p.x} y2={p.y} />
-        ))}
-        {network.edges.map((e, i) => {
+        <circle className="net-orbit" cx={W / 2} cy={H / 2} r="43" />
+        {links.map((e, i) => {
           const a = byUser.get(e.from);
           const b = byUser.get(e.to);
           if (!a || !b) return null;
@@ -64,9 +86,11 @@ export function SpacesNetwork({ network, ctaHref, signedIn }: { network: Network
           return (
             <g key={`${e.from}>${e.to}`} className="net-edge" data-on={on || undefined}>
               <path d={d} />
-              <circle className="net-packet" r="0.9">
-                <animateMotion dur={`${3.2 + (i % 4) * 0.7}s`} repeatCount="indefinite" path={d} />
-              </circle>
+              {on && (
+                <circle className="net-packet" r="0.8">
+                  <animateMotion dur={`${2.6 + (i % 3) * 0.6}s`} repeatCount="indefinite" path={d} />
+                </circle>
+              )}
             </g>
           );
         })}
@@ -96,9 +120,9 @@ export function SpacesNetwork({ network, ctaHref, signedIn }: { network: Network
               </li>
             );
           }
-          const size = 46 + Math.min(n.followers ?? 0, 20) * 1.1;
+          const size = 44 + Math.min(n.followers ?? 0, 20) * 0.6;
           return (
-            <li key={n.username} className="net-node" style={{ ...style, ["--s" as string]: `${size}px` }} data-featured={n.featured || undefined} data-on={active === n.username || undefined}>
+            <li key={n.username} className="net-node" style={{ ...style, ["--s" as string]: `${size}px` }} data-featured={n.featured || undefined} data-on={active === n.username || undefined} data-dim={(active && active !== n.username && !neighbors.has(n.username)) || undefined}>
               <Link href={`/@${n.username}`} onMouseEnter={() => setActive(n.username)} onMouseLeave={() => setActive(null)} onFocus={() => setActive(n.username)} onBlur={() => setActive(null)}>
                 <span className="net-av">
                   {n.avatarUrl ? (
@@ -124,6 +148,12 @@ export function SpacesNetwork({ network, ctaHref, signedIn }: { network: Network
           <>
             <b>{activeNode.displayName}</b>
             {activeNode.genres.length > 0 && <span> · {activeNode.genres.join(" · ")}</span>}
+            {neighbors.size > 0 && (
+              <span>
+                {" "}
+                · {neighbors.size} {neighbors.size === 1 ? "conexión" : "conexiones"}
+              </span>
+            )}
             {activeNode.followers !== null && (
               <span>
                 {" "}
@@ -131,8 +161,8 @@ export function SpacesNetwork({ network, ctaHref, signedIn }: { network: Network
               </span>
             )}
           </>
-        ) : network.edges.length > 0 ? (
-          "Cada línea es alguien siguiendo a otra persona"
+        ) : links.length > 0 ? (
+          "Las líneas son seguimientos entre personas"
         ) : (
           "Tu Space se conecta con el resto de la comunidad"
         )}
