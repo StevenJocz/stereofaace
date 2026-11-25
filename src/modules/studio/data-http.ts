@@ -7,7 +7,6 @@ import { loadAzuraClient } from "./settings";
 import { listHistory, logPlayed, type HistoryEntry } from "./history";
 import { deleteSaved, getSaved, listSaved, saveList, type SaveListInput } from "./playlists";
 import { createEvent, deleteEvent, listEvents, updateEvent, type EventInput } from "./events";
-import { listProgramsAdmin, listSlotsAdmin } from "@/modules/schedule/service";
 
 // ── Listas guardadas ──
 
@@ -89,13 +88,4 @@ export const eventsDeleteHandler = (db: Db, actor: Actor | null, id: string) =>
   guarded(actor, async () => {
     await deleteEvent(db, actor, id);
     return Response.json({ ok: true });
-  });
-
-// ── Parrilla de programas (para el AutoDJ dentro del estudio) ──
-
-/** Programas y horarios de la emisora. Solo quien gestiona la emisora (`station:update`). */
-export const parrillaHandler = (db: Db, actor: Actor | null) =>
-  guarded(actor, async () => {
-    const [programs, slots] = await Promise.all([listProgramsAdmin(db, actor), listSlotsAdmin(db, actor)]);
-    return Response.json({ programs, slots }, { headers: { "cache-control": "private, no-store" } });
   });

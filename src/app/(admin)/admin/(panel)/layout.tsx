@@ -41,7 +41,7 @@ async function Shell({ children }: { children: React.ReactNode }) {
           ) : (
             <>
               {children}
-              {relay && <PersistentStudio relay={relay} locutor={locutor ?? undefined} canManageStation={can(user.role, "station:update")} canDeleteStation={can(user.role, "station:delete")} />}
+              {relay && <PersistentStudio relay={relay} locutor={locutor ?? undefined} />}
             </>
           )}
         </div>

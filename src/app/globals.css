@@ -6208,13 +6208,6 @@ body[data-radio="on"] .adm-shell {
 .zs-drawer .panel {
   padding: 0.75rem 0.9rem;
 }
-/* El AutoDJ es una gestión larga (parrilla, carpetas, listas): ocupa casi toda la consola */
-.zs-drawer[data-wide] {
-  left: 0.45rem;
-  width: auto;
-  height: calc(100% - 5rem);
-  max-height: none;
-}
 .zs-drawer-body {
   flex: 1;
   min-height: 0;
