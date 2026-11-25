@@ -59,7 +59,7 @@ export function SpacesShowcase({ network, signedIn }: { network: Network; signed
         </div>
 
         <div data-reveal data-delay="0.1">
-          <SpacesNetwork network={network} ctaHref={cta.href} signedIn={signedIn} />
+          <SpacesNetwork network={network} ctaHref={cta.href} />
         </div>
       </div>
     </section>
