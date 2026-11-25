@@ -73,4 +73,27 @@ describe("red de la portada", () => {
     expect((await getNetwork(h.db, 9)).nodes).toHaveLength(9);
     expect((await getNetwork(h.db, 3)).nodes).toHaveLength(3);
   });
+
+  it("por defecto muestra 12 Spaces cuando hay más, sin pasarse del tope", async () => {
+    const before = (await getNetwork(h.db, 40)).nodes.length;
+    for (let i = before; i < 16; i++) await person();
+    const net = await getNetwork(h.db);
+    expect(net.nodes).toHaveLength(12);
+    expect(net.total).toBeGreaterThanOrEqual(16);
+    expect((await getNetwork(h.db, 500)).nodes.length).toBeLessThanOrEqual(40);
+  });
+
+  it("prioriza a los verificados y el resto sale al azar", async () => {
+    const verified = [await person(), await person(), await person()];
+    for (const v of verified) await h.db.update(spaceProfiles).set({ badgeVerifiedAt: new Date() }).where(eq(spaceProfiles.userId, v.id));
+    const others = new Set<string>();
+    for (let i = 0; i < 8; i++) {
+      const net = await getNetwork(h.db, 6);
+      const names = net.nodes.map((x) => x.username);
+      for (const v of verified) expect(names).toContain(v.username); // siempre entran
+      expect(net.nodes.filter((x) => x.verified).length).toBeGreaterThanOrEqual(3);
+      for (const x of net.nodes) if (!x.verified) others.add(x.username);
+    }
+    expect(others.size).toBeGreaterThan(3); // los demás cambian de una visita a otra
+  });
 });

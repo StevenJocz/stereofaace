@@ -17,21 +17,33 @@ type Slot = { ring: Ring; deg: number };
 const R_MIN = 16;
 const R_MAX = 44;
 const ASPECT = 0.84;
-const GOLDEN = 137.508;
+/** Más de esto en pantalla y los nombres solo aparecen al señalar (si no, tapan a los demás). */
+const DENSE_AFTER = 12;
+/** Tope de hilos dibujados a la vez: con muchos seguimientos la red volvería a saturarse. */
+const MAX_LINKS = 90;
 
 /**
- * Un anillo por persona: cuantos más seguidores, más cerca del centro. Los anillos vecinos giran en sentidos contrarios y los
- * de fuera más despacio; el punto de partida de cada uno sigue el ángulo áureo para que las fotos no queden alineadas.
- * Los lugares libres («libre») ocupan los anillos de más afuera. El orden de la lista es el de `nodes` (+ libres).
+ * Anillos concéntricos que giran en sentidos contrarios (los de fuera, más despacio). Cada anillo lleva varias personas
+ * repartidas a distancias iguales —al girar juntas nunca se pisan—, en proporción a su perímetro. Los verificados y quienes
+ * tienen más seguidores van en los anillos de dentro; los lugares «libre» ocupan los de fuera.
  */
 function layout(nodes: NetworkNode[], count: number): Slot[] {
-  const order = nodes.map((_, i) => i).sort((a, b) => (nodes[b].followers ?? 0) - (nodes[a].followers ?? 0) || a - b);
+  const rings = Math.min(6, Math.max(3, Math.ceil(count / 6)));
+  const radii = Array.from({ length: rings }, (_, k) => R_MIN + ((R_MAX - R_MIN) * k) / (rings - 1));
+  // Cuántas personas lleva cada anillo: proporcional a su radio (método del mayor resto).
+  const total = radii.reduce((a, b) => a + b, 0);
+  const exact = radii.map((r) => (count * r) / total);
+  const per = exact.map(Math.floor);
+  let left = count - per.reduce((a, b) => a + b, 0);
+  [...exact.keys()].sort((a, b) => exact[b] - per[b] - (exact[a] - per[a])).forEach((k) => left-- > 0 && per[k]++);
+  const order = nodes.map((_, i) => i).sort((a, b) => Number(nodes[b].verified) - Number(nodes[a].verified) || (nodes[b].followers ?? 0) - (nodes[a].followers ?? 0) || a - b);
   for (let i = nodes.length; i < count; i++) order.push(i);
   const slots: Slot[] = new Array(count);
-  order.forEach((slotIndex, rank) => {
-    const f = count > 1 ? rank / (count - 1) : 0;
-    const rx = R_MIN + (R_MAX - R_MIN) * f;
-    slots[slotIndex] = { ring: { rx, ry: rx * ASPECT, dps: (rank % 2 === 0 ? 1 : -1) * (5.2 - 3 * f) }, deg: -90 + rank * GOLDEN };
+  let cursor = 0;
+  radii.forEach((rx, k) => {
+    const f = rings > 1 ? k / (rings - 1) : 0;
+    const ring: Ring = { rx, ry: rx * ASPECT, dps: (k % 2 === 0 ? 1 : -1) * (4.6 - 2.4 * f) };
+    for (let j = 0; j < per[k]; j++) slots[order[cursor++]] = { ring, deg: -90 + k * 37 + (360 / per[k]) * j };
   });
   return slots;
 }
@@ -60,6 +72,7 @@ export function SpacesNetwork({ network, ctaHref }: { network: Network; ctaHref:
   const [active, setActive] = useState<string | null>(null);
   const count = Math.max(MIN_SLOTS, network.nodes.length);
   const slots = useMemo(() => layout(network.nodes, count), [network.nodes, count]);
+  const rings = useMemo(() => [...new Set(slots.map((sl) => sl.ring))], [slots]); // un anillo lleva a varias personas
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const rootRef = useRef<HTMLDivElement>(null);
   const nodeEls = useRef<(HTMLLIElement | null)[]>([]);
@@ -81,7 +94,7 @@ export function SpacesNetwork({ network, ctaHref }: { network: Network; ctaHref:
       if (e.from === e.to || seen.has(key)) return false;
       seen.add(key);
       return true;
-    });
+    }).slice(0, MAX_LINKS);
   }, [network.edges]);
   const neighbors = useMemo(() => {
     const set = new Set<string>();
@@ -135,10 +148,10 @@ export function SpacesNetwork({ network, ctaHref }: { network: Network; ctaHref:
   }, [slots, links, indexOf]);
 
   return (
-    <div ref={rootRef} className="net" data-active={active ? "true" : undefined}>
+    <div ref={rootRef} className="net" data-active={active ? "true" : undefined} data-dense={network.nodes.length > DENSE_AFTER || undefined}>
       <svg className="net-svg" viewBox={`0 0 ${W} ${H}`} aria-hidden="true" focusable="false">
-        {slots.map((sl, i) => (
-          <ellipse key={i} className="net-orbit" cx={W / 2} cy={H / 2} rx={sl.ring.rx} ry={sl.ring.ry} />
+        {rings.map((r) => (
+          <ellipse key={r.rx} className="net-orbit" cx={W / 2} cy={H / 2} rx={r.rx} ry={r.ry} />
         ))}
         {links.map((e, i) => {
           const a = indexOf.get(e.from);
@@ -184,21 +197,30 @@ export function SpacesNetwork({ network, ctaHref }: { network: Network; ctaHref:
               </li>
             );
           }
-          const size = 40 + Math.min(n.followers ?? 0, 20) * 0.5;
+          const size = 6.2 + Math.min(n.followers ?? 0, 20) * 0.05; // en unidades del lienzo (1 = 1 % del ancho)
           return (
-            <li key={n.username} ref={(el) => void (nodeEls.current[i] = el)} className="net-node" style={{ ...style, ["--s" as string]: `${size}px` }} data-featured={n.featured || undefined} data-on={active === n.username || undefined} data-dim={(active && active !== n.username && !neighbors.has(n.username)) || undefined}>
+            <li key={n.username} ref={(el) => void (nodeEls.current[i] = el)} className="net-node" style={{ ...style, ["--s" as string]: size }} data-featured={n.featured || undefined} data-on={active === n.username || undefined} data-dim={(active && active !== n.username && !neighbors.has(n.username)) || undefined}>
               <Link href={`/@${n.username}`} onMouseEnter={() => setActive(n.username)} onMouseLeave={() => setActive(null)} onFocus={() => setActive(n.username)} onBlur={() => setActive(null)}>
-                <span className="net-av">
-                  {n.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- imagen propia servida por /s
-                    <img src={n.avatarUrl} alt="" loading="lazy" />
-                  ) : (
-                    <span aria-hidden="true">{n.displayName.slice(0, 1).toUpperCase()}</span>
+                <span className="net-avw">
+                  <span className="net-av">
+                    {n.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- imagen propia servida por /s
+                      <img src={n.avatarUrl} alt="" loading="lazy" />
+                    ) : (
+                      <span aria-hidden="true">{n.displayName.slice(0, 1).toUpperCase()}</span>
+                    )}
+                  </span>
+                  {n.verified && (
+                    <svg className="net-check" viewBox="0 0 16 16" aria-hidden="true">
+                      <circle cx="8" cy="8" r="8" />
+                      <path d="M4.6 8.3l2.2 2.2 4.6-4.8" />
+                    </svg>
                   )}
                 </span>
                 <span className="net-name">@{n.username}</span>
                 <span className="sr-only">
                   {n.displayName}
+                  {n.verified ? ", verificado" : ""}
                   {n.genres.length ? `, ${n.genres.join(", ")}` : ""}
                 </span>
               </Link>
@@ -211,6 +233,7 @@ export function SpacesNetwork({ network, ctaHref }: { network: Network; ctaHref:
         {activeNode ? (
           <>
             <b>{activeNode.displayName}</b>
+            {activeNode.verified && <span> · verificado</span>}
             {activeNode.genres.length > 0 && <span> · {activeNode.genres.join(" · ")}</span>}
             {neighbors.size > 0 && (
               <span>
@@ -226,7 +249,7 @@ export function SpacesNetwork({ network, ctaHref }: { network: Network; ctaHref:
             )}
           </>
         ) : (
-          "Cada anillo es una persona · más cerca del centro, más seguidores"
+          "Los verificados y con más seguidores, más cerca del centro"
         )}
       </p>
     </div>

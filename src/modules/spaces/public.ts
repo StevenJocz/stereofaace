@@ -156,23 +156,28 @@ export async function reportSpace(db: Db, raw: unknown, reporterId: string | nul
   await db.insert(spaceReports).values({ profileUserId: p.userId, reporterId, reason: input.reason, detail: input.detail || null });
 }
 
-export type NetworkNode = { username: string; displayName: string; avatarUrl: string | null; genres: string[]; featured: boolean; followers: number | null };
+export type NetworkNode = { username: string; displayName: string; avatarUrl: string | null; genres: string[]; featured: boolean; /** Chulo de verificado dado por el equipo. */ verified: boolean; followers: number | null };
 export type Network = { nodes: NetworkNode[]; edges: { from: string; to: string }[]; total: number };
 
+/** Cuántos Spaces muestra la red por defecto (si hay tantos) y el tope. */
+export const NETWORK_DEFAULT = 12;
+const NETWORK_MAX = 40;
+
 /**
- * «Red de amigos» de la portada: hasta `limit` Spaces públicos (destacados primero) y los seguimientos que hay entre ellos.
+ * «Red de amigos» de la portada: hasta `limit` Spaces públicos **al azar** (cambian en cada visita) y los seguimientos que hay
+ * entre ellos. Se priorizan los verificados (chulo del equipo), luego los destacados y el resto se completa al azar.
  * Solo salen Spaces publicados y que aceptan aparecer en el listado. Un seguimiento se dibuja únicamente si las DOS personas
  * dejaron visibles sus números de seguidores (la opción «mostrar seguidores y seguidos»); si no, la relación no se revela.
  */
-export async function getNetwork(db: Db, limit = 9): Promise<Network> {
+export async function getNetwork(db: Db, limit = NETWORK_DEFAULT): Promise<Network> {
   const visible = and(eq(spaceProfiles.status, "published"), sql`coalesce((${spaceProfiles.privacy} ->> 'listed')::boolean, true)`);
   const rows = await db
     .select({ p: spaceProfiles, avatarKey: spaceAssets.storageKey })
     .from(spaceProfiles)
     .leftJoin(spaceAssets, and(eq(spaceAssets.id, spaceProfiles.avatarAssetId), eq(spaceAssets.status, "ok")))
     .where(visible)
-    .orderBy(desc(spaceProfiles.featured), desc(spaceProfiles.publishedAt))
-    .limit(Math.max(1, Math.min(limit, 16)));
+    .orderBy(sql`(${spaceProfiles.badgeVerifiedAt} is not null) desc`, desc(spaceProfiles.featured), sql`random()`)
+    .limit(Math.max(1, Math.min(limit, NETWORK_MAX)));
   const [{ c }] = await db.select({ c: sql<number>`count(*)` }).from(spaceProfiles).where(visible);
   if (!rows.length) return { nodes: [], edges: [], total: 0 };
   const ids = rows.map((r) => r.p.userId);
@@ -194,6 +199,7 @@ export async function getNetwork(db: Db, limit = 9): Promise<Network> {
     avatarUrl: r.avatarKey ? assetUrl(r.avatarKey) : null,
     genres: genreRows.filter((g) => g.userId === r.p.userId).slice(0, 2).map((g) => g.name),
     featured: r.p.featured,
+    verified: r.p.badgeVerifiedAt !== null,
     followers: shows(r) ? Number(countRows.find((x) => x.id === r.p.userId)?.n ?? 0) : null,
   }));
   const edges = followRows

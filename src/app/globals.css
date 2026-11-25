@@ -4175,7 +4175,10 @@ body[data-radio="on"] .adm-shell {
   width: 100%;
   max-width: 40rem;
   margin-inline: auto;
+  margin-bottom: 3.2rem;
   aspect-ratio: 100 / 84;
+  container-type: inline-size;
+  overflow-x: clip; /* los nombres de los extremos no deben ensanchar la página */
 }
 .net-svg {
   position: absolute;
@@ -4195,10 +4198,10 @@ body[data-radio="on"] .adm-shell {
 .net-edge path {
   fill: none;
   stroke: var(--violet);
-  stroke-width: 0.6px;
+  stroke-width: 0.5px;
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
-  opacity: 0;
+  opacity: 0.22;
   transition: opacity 0.25s, stroke 0.25s;
 }
 .net-edge .net-packet {
@@ -4206,14 +4209,13 @@ body[data-radio="on"] .adm-shell {
   opacity: 0.7;
 }
 .net[data-active] .net-edge:not([data-on]) path {
-  opacity: 0.04;
+  opacity: 0.05;
 }
 .net-edge[data-on] path {
   stroke: var(--accent);
-  opacity: 0.5;
+  opacity: 0.55;
   stroke-width: 0.6px;
 }
-/* El centro es un disco de vinilo con el logo de StereoFace de etiqueta: gira y todo lo demás órbita a su alrededor. */
 .net-me {
   position: absolute;
   z-index: 1;
@@ -4301,15 +4303,35 @@ body[data-radio="on"] .adm-shell {
   display: grid;
   place-items: center;
   overflow: hidden;
-  width: var(--s, 52px);
+  width: max(calc(var(--s, 5) * 1cqw), 24px);
   aspect-ratio: 1;
   border-radius: 999px;
   border: 1.5px solid color-mix(in srgb, var(--violet) 55%, transparent);
   background: linear-gradient(135deg, color-mix(in srgb, var(--violet) 60%, #0a0a0c), #0a0a0c);
   font-weight: 800;
-  font-size: 1.2rem;
+  font-size: max(calc(var(--s, 5) * 0.4cqw), 10px);
   box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.8);
   transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.25s, box-shadow 0.3s;
+}
+.net-avw {
+  position: relative;
+  display: grid;
+}
+.net-check {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: max(1.3cqw, 11px);
+  height: max(1.3cqw, 11px);
+  fill: var(--accent);
+  filter: drop-shadow(0 0 0 var(--bg));
+}
+.net-check path {
+  fill: none;
+  stroke: #0a0a0c;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .net-av img {
   width: 100%;
@@ -4338,6 +4360,15 @@ body[data-radio="on"] .adm-shell {
   text-shadow: 0 1px 6px var(--bg), 0 0 2px var(--bg);
   transition: color 0.25s;
 }
+.net[data-dense] .net-name {
+  opacity: 0;
+  transition: opacity 0.2s, color 0.25s;
+}
+.net[data-dense] .net-node > a:hover .net-name,
+.net[data-dense] .net-node > a:focus-visible .net-name,
+.net[data-dense] .net-node[data-on] .net-name {
+  opacity: 1;
+}
 .net-node > a:hover .net-name,
 .net-node > a:focus-visible .net-name,
 .net-node[data-on] .net-name {
@@ -4358,7 +4389,7 @@ body[data-radio="on"] .adm-shell {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -0.3rem;
+  bottom: -2.7rem;
   text-align: center;
   font-size: 0.7rem;
   color: var(--muted, #9a9aa0);
@@ -4378,12 +4409,17 @@ body[data-radio="on"] .adm-shell {
   }
 }
 @media (max-width: 639px) {
+  /* En el móvil los nombres de los extremos se salen de la pantalla: solo se ven al señalar a alguien. */
   .net-name {
     max-width: 4.6rem;
     font-size: 0.55rem;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.25s;
   }
-  .net-av {
-    width: calc(var(--s, 52px) * 0.78);
+  .net-node > a:hover .net-name,
+  .net-node > a:focus-visible .net-name,
+  .net-node[data-on] .net-name {
+    opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
