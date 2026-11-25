@@ -6,7 +6,6 @@ import { LibraryPanel } from "./LibraryPanel";
 import type { DjProgramInfo, StudioProgram } from "@/modules/schedule/dj";
 import type { CartView } from "@/modules/studio/carts";
 import { SpotifyPanel } from "./SpotifyPanel";
-import { CartWall } from "./CartWall";
 import { EventsPanel } from "./EventsPanel";
 import { useStudioEvents } from "./useStudioEvents";
 import type { EventView } from "@/modules/studio/events";
@@ -26,6 +25,7 @@ import { LinePanel } from "./LinePanel";
 import { MidiPanel } from "./MidiPanel";
 import { useMidi } from "./useMidi";
 import type { MidiEvent } from "./engine/midi";
+import { DEFAULT_PTT, PTT_KEY, parsePtt, pttLabel } from "./engine/ptt";
 import { MicPanel, type MicDevice } from "./MicPanel";
 import { AudioEngine, LoadSupersededError, type DeckId, type Levels, type RelayState } from "./engine/audio-engine";
 import { makeItems } from "./engine/audio-files";
@@ -790,6 +790,9 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
       const e = getEngine();
       await e.resume();
       await e.startMic(deviceId || undefined);
+      // Encender el micrófono lo deja abierto, aunque antes se hubiera silenciado.
+      e.setMicMuted(false);
+      setMicMuted(false);
       setMicActive(true);
       setDevices(await e.listMics()); // las etiquetas solo existen tras conceder el permiso
     } catch (err) {
@@ -856,30 +859,96 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     setMicActive(false);
   }, []);
 
-  // Mantener V para hablar mientras el micrófono está silenciado.
+  // Tecla para hablar elegida por el DJ (se guarda en este navegador).
+  const [pttCode, setPttCode] = useState(DEFAULT_PTT);
+  const pttCodeRef = useRef(DEFAULT_PTT);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        const c = parsePtt(localStorage.getItem(PTT_KEY));
+        pttCodeRef.current = c;
+        setPttCode(c);
+      } catch {
+        /* sin almacenamiento: queda la V */
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const changePttCode = useCallback((code: string) => {
+    pttCodeRef.current = code;
+    setPttCode(code);
+    try {
+      localStorage.setItem(PTT_KEY, code);
+    } catch {
+      /* vale solo para esta visita */
+    }
+  }, []);
+
+  /**
+   * Hablar mientras se mantiene la tecla (o el botón del aparato MIDI): abre el micrófono —y lo enciende si aún no lo estaba— y al
+   * soltar lo vuelve a silenciar. Si ya estaba abierto con el botón, no se toca.
+   */
+  const holdTalk = useCallback(
+    (press: boolean) => {
+      const eng = engineRef.current;
+      if (press) {
+        if (pttRef.current) return;
+        if (eng?.micActive && !voiceRef.current.micMuted) return; // ya está abierto
+        pttRef.current = true;
+        if (eng?.micActive) {
+          eng.setMicMuted(false);
+          setMicMuted(false);
+        } else {
+          void startMic().then(() => {
+            // Si soltó la tecla mientras el navegador pedía el micrófono, no debe quedar abierto.
+            if (!pttRef.current) {
+              engineRef.current?.setMicMuted(true);
+              setMicMuted(true);
+            }
+          });
+        }
+      } else if (pttRef.current) {
+        pttRef.current = false;
+        eng?.setMicMuted(true);
+        setMicMuted(true);
+      }
+    },
+    [startMic],
+  );
+  const holdTalkRef = useRef(holdTalk);
+  useEffect(() => {
+    holdTalkRef.current = holdTalk;
+  });
+
+  /** Botón del micrófono: enciende (abierto) o apaga (silenciado); el aparato queda listo para hablar al instante. */
+  const toggleMic = useCallback(() => {
+    if (!engineRef.current?.micActive) {
+      void startMic();
+      return;
+    }
+    const m = !voiceRef.current.micMuted;
+    pttRef.current = false;
+    setMicMuted(m);
+    engineRef.current.setMicMuted(m);
+  }, [startMic]);
+
+  // Mantener la tecla elegida para hablar (por defecto V).
   useEffect(() => {
     const isTyping = (t: EventTarget | null) => {
       const el = t as HTMLElement | null;
       return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
     };
     const down = (e: KeyboardEvent) => {
-      if (!visibleRef.current || e.code !== "KeyV" || e.repeat || isTyping(e.target)) return;
-      const eng = engineRef.current;
-      if (!eng?.micActive || !voiceRef.current.micMuted) return;
-      pttRef.current = true;
-      eng.setMicMuted(false);
-      setMicMuted(false);
+      if (!visibleRef.current || e.code !== pttCodeRef.current || e.repeat || e.ctrlKey || e.altKey || e.metaKey || isTyping(e.target)) return;
+      if (e.target instanceof HTMLElement && e.target.closest("[data-ptt-capture]")) return; // eligiendo la tecla
+      e.preventDefault();
+      holdTalkRef.current(true);
     };
-    const release = () => {
-      if (!pttRef.current) return;
-      pttRef.current = false;
-      engineRef.current?.setMicMuted(true);
-      setMicMuted(true);
-    };
+    const release = () => holdTalkRef.current(false);
     const up = (e: KeyboardEvent) => {
-      if (e.code === "KeyV") release();
+      if (e.code === pttCodeRef.current) release();
     };
-    // Si la ventana pierde el foco con V pulsada, el «keyup» nunca llega: el micrófono no puede quedar abierto al aire.
+    // Si la ventana pierde el foco con la tecla pulsada, el «keyup» nunca llega: el micrófono no puede quedar abierto al aire.
     const hide = () => {
       if (document.visibilityState === "hidden") release();
     };
@@ -1005,7 +1074,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         engineRef.current?.stopAllCarts();
         return;
       }
-      if (e.repeat) return;
+      if (e.repeat || e.code === pttCodeRef.current) return;
       const id = keys.get(e.key.toLowerCase());
       const cart = id ? carts.find((c) => c.id === id) : undefined;
       if (cart) {
@@ -1140,7 +1209,6 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   }, [decks, play, pause]);
 
   const hot = new Set<ToolId>();
-  if (cartsPlaying.size > 0) hot.add("carts");
   if (micActive && !micMuted) hot.add("voice");
   if (relayState === "playing" || relayState === "connecting") hot.add("relay");
   if (cabinLive) hot.add("camera");
@@ -1148,7 +1216,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   if (lineOn) hot.add("line");
   if (midi.status === "ready" && midi.inputs.length > 0) hot.add("midi");
 
-  const TOOL_TITLE: Record<ToolId, string> = { midi: "Controlador MIDI", line: "Consola o mezclador externo", carts: "Cart Wall", voice: "Voz y ducking", chat: "Chat de la audiencia", spotify: "Spotify al aire", relay: "Señal externa", camera: "Cámara en cabina", eq: "Ecualizador" };
+  const TOOL_TITLE: Record<ToolId, string> = { midi: "Controlador MIDI", line: "Consola o mezclador externo", voice: "Voz y ducking", chat: "Chat de la audiencia", spotify: "Spotify al aire", relay: "Señal externa", camera: "Cámara en cabina", eq: "Ecualizador" };
   const searchFor = (text: string) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }));
   const setBothVolumes = (v: number) => {
     setDecks((d) => ({ A: { ...d.A, volume: v }, B: { ...d.B, volume: v } }));
@@ -1175,21 +1243,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         return;
       }
       if (id === "mic-ptt") {
-        const eng = engineRef.current;
-        if (ev.press) {
-          if (!eng?.micActive) {
-            setMessage("Activa el micrófono en «Voz» para hablar con el botón del aparato.");
-            return;
-          }
-          if (!voiceRef.current.micMuted) return; // ya está abierto
-          pttRef.current = true;
-          eng.setMicMuted(false);
-          setMicMuted(false);
-        } else if (pttRef.current) {
-          pttRef.current = false;
-          eng?.setMicMuted(true);
-          setMicMuted(true);
-        }
+        holdTalk(ev.press);
         return;
       }
       if (!ev.press) return; // el resto actúa al pulsar, no al soltar
@@ -1221,16 +1275,9 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         case "carts-stop":
           stopCarts();
           break;
-        case "mic-toggle": {
-          if (!engineRef.current?.micActive) {
-            setMessage("Activa el micrófono en «Voz» para silenciarlo o abrirlo desde el aparato.");
-            break;
-          }
-          const m = !voiceRef.current.micMuted;
-          setMicMuted(m);
-          engineRef.current.setMicMuted(m);
+        case "mic-toggle":
+          toggleMic();
           break;
-        }
         case "event-next": {
           const next = nextOccurrence(eventsRef.current, Date.now());
           if (next) void fireEvents([next.event as EventView]);
@@ -1325,7 +1372,23 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         </ZaraWindow>
       </div>
 
-      <JingleBar carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
+      <JingleBar
+        carts={carts}
+        state={cartState}
+        playing={cartsPlaying}
+        onFire={(c) => void fireCart(c)}
+        onStopAll={stopCarts}
+        readRemaining={readCartRemaining}
+        mic={{
+          active: micActive,
+          muted: micMuted,
+          error: micError,
+          readLevel: readMicLevel,
+          pttLabel: pttLabel(pttCode),
+          onToggle: toggleMic,
+          onSettings: () => setTool(tool === "voice" ? null : "voice"),
+        }}
+      />
       <StatusBar live={live} dj={creds.user} program={activeProgram?.name ?? null} queueCount={queue.length} active={active} />
 
       {/* Ventana de herramientas: sus cuerpos siguen montados (solo se ocultan), así cambiar de herramienta no corta la cámara ni lo que suena. */}
@@ -1337,9 +1400,6 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
           </button>
         </header>
         <div className="zs-drawer-body">
-          <div id="tool-carts" className="studio-tool-body" hidden={tool !== "carts"}>
-            <CartWall carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
-          </div>
           <div id="tool-midi" className="studio-tool-body" hidden={tool !== "midi"}>
             <MidiPanel
               status={midi.status}
@@ -1382,6 +1442,8 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
                 engineRef.current?.setMicGateThreshold(db);
               }}
               onDevice={setDeviceId}
+              pttCode={pttCode}
+              onPttCode={changePttCode}
             />
             <DuckingPanel
               settings={duck}

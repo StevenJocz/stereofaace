@@ -4,9 +4,24 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { CartKind, CartView } from "@/modules/studio/carts";
 import { CART_KIND_LABEL, groupByKind } from "./engine/carts";
+import { PollMeter } from "./PollMeter";
 import { formatRemaining } from "./zara-format";
 
 const SLOTS = 9;
+
+/** Micrófono del locutor, siempre a mano junto a los jingles. */
+export type MicControl = {
+  active: boolean;
+  muted: boolean;
+  error: string | null;
+  readLevel: () => number;
+  /** Tecla para hablar mientras se mantiene (p. ej. «V»). */
+  pttLabel: string;
+  /** Enciende el micrófono (pide permiso la primera vez) o lo apaga; con un solo botón. */
+  onToggle: () => void;
+  /** Abre los ajustes de voz (dispositivo, ganancia, puerta de ruido y ducking). */
+  onSettings: () => void;
+};
 
 /** Tiempo que le queda al audio de la casilla; solo ella se vuelve a dibujar. */
 function Remaining({ read }: { read: () => number }) {
@@ -29,6 +44,7 @@ export function JingleBar({
   onFire,
   onStopAll,
   readRemaining,
+  mic,
 }: {
   carts: CartView[];
   state: "loading" | "ready" | "error";
@@ -36,6 +52,7 @@ export function JingleBar({
   onFire: (c: CartView) => void;
   onStopAll: () => void;
   readRemaining: (id: string) => number;
+  mic?: MicControl;
 }) {
   const groups = groupByKind(carts);
   const kinds = (Object.keys(CART_KIND_LABEL) as CartKind[]).filter((k) => groups[k].length > 0);
@@ -118,6 +135,33 @@ export function JingleBar({
           )}
         </div>
       </div>
+      {mic && (
+        <div className="zs-mic" data-state={mic.active && !mic.muted ? "open" : "off"}>
+          <div className="zs-mic-row">
+            <button
+              type="button"
+              className="zs-mic-btn"
+              onClick={mic.onToggle}
+              aria-pressed={mic.active && !mic.muted}
+              aria-label={mic.active && !mic.muted ? "Apagar el micrófono" : "Encender el micrófono"}
+              title={mic.active && !mic.muted ? "Micrófono encendido: pulsa para apagarlo" : `Micrófono apagado: pulsa para encenderlo, o mantén la tecla ${mic.pttLabel} para hablar`}
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4" />
+                {!(mic.active && !mic.muted) && <path d="M4 4l16 16" />}
+              </svg>
+              <span>{mic.active && !mic.muted ? "Micrófono encendido" : "Micrófono apagado"}</span>
+            </button>
+            <button type="button" className="zs-iconbtn" onClick={mic.onSettings} title="Mezcla y ajustes del micrófono: dispositivo, ganancia, puerta de ruido, tecla para hablar y música de fondo" aria-label="Ajustes de voz">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 4v16M12 4v16M19 4v16M3 9h4M10 15h4M17 8h4" />
+              </svg>
+            </button>
+          </div>
+          {mic.active ? <PollMeter read={mic.readLevel} label="Nivel del micrófono" /> : null}
+          <span className="zs-mic-hint">{mic.error ?? (mic.active && !mic.muted ? "Pulsa para apagar" : `Mantén ${mic.pttLabel} para hablar`)}</span>
+        </div>
+      )}
     </div>
   );
 }

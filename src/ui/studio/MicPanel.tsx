@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { PollMeter } from "./PollMeter";
+import { pttLabel, validPttCode } from "./engine/ptt";
 
 export type MicDevice = { id: string; label: string };
 
@@ -19,6 +21,8 @@ export function MicPanel({
   onGain,
   onGate,
   onDevice,
+  pttCode,
+  onPttCode,
 }: {
   active: boolean;
   muted: boolean;
@@ -34,7 +38,29 @@ export function MicPanel({
   onGain: (g: number) => void;
   onGate: (db: number) => void;
   onDevice: (id: string) => void;
+  pttCode: string;
+  onPttCode: (code: string) => void;
 }) {
+  // «Cambiar»: la siguiente tecla que se pulse queda como tecla para hablar (Esc cancela).
+  const [capturing, setCapturing] = useState(false);
+  const [pttNote, setPttNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code === "Escape") {
+        setCapturing(false);
+        setPttNote(null);
+      } else if (validPttCode(e.code)) {
+        onPttCode(e.code);
+        setCapturing(false);
+        setPttNote(null);
+      } else setPttNote("Esa tecla no se puede usar. Prueba con una letra, un número o una tecla F.");
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [capturing, onPttCode]);
   return (
     <section className="studio-voice panel" aria-label="Micrófono">
       <header className="flex items-center justify-between gap-2">
@@ -54,7 +80,7 @@ export function MicPanel({
       </label>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className={active ? "btn" : "btn btn-accent"} onClick={active ? onStop : onStart}>
-          {active ? "Apagar micrófono" : "Activar micrófono"}
+          {active ? "Soltar el micrófono" : "Activar micrófono"}
         </button>
         <button
           type="button"
@@ -66,7 +92,21 @@ export function MicPanel({
           {muted ? "Hablar" : "Silenciar"}
         </button>
       </div>
-      <p className="mono muted mt-2">Mantén la tecla V para hablar mientras está silenciado.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2" data-ptt-capture>
+        <span className="mono muted">Tecla para hablar</span>
+        <kbd className="zs-kbd" aria-label={`Tecla para hablar: ${pttLabel(pttCode)}`}>
+          {capturing ? "Pulsa una tecla…" : pttLabel(pttCode)}
+        </kbd>
+        <button type="button" className="btn !px-3 !py-1.5" onClick={() => (setCapturing(!capturing), setPttNote(null))} aria-pressed={capturing}>
+          {capturing ? "Cancelar" : "Cambiar"}
+        </button>
+      </div>
+      <p className="mono muted mt-2">Mantén esa tecla para hablar mientras el micrófono está apagado; al soltarla se vuelve a apagar.</p>
+      {pttNote && (
+        <p role="alert" className="mono mt-1 text-[var(--violet)]">
+          {pttNote}
+        </p>
+      )}
       <PollMeter read={readLevel} label="Nivel del micrófono" className="mt-3" />
       <label className="mono muted mt-3 flex items-center gap-2">
         Ganancia
