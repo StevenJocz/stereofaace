@@ -59,12 +59,9 @@ export function LiveBar({
 }) {
   const on = state === "live" || state === "connecting" || state === "reconnecting";
   return (
-    <section className="studio-livebar panel" data-state={state} aria-label="Emisión">
+    <section className="studio-livebar zs-strip" data-state={state} aria-label="Emisión">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-        <div className="mr-2">
-          <p className="mono text-accent-ink">StereoFace Radio</p>
-          <h1 className="display-up text-[1.5rem] leading-none">Estudio en vivo</h1>
-        </div>
+        <h1 className="sr-only">Estudio en vivo de StereoFace Radio</h1>
         {!locked && (
         <>
         <label className="block">
@@ -94,7 +91,7 @@ export function LiveBar({
           {state === "live" && <span className="mono muted"> · {formatTime(elapsedSec)}</span>}
           {on && endsAt !== null && <AirClock endsAt={endsAt} className="ml-2 block text-[0.78rem]" />}
         </p>
-        <div className="ml-auto flex w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:min-w-[16rem] sm:max-w-[34rem] sm:flex-1 sm:flex-nowrap">
+        <div className="ml-auto flex w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:min-w-[16rem] sm:max-w-[34rem] sm:flex-1 xl:flex-nowrap">
           <div className="flex-1">
             <span className="mono muted">Master</span>
             <PollMeter read={readMaster} label="Nivel de salida (master)" className="mt-1" />

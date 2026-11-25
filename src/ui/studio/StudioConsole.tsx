@@ -1,12 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { DeckPanel, type DeckView } from "./DeckPanel";
+import type { DeckView } from "./DeckPanel";
 import { LibraryPanel } from "./LibraryPanel";
 import type { DjProgramInfo, StudioProgram } from "@/modules/schedule/dj";
 import type { CartView } from "@/modules/studio/carts";
 import { SpotifyPanel } from "./SpotifyPanel";
 import { CartWall } from "./CartWall";
+import { EventsPanel } from "./EventsPanel";
+import { JingleBar } from "./JingleBar";
+import { PrincipalPanel } from "./PrincipalPanel";
+import { StatusBar } from "./StatusBar";
+import { StudioToolbar, type ToolId } from "./StudioToolbar";
+import { ZaraWindow } from "./ZaraWindow";
 import { DuckingPanel } from "./DuckingPanel";
 import { EqPanel } from "./EqPanel";
 import type { RelayTrack } from "@/modules/studio/relay-meta";
@@ -15,8 +21,7 @@ import { ChatModPanel, RequestsPanel, useDeskFeed } from "./DeskChat";
 import { liveStore } from "./live-store";
 import { LiveBar } from "./LiveBar";
 import { MicPanel, type MicDevice } from "./MicPanel";
-import { QueuePanel } from "./QueuePanel";
-import { AudioEngine, LoadSupersededError, type DeckId, type RelayState } from "./engine/audio-engine";
+import { AudioEngine, LoadSupersededError, type DeckId, type Levels, type RelayState } from "./engine/audio-engine";
 import { makeItems } from "./engine/audio-files";
 import { hotkeyMap, isTypingTarget } from "./engine/carts";
 import { loadCover, type DeckCover } from "./engine/deck-cover";
@@ -104,7 +109,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const [eqMusic, setEqMusic] = useState<EqSettings>(FLAT_EQ);
   const [eqMic, setEqMic] = useState<EqSettings>(FLAT_EQ);
   const [carts, setCarts] = useState<CartView[]>([]);
-  const [tool, setTool] = useState<"carts" | "voice" | "eq" | "relay" | "requests" | "chat" | "spotify" | "camera">("carts");
+  const [tool, setTool] = useState<ToolId | null>(null);
   const [cabinLive, setCabinLive] = useState(false);
   const [searchSeed, setSearchSeed] = useState<{ text: string; n: number } | null>(null);
   const [spSeed, setSpSeed] = useState<{ text: string; n: number } | null>(null);
@@ -133,6 +138,8 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   const activeRef = useRef(active);
   const autoRef = useRef(auto);
   const fadingRef = useRef(false);
+  /** Pasa a la siguiente pista (con fundido o en seco); lo asigna el motor al crearse. */
+  const nextRef = useRef<(mode: "fade" | "cut") => Promise<void>>(async () => undefined);
   const startingRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   // Un deck «cedió el aire» cuando ya empezó el fundido hacia el otro: no debe volver a disparar nada.
@@ -256,6 +263,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         fadingRef.current = false;
       }
     };
+    nextRef.current = (mode) => startNext(activeRef.current, mode);
     e.onDeckEnded = (id) => {
       setDecks((d) => ({ ...d, [id]: { ...d[id], playing: false } }));
       const to = other(id);
@@ -305,7 +313,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
   }, []);
 
   // Los medidores consultan el motor por su cuenta (PollMeter): la consola no se re-renderiza por ellos.
-  const levelsRef = useRef({ at: 0, value: { master: { rmsDb: -100, peakDb: -100 }, A: -100, B: -100 } });
+  const levelsRef = useRef({ at: 0, value: { master: { rmsDb: -100, peakDb: -100 }, A: -100, B: -100, stereo: { A: [-100, -100], B: [-100, -100] } } as Levels });
   const readLevels = useCallback(() => {
     const e = engineRef.current;
     const now = performance.now();
@@ -313,8 +321,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     return levelsRef.current.value;
   }, []);
   const readMaster = useCallback(() => readLevels().master.peakDb, [readLevels]);
-  const readDeckA = useCallback(() => readLevels().A, [readLevels]);
-  const readDeckB = useCallback(() => readLevels().B, [readLevels]);
+  const readLR = useCallback((id: DeckId, ch: 0 | 1) => readLevels().stereo[id][ch], [readLevels]);
 
   // Evita que soltar un archivo fuera de la cola haga que el navegador lo abra y se pierda la sesión.
   useEffect(() => {
@@ -360,13 +367,13 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     const fit = () => {
       const el = rootRef.current;
       if (!el) return;
-      if (window.innerWidth < 1024) {
-        el.style.height = "";
+      if (window.innerWidth < 1280) {
+        el.style.height = ""; // con menos de tres columnas la consola crece con la página
         return;
       }
       const pad = (parseFloat(getComputedStyle(el.parentElement ?? el).paddingBottom) || 0) + (parseFloat(getComputedStyle(document.body).paddingBottom) || 0); // relleno del contenedor + espacio del reproductor fijo
-      const bleed = 20; // el margen negativo de .studio compensa parte del relleno del contenedor
-      el.style.height = `${Math.max(760, window.innerHeight - el.getBoundingClientRect().top - pad + bleed)}px`;
+      const gap = 8; // respiro bajo la barra de estado (la última fila de la consola debe verse completa)
+      el.style.height = `${Math.max(760, window.innerHeight - el.getBoundingClientRect().top - pad - gap)}px`;
     };
     fit();
     window.addEventListener("resize", fit);
@@ -525,6 +532,94 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
       setDecks((d) => ({ ...d, [id]: { ...d[id], playing: false } }));
     },
     [],
+  );
+
+  /* ───────────── Transporte de la lista principal (estilo ZaraStudio) ───────────── */
+
+  /** Play: reanuda lo cargado en el deck activo; si no hay nada, arranca la cabeza de la cola. */
+  const playMain = useCallback(async () => {
+    const e = getEngine();
+    const id = activeRef.current;
+    if (e.isPlaying(id)) return;
+    if (e.deckItem(id)) return play(id);
+    if (e.deckItem(other(id)) && !handedOffRef.current[other(id)]) return play(other(id));
+    const head = queueRef.current[0];
+    if (!head) {
+      setMessage("La lista está vacía: añade pistas desde el explorador.");
+      return;
+    }
+    await loadToDeck(head, id);
+    await play(id);
+  }, [getEngine, play, loadToDeck]);
+
+  /** Stop: detiene el deck activo y lo deja al principio de su pista. */
+  const stopMain = useCallback(() => {
+    const e = engineRef.current;
+    if (!e) return;
+    const id = activeRef.current;
+    pause(id);
+    e.seek(id, 0);
+    setDecks((d) => ({ ...d, [id]: { ...d[id], currentSec: 0 } }));
+  }, [pause]);
+
+  const restartMain = useCallback(() => {
+    const e = engineRef.current;
+    const id = activeRef.current;
+    if (!e?.deckItem(id)) return;
+    e.seek(id, 0);
+    setDecks((d) => ({ ...d, [id]: { ...d[id], currentSec: 0 } }));
+  }, []);
+
+  /** Siguiente pista con fundido o en seco. Avisa si no hay otra. */
+  const skipMain = useCallback(
+    async (mode: "fade" | "cut") => {
+      const e = engineRef.current;
+      if (!e) return;
+      const to = other(activeRef.current);
+      const pick = pickNext({ queue: queueRef.current, otherDeckItem: e.deckItem(to), otherDeckPlaying: e.isPlaying(to), otherDeckConsumed: handedOffRef.current[to] });
+      if (!pick) {
+        setMessage("No hay otra pista en la lista.");
+        return;
+      }
+      setMessage(null);
+      await nextRef.current(mode);
+    },
+    [],
+  );
+
+  /** Reproduce ya una pista de la lista (doble clic): con fundido si algo está sonando, directa si no. */
+  const playItemNow = useCallback(
+    async (item: QueueItem) => {
+      const e = getEngine();
+      const from = activeRef.current;
+      const busy = e.isPlaying(from);
+      const to = busy ? other(from) : from;
+      if (busy && e.isPlaying(to)) {
+        setMessage("Los dos decks están sonando: espera a que termine el fundido.");
+        return;
+      }
+      fadingRef.current = true;
+      try {
+        await loadToDeck(item, to);
+        if (busy) {
+          handedOffRef.current[from] = true;
+          handedOffRef.current[to] = false;
+          await e.crossfadeTo(to, FADE_SEC);
+          setDecks((d) => ({ ...d, [to]: { ...d[to], playing: true } }));
+          activeRef.current = to;
+          setActive(to);
+          senderRef.current?.setMetadata(metaFor(item));
+        } else {
+          await play(to);
+        }
+      } catch (err) {
+        if (busy) handedOffRef.current[from] = false;
+        if (!(err instanceof LoadSupersededError)) setMessage(err instanceof Error ? err.message : "No se pudo reproducir la pista.");
+      } finally {
+        fadingRef.current = false;
+      }
+    },
+    [getEngine, loadToDeck, play, metaFor],
   );
 
   const startMic = useCallback(async () => {
@@ -882,8 +977,24 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
     return () => window.removeEventListener("keydown", h);
   }, [decks, play, pause]);
 
+  const hot = new Set<ToolId>();
+  if (cartsPlaying.size > 0) hot.add("carts");
+  if (micActive && !micMuted) hot.add("voice");
+  if (relayState === "playing" || relayState === "connecting") hot.add("relay");
+  if (cabinLive) hot.add("camera");
+  if (extOn) hot.add("spotify");
+
+  const TOOL_TITLE: Record<ToolId, string> = { carts: "Cart Wall", voice: "Voz y ducking", chat: "Chat de la audiencia", spotify: "Spotify al aire", relay: "Señal externa", camera: "Cámara en cabina", eq: "Ecualizador" };
+  const searchFor = (text: string) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }));
+  const setBothVolumes = (v: number) => {
+    setDecks((d) => ({ A: { ...d.A, volume: v }, B: { ...d.B, volume: v } }));
+    engineRef.current?.setDeckVolume("A", v);
+    engineRef.current?.setDeckVolume("B", v);
+  };
+
   return (
-    <div ref={rootRef} className="studio">
+    <div ref={rootRef} className="studio zs">
+      <StudioToolbar tool={tool} onTool={setTool} hot={hot} />
       <LiveBar
         state={live}
         user={creds.user}
@@ -908,60 +1019,61 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
         onProgramChoice={setProgramChoice}
         locked={locked}
       />
-      <div className="studio-decks">
-        {(["A", "B"] as const).map((id) => (
-          <DeckPanel
-            key={id}
-            id={id}
-            deck={decks[id]}
-            active={active === id}
-            readLevel={id === "A" ? readDeckA : readDeckB}
-            onPlay={() => void play(id)}
-            onPause={() => pause(id)}
-            onSeek={(s) => engineRef.current?.seek(id, s)}
-            onVolume={(v) => {
-              setDecks((d) => ({ ...d, [id]: { ...d[id], volume: v } }));
-              engineRef.current?.setDeckVolume(id, v);
-            }}
-          />
-        ))}
+
+      <div className="zs-grid">
+        <div className="zs-col">
+          <EventsPanel />
+          <ZaraWindow title={`Pedidos${desk.feed.requests.length > 0 ? ` (${desk.feed.requests.length})` : ""}`} tone="blue" className="zs-requests-win">
+            <RequestsPanel bare feed={desk.feed} refresh={desk.refresh} onSearch={searchFor} onSpotify={(text) => { setSpSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 })); setTool("spotify"); }} />
+          </ZaraWindow>
+        </div>
+
+        <PrincipalPanel
+          decks={decks}
+          active={active}
+          queue={queue}
+          rejected={rejected}
+          auto={auto}
+          onAuto={setAuto}
+          readLR={readLR}
+          volume={decks[active].volume}
+          onVolume={setBothVolumes}
+          onPlay={() => void playMain()}
+          onPause={() => pause(active)}
+          onStop={stopMain}
+          onFade={() => void skipMain("fade")}
+          onCut={() => void skipMain("cut")}
+          onRestart={restartMain}
+          onSeek={(sec) => engineRef.current?.seek(active, sec)}
+          onPlayNow={(item) => void playItemNow(item)}
+          onAddFiles={addFiles}
+          onAddItems={(items) => dispatch({ type: "add", items })}
+          onMove={(from, to) => dispatch({ type: "move", from, to })}
+          onRemove={(id) => dispatch({ type: "remove", id })}
+          onClear={() => dispatch({ type: "clear" })}
+        />
+
+        <ZaraWindow title="Explorador de Audio" tone="blue" className="zs-explorer-win">
+          <LibraryPanel onAdd={(items) => dispatch({ type: "add", items })} queue={queue} searchSeed={searchSeed} />
+        </ZaraWindow>
       </div>
-      <div className="studio-bottom">
-      <QueuePanel
-        queue={queue}
-        rejected={rejected}
-        onAir={decks[active].playing ? active : null}
-        auto={auto}
-        onAuto={setAuto}
-        onAddFiles={addFiles}
-        onAddItems={(items) => dispatch({ type: "add", items })}
-        onMove={(from, to) => dispatch({ type: "move", from, to })}
-        onRemove={(id) => dispatch({ type: "remove", id })}
-        onClear={() => dispatch({ type: "clear" })}
-        onLoad={(item, id) => void loadToDeck(item, id)}
-      />
-      <LibraryPanel onAdd={(items) => dispatch({ type: "add", items })} queue={queue} searchSeed={searchSeed} />
-        <section className="studio-tools panel" aria-label="Herramientas">
-          <div role="tablist" aria-label="Herramientas del estudio" className="studio-tabs">
-            {([
-              ["carts", "Cart Wall", cartsPlaying.size > 0],
-              ["voice", "Voz", micActive && !micMuted],
-              ["requests", `Pedidos${desk.feed.requests.length > 0 ? ` (${desk.feed.requests.length})` : ""}`, desk.feed.requests.length > 0],
-              ["chat", "Chat", false],
-              ["spotify", "Spotify", false],
-              ["relay", "Señal", relayState === "playing" || relayState === "connecting"],
-              ["camera", "Cámara", cabinLive],
-              ["eq", "Ecualizador", false],
-            ] as const).map(([k, label, hot]) => (
-              <button key={k} type="button" role="tab" id={`tool-tab-${k}`} aria-selected={tool === k} aria-controls={`tool-${k}`} className="studio-tab" data-hot={hot} onClick={() => setTool(k)}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <div id="tool-carts" role="tabpanel" aria-labelledby="tool-tab-carts" className="studio-tool-body" hidden={tool !== "carts"}>
+
+      <JingleBar carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
+      <StatusBar live={live} dj={creds.user} program={activeProgram?.name ?? null} queueCount={queue.length} active={active} />
+
+      {/* Ventana de herramientas: sus cuerpos siguen montados (solo se ocultan), así cambiar de herramienta no corta la cámara ni lo que suena. */}
+      <section className="zs-drawer" hidden={tool === null} aria-label={tool ? TOOL_TITLE[tool] : "Herramientas"}>
+        <header className="zs-win-bar" data-tone="blue">
+          <h2 className="zs-win-title">{tool ? TOOL_TITLE[tool] : ""}</h2>
+          <button type="button" className="zs-close" onClick={() => setTool(null)} aria-label="Cerrar la ventana de herramientas">
+            ✕
+          </button>
+        </header>
+        <div className="zs-drawer-body">
+          <div id="tool-carts" className="studio-tool-body" hidden={tool !== "carts"}>
             <CartWall carts={carts} state={cartState} playing={cartsPlaying} onFire={(c) => void fireCart(c)} onStopAll={stopCarts} readRemaining={readCartRemaining} />
           </div>
-          <div id="tool-voice" role="tabpanel" aria-labelledby="tool-tab-voice" className="studio-tool-body grid content-start gap-4" hidden={tool !== "voice"}>
+          <div id="tool-voice" className="studio-tool-body grid content-start gap-4" hidden={tool !== "voice"}>
             <MicPanel
               active={micActive}
               muted={micMuted}
@@ -997,7 +1109,7 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
               readDuckDb={readDuckDb}
             />
           </div>
-          <div id="tool-relay" role="tabpanel" aria-labelledby="tool-tab-relay" className="studio-tool-body" hidden={tool !== "relay"}>
+          <div id="tool-relay" className="studio-tool-body" hidden={tool !== "relay"}>
             <RelayPanel
               name={relay.name}
               configured={relay.configured}
@@ -1013,21 +1125,18 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
               }}
             />
           </div>
-          <div id="tool-requests" role="tabpanel" aria-labelledby="tool-tab-requests" className="studio-tool-body" hidden={tool !== "requests"}>
-            <RequestsPanel feed={desk.feed} refresh={desk.refresh} onSearch={(text) => setSearchSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 }))} onSpotify={(text) => { setSpSeed((cur) => ({ text, n: (cur?.n ?? 0) + 1 })); setTool("spotify"); }} />
-          </div>
           {/* Siempre montado (solo se oculta): cambiar de pestaña no corta el video que se está escuchando. */}
-          <div id="tool-spotify" role="tabpanel" aria-labelledby="tool-tab-spotify" className="studio-tool-body" hidden={tool !== "spotify"}>
+          <div id="tool-spotify" className="studio-tool-body" hidden={tool !== "spotify"}>
             <SpotifyPanel seed={spSeed} program={activeProgram} onAir={{ on: extOn, share: shareExternal, stop: stopExternal, volume: extVol, setVolume: changeExtVolume }} follow={spFollow} onFollow={setSpFollow} />
           </div>
-          <div id="tool-chat" role="tabpanel" aria-labelledby="tool-tab-chat" className="studio-tool-body" hidden={tool !== "chat"}>
+          <div id="tool-chat" className="studio-tool-body" hidden={tool !== "chat"}>
             <ChatModPanel feed={desk.feed} refresh={desk.refresh} dropMessage={desk.dropMessage} />
           </div>
           {/* Siempre montada (solo se oculta): cambiar de pestaña no corta la cámara ni el directo de YouTube. */}
-          <div id="tool-camera" role="tabpanel" aria-labelledby="tool-tab-camera" className="studio-tool-body" hidden={tool !== "camera"}>
+          <div id="tool-camera" className="studio-tool-body" hidden={tool !== "camera"}>
             <CabinCamera compact onActive={setCabinLive} />
           </div>
-          <div id="tool-eq" role="tabpanel" aria-labelledby="tool-tab-eq" className="studio-tool-body" hidden={tool !== "eq"}>
+          <div id="tool-eq" className="studio-tool-body" hidden={tool !== "eq"}>
             <EqPanel
               music={eqMusic}
               mic={eqMic}
@@ -1041,8 +1150,8 @@ function StudioConsoleInner({ entry, relay, visible, locked }: { entry: DjEntry;
               }}
             />
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -18,9 +18,14 @@ type Deck = {
   fade: GainNode; // crossfade
   analyser: AnalyserNode;
   buf: Float32Array<ArrayBuffer>;
+  /** Medidores L/R del deck: una toma lateral después del fundido. No están en la ruta del audio al aire. */
+  left: AnalyserNode;
+  right: AnalyserNode;
+  bufL: Float32Array<ArrayBuffer>;
+  bufR: Float32Array<ArrayBuffer>;
 };
 
-export type Levels = { master: { rmsDb: number; peakDb: number }; A: number; B: number };
+export type Levels = { master: { rmsDb: number; peakDb: number }; A: number; B: number; /** Pico por canal [izquierdo, derecho] en dB. */ stereo: { A: [number, number]; B: [number, number] } };
 
 const CURVE_POINTS = 64;
 const CONTROL_MS = 30;
@@ -148,6 +153,15 @@ export class AudioEngine {
     volume.connect(fade);
     fade.connect(analyser);
     analyser.connect(this.musicBus);
+    // Medidores L/R: se derivan del mismo punto, sin tocar la señal que sale al aire.
+    const split = this.ctx.createChannelSplitter(2);
+    const left = this.ctx.createAnalyser();
+    const right = this.ctx.createAnalyser();
+    left.fftSize = 1024;
+    right.fftSize = 1024;
+    fade.connect(split);
+    split.connect(left, 0);
+    split.connect(right, 1);
     return {
       el: null,
       source: null,
@@ -157,6 +171,10 @@ export class AudioEngine {
       fade,
       analyser,
       buf: new Float32Array(analyser.fftSize),
+      left,
+      right,
+      bufL: new Float32Array(left.fftSize),
+      bufR: new Float32Array(right.fftSize),
     };
   }
 
@@ -625,10 +643,16 @@ export class AudioEngine {
     const b = this.decks.B;
     a.analyser.getFloatTimeDomainData(a.buf);
     b.analyser.getFloatTimeDomainData(b.buf);
+    const lr = (d: Deck): [number, number] => {
+      d.left.getFloatTimeDomainData(d.bufL);
+      d.right.getFloatTimeDomainData(d.bufR);
+      return [peakToDb(d.bufL), peakToDb(d.bufR)];
+    };
     return {
       master: { rmsDb: rmsToDb(this.masterBuf), peakDb: peakToDb(this.masterBuf) },
       A: peakToDb(a.buf),
       B: peakToDb(b.buf),
+      stereo: { A: lr(a), B: lr(b) },
     };
   }
 

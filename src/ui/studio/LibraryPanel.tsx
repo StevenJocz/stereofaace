@@ -60,27 +60,23 @@ function FileRow({
 }) {
   return (
     <li
-      className="studio-row"
+      className="zs-row zs-frow"
+      data-state="file"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_TYPE, JSON.stringify([file]));
         e.dataTransfer.effectAllowed = "copy";
       }}
       onDoubleClick={() => onAdd([file])}
+      title="Doble clic o arrastra a la lista para añadirla"
     >
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-bold">{file.title}</span>
-        <span className="mono muted block truncate">
-          {file.artist || "—"} ·{" "}
-          {file.durationSec ? formatTime(file.durationSec) : "--:--"}
-        </span>
+      <span className="zs-ico" aria-hidden="true">
+        ♪
       </span>
-      <button
-        type="button"
-        className="btn !px-3 !py-1"
-        onClick={() => onAdd([file])}
-        aria-label={`Añadir ${file.title} a la cola`}
-      >
+      <span className="zs-fcol zs-ftitle">{file.title}</span>
+      <span className="zs-fcol zs-fartist">{file.artist || "—"}</span>
+      <span className="zs-row-dur">{file.durationSec ? formatTime(file.durationSec) : "--:--"}</span>
+      <button type="button" className="zs-row-add" onClick={() => onAdd([file])} aria-label={`Añadir ${file.title} a la lista`}>
         +
       </button>
     </li>
@@ -149,22 +145,16 @@ export function LibraryPanel({
   const showLists = !q && tab === "playlists" && listId === null;
 
   return (
-    <section
-      className="studio-library panel"
-      aria-label="Biblioteca de AzuraCast"
-    >
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="display-up text-[1.4rem]">Biblioteca</h2>
-        <div role="tablist" aria-label="Origen" className="flex flex-wrap gap-1.5">
+    <div className="zs-explorer" aria-label="Biblioteca de AzuraCast">
+      <header className="zs-explorer-head">
+        <div role="tablist" aria-label="Origen" className="zs-tabs">
           {(["folders", "playlists", "saved", "history"] as const).map((t) => (
             <button
               key={t}
               role="tab"
               type="button"
               aria-selected={tab === t}
-              className={
-                tab === t ? "btn btn-accent !px-3 !py-1" : "btn !px-3 !py-1"
-              }
+              className="zs-tab"
               onClick={() => {
                 setTab(t);
                 setListId(null);
@@ -189,7 +179,7 @@ export function LibraryPanel({
         <>
           <input
             type="search"
-            className="input mt-3 w-full"
+            className="zs-search"
             placeholder="Buscar por título o artista"
             aria-label="Buscar en la biblioteca"
             value={qInput}
@@ -199,7 +189,7 @@ export function LibraryPanel({
           {!q && tab === "folders" && (
             <nav
               aria-label="Ruta"
-              className="mono muted mt-3 flex flex-wrap gap-1"
+              className="zs-crumbs"
             >
               <button
                 type="button"
@@ -225,16 +215,16 @@ export function LibraryPanel({
           {!q && tab === "playlists" && listId !== null && (
             <button
               type="button"
-              className="mono muted mt-3 hover:text-accent"
+              className="zs-crumbs"
               onClick={() => setListId(null)}
             >
               ← Todas las listas
             </button>
           )}
 
-          {loading && <p className="mono muted mt-4">Cargando…</p>}
+          {loading && <p className="zs-empty">Cargando…</p>}
           {!loading && status === 409 && (
-            <p role="alert" className="mt-4">
+            <p role="alert" className="zs-empty">
               {error}{" "}
               <Link
                 href="/admin/radio/studio/ajustes"
@@ -245,7 +235,7 @@ export function LibraryPanel({
             </p>
           )}
           {!loading && status !== 200 && status !== 409 && (
-            <p role="alert" className="mono mt-4 text-[var(--violet)]">
+            <p role="alert" className="zs-empty">
               {error ?? "No se pudo cargar la biblioteca."}
             </p>
           )}
@@ -253,45 +243,36 @@ export function LibraryPanel({
           {!loading && status === 200 && (
             <>
               {files.length > 0 && (
-                <button
-                  type="button"
-                  className="btn mt-3 !px-3 !py-1"
-                  onClick={() => add(files)}
-                >
-                  Añadir todo ({files.length})
-                </button>
+                <div className="zs-listhead zs-fhead" aria-hidden="true">
+                  <span>Título</span>
+                  <span>Intérprete</span>
+                  <span>Duración</span>
+                </div>
               )}
-              <ul className="studio-scroll mt-3">
+              <ul className="zs-list zs-flist">
                 {showLists &&
                   lists.map((l) => (
-                    <li key={l.id} className="studio-row">
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 text-left"
-                        onClick={() => setListId(l.id)}
-                      >
-                        <span className="block truncate font-bold">
-                          {l.name}
-                        </span>
-                        <span className="mono muted">
-                          {l.trackCount} pistas
-                        </span>
+                    <li key={l.id} className="zs-row" data-state="folder">
+                      <button type="button" className="zs-folder" onClick={() => setListId(l.id)}>
+                        <span aria-hidden="true">▤</span>
+                        <span className="zs-row-text">{l.name}</span>
+                        <span className="zs-row-dur">{l.trackCount} pistas</span>
                       </button>
                     </li>
                   ))}
                 {folders.map((f) => (
-                  <li key={f.path} className="studio-row">
+                  <li key={f.path} className="zs-row" data-state="folder">
                     <button
                       type="button"
-                      className="min-w-0 flex-1 text-left"
+                      className="zs-folder"
                       onClick={() => {
                         setQInput("");
                         setTab("folders");
                         setPath(f.path);
                       }}
                     >
-                      <span aria-hidden="true">▸ </span>
-                      <span className="font-bold">{f.name}</span>
+                      <span aria-hidden="true">▸</span>
+                      <span className="zs-row-text">{f.name}</span>
                     </button>
                   </li>
                 ))}
@@ -300,12 +281,20 @@ export function LibraryPanel({
                 ))}
               </ul>
               {!showLists && folders.length === 0 && files.length === 0 && (
-                <p className="studio-empty">No hay pistas aquí.</p>
+                <p className="zs-empty">No hay pistas aquí.</p>
               )}
+              <p className="zs-foot">
+                {files.length} {files.length === 1 ? "audio" : "audios"}
+                {files.length > 0 && (
+                  <button type="button" className="zs-linkbtn" onClick={() => add(files)}>
+                    Añadir todo
+                  </button>
+                )}
+              </p>
             </>
           )}
         </>
       )}
-    </section>
+    </div>
   );
 }

@@ -65,7 +65,7 @@ function Switches({ config, onChange }: { config: ChatConfig | null; onChange: (
   );
 }
 
-export function RequestsPanel({ feed, refresh, onSearch, onSpotify }: { feed: DeskFeed; refresh: () => void; onSearch: (text: string) => void; onSpotify?: (text: string) => void }) {
+export function RequestsPanel({ feed, refresh, onSearch, onSpotify, bare = false }: { feed: DeskFeed; refresh: () => void; onSearch: (text: string) => void; onSpotify?: (text: string) => void; /** Sin marco ni título propios (va dentro de otra ventana). */ bare?: boolean }) {
   const setStatus = async (id: string, status: "played" | "rejected") => {
     await act({ action: "request", id, status });
     refresh();
@@ -75,8 +75,8 @@ export function RequestsPanel({ feed, refresh, onSearch, onSpotify }: { feed: De
     refresh();
   };
   return (
-    <section className="studio-voice panel" aria-label="Pedidos de canciones">
-      <h2 className="display-up text-[1.15rem]">Pedidos de la audiencia</h2>
+    <section className={bare ? "zs-requests" : "studio-voice panel"} aria-label="Pedidos de canciones">
+      {!bare && <h2 className="display-up text-[1.15rem]">Pedidos de la audiencia</h2>}
       <div className="mt-2">
         <Switches config={feed.config} onChange={(c) => void setConfig(c)} />
       </div>
