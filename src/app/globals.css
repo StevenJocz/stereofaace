@@ -6369,7 +6369,10 @@ body[data-radio="on"] .adm-shell {
 .zs-block[data-ev="off"] .zs-row-head .zs-row-dur {
   color: var(--muted);
 }
-.zs-block[data-selected] .zs-row-head {
+.zs-block[data-ev] {
+  cursor: pointer;
+}
+.zs-block[data-selected] {
   outline: 2px solid var(--zs-blue-a);
   outline-offset: -2px;
 }

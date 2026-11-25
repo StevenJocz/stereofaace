@@ -318,14 +318,17 @@ export function EventsPanel({
                 const isNext = o.key === nextKey;
                 const st = !ev.active ? "off" : isFired ? "done" : missed ? "missed" : isNext ? "next" : "later";
                 return (
-                  <li key={o.key} className="zs-block" data-ev={st} data-next={isNext || undefined} data-selected={selected === ev.id || undefined}>
-                    <div
-                      className="zs-row zs-row-head"
-                      onClick={() => setSelected(ev.id)}
-                      onDoubleClick={() => ev.canEdit && setEditing(ev)}
-                      aria-current={isNext ? "true" : undefined}
-                      title={ev.canEdit ? "Doble clic para editar" : "Lo creó otra persona"}
-                    >
+                  <li
+                    key={o.key}
+                    className="zs-block"
+                    data-ev={st}
+                    data-next={isNext || undefined}
+                    data-selected={selected === ev.id || undefined}
+                    onClick={() => setSelected(ev.id)}
+                    onDoubleClick={() => ev.canEdit && setEditing(ev)}
+                    title={ev.canEdit ? "Clic: seleccionar · doble clic: editar" : "Lo creó otra persona: solo puede cambiarlo su autor o quien gestiona la emisora"}
+                  >
+                    <div className="zs-row zs-row-head" aria-current={isNext ? "true" : undefined}>
                       <span className="zs-ico">{clockIcon}</span>
                       <span className="zs-row-text">
                         {formatClock(o.atMs)} – {ev.name}
